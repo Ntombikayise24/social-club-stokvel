@@ -114,7 +114,7 @@ export default function MainDashboard() {
               </div>
             </div>
 
-            {/* Loan Card */}
+            {/* Loan Card - WITH WORKING REQUEST LOAN BUTTON */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center space-x-2">
@@ -158,10 +158,13 @@ export default function MainDashboard() {
                 </div>
               </div>
 
-              <button className="w-full bg-secondary-500 text-white py-3 rounded-lg hover:bg-secondary-600 transition-colors font-medium flex items-center justify-center space-x-2">
-                <PlusCircle className="w-5 h-5" />
-                <span>+ Borrow (30%)</span>
-              </button>
+              {/* REQUEST LOAN BUTTON - FIXED WITH LINK */}
+              <Link to="/loans/request">
+                <button className="w-full bg-secondary-500 text-white py-3 rounded-lg hover:bg-secondary-600 transition-colors font-medium flex items-center justify-center space-x-2">
+                  <PlusCircle className="w-5 h-5" />
+                  <span>+ Borrow (30%)</span>
+                </button>
+              </Link>
 
               <Link to="/loans" className="block text-center text-sm text-primary-600 hover:text-primary-700 mt-3">
                 Tap to view loan history
