@@ -441,7 +441,6 @@ function AddStokvelModal({ onClose, onAdd }: AddStokvelModalProps) {
           <div className="space-y-4">
             <h3 className="text-sm font-medium text-gray-700 uppercase tracking-wider">Stokvel Details</h3>
             
-            {/* Name and Icon */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -481,7 +480,6 @@ function AddStokvelModal({ onClose, onAdd }: AddStokvelModalProps) {
               </div>
             </div>
 
-            {/* Description */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Description
@@ -495,7 +493,6 @@ function AddStokvelModal({ onClose, onAdd }: AddStokvelModalProps) {
               />
             </div>
 
-            {/* Type and Status */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -687,6 +684,801 @@ function AddStokvelModal({ onClose, onAdd }: AddStokvelModalProps) {
   );
 }
 
+// Edit User Modal Component
+interface EditUserModalProps {
+  user: User;
+  onClose: () => void;
+  onSave: (updatedUser: User) => void;
+  stokvels: Stokvel[];
+}
+
+function EditUserModal({ user, onClose, onSave, stokvels }: EditUserModalProps) {
+  const [formData, setFormData] = useState({
+    name: user.name,
+    email: user.email,
+    phone: user.phone,
+    status: user.status,
+    selectedStokvels: user.profiles.map(p => p.stokvelId)
+  });
+
+  const [errors, setErrors] = useState({
+    name: '',
+    email: '',
+    phone: ''
+  });
+
+  const validateForm = () => {
+    const newErrors = {
+      name: '',
+      email: '',
+      phone: ''
+    };
+    let isValid = true;
+
+    if (!formData.name.trim()) {
+      newErrors.name = 'Name is required';
+      isValid = false;
+    }
+
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email is required';
+      isValid = false;
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = 'Email is invalid';
+      isValid = false;
+    }
+
+    if (!formData.phone.trim()) {
+      newErrors.phone = 'Phone is required';
+      isValid = false;
+    } else if (!/^[0-9\s\+\-\(\)]{10,}$/.test(formData.phone)) {
+      newErrors.phone = 'Phone number is invalid';
+      isValid = false;
+    }
+
+    setErrors(newErrors);
+    return isValid;
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!validateForm()) return;
+
+    const updatedUser: User = {
+      ...user,
+      name: formData.name,
+      email: formData.email,
+      phone: formData.phone,
+      status: formData.status,
+      profiles: formData.selectedStokvels.map(stokvelId => {
+        const stokvel = stokvels.find(s => s.id === stokvelId);
+        const existingProfile = user.profiles.find(p => p.stokvelId === stokvelId);
+        
+        if (existingProfile) {
+          return existingProfile;
+        }
+        
+        return {
+          id: `p${Date.now()}-${stokvelId}`,
+          stokvelId,
+          stokvelName: stokvel?.name || '',
+          role: 'member',
+          targetAmount: stokvel?.targetAmount || 0,
+          savedAmount: 0,
+          joinedDate: new Date().toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })
+        };
+      })
+    };
+
+    onSave(updatedUser);
+  };
+
+  const toggleStokvel = (stokvelId: number) => {
+    setFormData(prev => ({
+      ...prev,
+      selectedStokvels: prev.selectedStokvels.includes(stokvelId)
+        ? prev.selectedStokvels.filter(id => id !== stokvelId)
+        : [...prev.selectedStokvels, stokvelId]
+    }));
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-gray-800">Edit User</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {/* Basic Information */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-medium text-gray-700 uppercase tracking-wider">Basic Information</h3>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Full Name *
+              </label>
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData({...formData, name: e.target.value})}
+                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 ${
+                  errors.name ? 'border-red-500' : 'border-gray-300'
+                }`}
+                placeholder="John Doe"
+              />
+              {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name}</p>}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Email Address *
+              </label>
+              <input
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({...formData, email: e.target.value})}
+                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 ${
+                  errors.email ? 'border-red-500' : 'border-gray-300'
+                }`}
+                placeholder="john@example.com"
+              />
+              {errors.email && <p className="mt-1 text-xs text-red-600">{errors.email}</p>}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Phone Number *
+              </label>
+              <input
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 ${
+                  errors.phone ? 'border-red-500' : 'border-gray-300'
+                }`}
+                placeholder="082 123 4567"
+              />
+              {errors.phone && <p className="mt-1 text-xs text-red-600">{errors.phone}</p>}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Status
+              </label>
+              <select
+                value={formData.status}
+                onChange={(e) => setFormData({...formData, status: e.target.value as 'active' | 'inactive' | 'pending'})}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              >
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="pending">Pending</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Stokvel Assignment */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-medium text-gray-700 uppercase tracking-wider">Stokvel Membership</h3>
+            <p className="text-xs text-gray-500">Select which stokvels this user belongs to</p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {stokvels.filter(s => s.status === 'active').map(stokvel => (
+                <label
+                  key={stokvel.id}
+                  className={`flex items-center p-4 border rounded-lg cursor-pointer transition-colors ${
+                    formData.selectedStokvels.includes(stokvel.id)
+                      ? `border-${stokvel.color}-500 bg-${stokvel.color}-50`
+                      : 'border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={formData.selectedStokvels.includes(stokvel.id)}
+                    onChange={() => toggleStokvel(stokvel.id)}
+                    className="hidden"
+                  />
+                  <div className="flex items-center space-x-3 flex-1">
+                    <span className="text-2xl">{stokvel.icon}</span>
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-800">{stokvel.name}</p>
+                      <p className="text-xs text-gray-500">
+                        Target: R {stokvel.targetAmount.toLocaleString()}
+                      </p>
+                    </div>
+                    {formData.selectedStokvels.includes(stokvel.id) && (
+                      <CheckCircle className={`w-5 h-5 text-${stokvel.color}-600`} />
+                    )}
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center space-x-2"
+            >
+              <Edit2 className="w-4 h-4" />
+              <span>Save Changes</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// Edit Stokvel Modal Component
+interface EditStokvelModalProps {
+  stokvel: Stokvel;
+  onClose: () => void;
+  onSave: (updatedStokvel: Stokvel) => void;
+}
+
+function EditStokvelModal({ stokvel, onClose, onSave }: EditStokvelModalProps) {
+  const [formData, setFormData] = useState({
+    name: stokvel.name,
+    description: stokvel.description,
+    targetAmount: stokvel.targetAmount.toString(),
+    maxMembers: stokvel.maxMembers.toString(),
+    cycle: stokvel.cycle,
+    meetingDay: stokvel.meetingDay || '',
+    status: stokvel.status,
+    icon: stokvel.icon,
+    color: stokvel.color
+  });
+
+  const [errors, setErrors] = useState({
+    name: '',
+    targetAmount: '',
+    maxMembers: ''
+  });
+
+  const iconOptions = [
+    { value: '💰', label: 'Money Bag' },
+    { value: '🌱', label: 'Seedling' },
+    { value: '❄️', label: 'Snowflake' },
+    { value: '🏖️', label: 'Beach' },
+    { value: '🎄', label: 'Christmas' },
+    { value: '🏦', label: 'Bank' },
+    { value: '📈', label: 'Growth' },
+    { value: '💎', label: 'Diamond' }
+  ];
+
+  const colors = [
+    { value: 'primary', label: 'Green' },
+    { value: 'secondary', label: 'Orange' },
+    { value: 'blue', label: 'Blue' },
+    { value: 'purple', label: 'Purple' },
+    { value: 'pink', label: 'Pink' }
+  ];
+
+  const cycleDays = {
+    weekly: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+    monthly: ['1st', '5th', '10th', '15th', '20th', '25th', 'Last day'],
+    quarterly: ['Jan', 'Apr', 'Jul', 'Oct']
+  };
+
+  const validateForm = () => {
+    const newErrors = {
+      name: '',
+      targetAmount: '',
+      maxMembers: ''
+    };
+    let isValid = true;
+
+    if (!formData.name.trim()) {
+      newErrors.name = 'Stokvel name is required';
+      isValid = false;
+    }
+
+    if (!formData.targetAmount) {
+      newErrors.targetAmount = 'Target amount is required';
+      isValid = false;
+    } else if (parseInt(formData.targetAmount) < 1000) {
+      newErrors.targetAmount = 'Minimum target is R 1,000';
+      isValid = false;
+    }
+
+    if (!formData.maxMembers) {
+      newErrors.maxMembers = 'Maximum members is required';
+      isValid = false;
+    } else if (parseInt(formData.maxMembers) < 5) {
+      newErrors.maxMembers = 'Minimum 5 members required';
+      isValid = false;
+    }
+
+    setErrors(newErrors);
+    return isValid;
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!validateForm()) return;
+
+    const updatedStokvel: Stokvel = {
+      ...stokvel,
+      name: formData.name.toUpperCase(),
+      description: formData.description,
+      targetAmount: parseInt(formData.targetAmount),
+      maxMembers: parseInt(formData.maxMembers),
+      cycle: formData.cycle as 'weekly' | 'monthly' | 'quarterly',
+      meetingDay: formData.meetingDay || undefined,
+      status: formData.status as 'active' | 'inactive' | 'upcoming',
+      icon: formData.icon,
+      color: formData.color
+    };
+
+    onSave(updatedStokvel);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-gray-800">Edit Stokvel</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {/* Basic Information */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-medium text-gray-700 uppercase tracking-wider">Stokvel Details</h3>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Stokvel Name *
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 ${
+                    errors.name ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                />
+                {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name}</p>}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Icon
+                </label>
+                <select
+                  value={formData.icon}
+                  onChange={(e) => setFormData({...formData, icon: e.target.value})}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  {iconOptions.map(icon => (
+                    <option key={icon.value} value={icon.value}>
+                      {icon.value} {icon.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Description
+              </label>
+              <textarea
+                value={formData.description}
+                onChange={(e) => setFormData({...formData, description: e.target.value})}
+                rows={2}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+          </div>
+
+          {/* Financial Settings */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-medium text-gray-700 uppercase tracking-wider">Financial Settings</h3>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Target Amount (R) *
+                </label>
+                <input
+                  type="number"
+                  value={formData.targetAmount}
+                  onChange={(e) => setFormData({...formData, targetAmount: e.target.value})}
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 ${
+                    errors.targetAmount ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                  min="1000"
+                  step="100"
+                />
+                {errors.targetAmount && <p className="mt-1 text-xs text-red-600">{errors.targetAmount}</p>}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Max Members *
+                </label>
+                <input
+                  type="number"
+                  value={formData.maxMembers}
+                  onChange={(e) => setFormData({...formData, maxMembers: e.target.value})}
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 ${
+                    errors.maxMembers ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                  min="5"
+                  max="50"
+                />
+                {errors.maxMembers && <p className="mt-1 text-xs text-red-600">{errors.maxMembers}</p>}
+              </div>
+            </div>
+          </div>
+
+          {/* Cycle Settings */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-medium text-gray-700 uppercase tracking-wider">Cycle Settings</h3>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Contribution Cycle
+                </label>
+                <select
+                  value={formData.cycle}
+                  onChange={(e) => {
+                    setFormData({...formData, cycle: e.target.value as 'weekly' | 'monthly' | 'quarterly', meetingDay: ''});
+                  }}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                  <option value="quarterly">Quarterly</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Meeting Day
+                </label>
+                <select
+                  value={formData.meetingDay}
+                  onChange={(e) => setFormData({...formData, meetingDay: e.target.value})}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="">Select day</option>
+                  {cycleDays[formData.cycle as keyof typeof cycleDays].map(day => (
+                    <option key={day} value={day}>{day}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Status
+                </label>
+                <select
+                  value={formData.status}
+                  onChange={(e) => setFormData({...formData, status: e.target.value as 'active' | 'inactive' | 'upcoming'})}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                  <option value="upcoming">Upcoming</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Color Theme
+                </label>
+                <select
+                  value={formData.color}
+                  onChange={(e) => setFormData({...formData, color: e.target.value})}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  {colors.map(color => (
+                    <option key={color.value} value={color.value}>{color.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center space-x-2"
+            >
+              <Edit2 className="w-4 h-4" />
+              <span>Save Changes</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// Approve User Modal Component
+interface ApproveUserModalProps {
+  user: User;
+  onClose: () => void;
+  onApprove: (userId: number, selectedStokvels: number[]) => void;
+  stokvels: Stokvel[];
+}
+
+function ApproveUserModal({ user, onClose, onApprove, stokvels }: ApproveUserModalProps) {
+  const [selectedStokvels, setSelectedStokvels] = useState<number[]>([]);
+
+  const toggleStokvel = (stokvelId: number) => {
+    setSelectedStokvels(prev =>
+      prev.includes(stokvelId)
+        ? prev.filter(id => id !== stokvelId)
+        : [...prev, stokvelId]
+    );
+  };
+
+  const handleApprove = () => {
+    onApprove(user.id, selectedStokvels);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-gray-800">Approve User</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-6">
+          {/* User Information */}
+          <div className="bg-gray-50 rounded-lg p-4">
+            <h3 className="font-medium text-gray-700 mb-3">User Details</h3>
+            <div className="space-y-2">
+              <p><span className="text-sm text-gray-500">Name:</span> <span className="font-medium">{user.name}</span></p>
+              <p><span className="text-sm text-gray-500">Email:</span> <span className="font-medium">{user.email}</span></p>
+              <p><span className="text-sm text-gray-500">Phone:</span> <span className="font-medium">{user.phone}</span></p>
+              <p><span className="text-sm text-gray-500">Registered:</span> <span className="font-medium">{user.joinedDate}</span></p>
+            </div>
+          </div>
+
+          {/* Stokvel Assignment */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-medium text-gray-700 uppercase tracking-wider">Assign to Stokvels</h3>
+            <p className="text-xs text-gray-500">Select which stokvels this user should join</p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {stokvels.filter(s => s.status === 'active').map(stokvel => (
+                <label
+                  key={stokvel.id}
+                  className={`flex items-center p-4 border rounded-lg cursor-pointer transition-colors ${
+                    selectedStokvels.includes(stokvel.id)
+                      ? `border-${stokvel.color}-500 bg-${stokvel.color}-50`
+                      : 'border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedStokvels.includes(stokvel.id)}
+                    onChange={() => toggleStokvel(stokvel.id)}
+                    className="hidden"
+                  />
+                  <div className="flex items-center space-x-3 flex-1">
+                    <span className="text-2xl">{stokvel.icon}</span>
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-800">{stokvel.name}</p>
+                      <p className="text-xs text-gray-500">
+                        Target: R {stokvel.targetAmount.toLocaleString()} • {stokvel.currentMembers}/{stokvel.maxMembers} members
+                      </p>
+                    </div>
+                    {selectedStokvels.includes(stokvel.id) && (
+                      <CheckCircle className={`w-5 h-5 text-${stokvel.color}-600`} />
+                    )}
+                  </div>
+                </label>
+              ))}
+            </div>
+            
+            {selectedStokvels.length === 0 && (
+              <p className="text-xs text-yellow-600 flex items-center">
+                <AlertCircle className="w-3 h-3 mr-1" />
+                User will have no stokvel access until assigned
+              </p>
+            )}
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleApprove}
+              disabled={selectedStokvels.length === 0}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <CheckCircle className="w-4 h-4" />
+              <span>Approve User</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Confirm Contribution Modal Component
+interface ConfirmContributionModalProps {
+  contribution: Contribution;
+  onClose: () => void;
+  onConfirm: (contributionId: number) => void;
+}
+
+function ConfirmContributionModal({ contribution, onClose, onConfirm }: ConfirmContributionModalProps) {
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const handleConfirm = () => {
+    setIsProcessing(true);
+    // Simulate processing
+    setTimeout(() => {
+      onConfirm(contribution.id);
+      setIsProcessing(false);
+    }, 1000);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-gray-800">Confirm Contribution</h2>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                <CheckCircle className="w-6 h-6 text-green-600" />
+              </div>
+              <div>
+                <p className="font-medium text-gray-800">{contribution.userName}</p>
+                <p className="text-sm text-gray-500">{contribution.stokvelName}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3 mb-6">
+            <div className="flex justify-between items-center py-2 border-b border-gray-100">
+              <span className="text-gray-600">Amount:</span>
+              <span className="font-bold text-lg text-primary-600">
+                R {contribution.amount.toLocaleString()}
+              </span>
+            </div>
+            <div className="flex justify-between items-center py-2 border-b border-gray-100">
+              <span className="text-gray-600">Date:</span>
+              <span className="font-medium">{contribution.date}</span>
+            </div>
+            <div className="flex justify-between items-center py-2 border-b border-gray-100">
+              <span className="text-gray-600">Payment Method:</span>
+              <span className="font-medium capitalize">{contribution.paymentMethod}</span>
+            </div>
+            <div className="flex justify-between items-center py-2">
+              <span className="text-gray-600">Reference:</span>
+              <span className="font-medium">{contribution.reference || 'N/A'}</span>
+            </div>
+          </div>
+
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-6">
+            <p className="text-xs text-yellow-700 flex items-center">
+              <AlertCircle className="w-3 h-3 mr-1" />
+              Confirming this payment will update the member's contribution history and group total.
+            </p>
+          </div>
+
+          <div className="flex space-x-3">
+            <button
+              onClick={onClose}
+              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              disabled={isProcessing}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleConfirm}
+              disabled={isProcessing}
+              className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isProcessing ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Processing...</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="w-4 h-4" />
+                  <span>Confirm Payment</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Delete Confirmation Modal
+interface DeleteConfirmModalProps {
+  title: string;
+  message: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+function DeleteConfirmModal({ title, message, onConfirm, onCancel }: DeleteConfirmModalProps) {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+        <div className="text-center mb-6">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="w-8 h-8 text-red-600" />
+          </div>
+          <h3 className="text-xl font-semibold text-gray-800 mb-2">{title}</h3>
+          <p className="text-gray-500">{message}</p>
+        </div>
+        <div className="flex space-x-3">
+          <button
+            onClick={onCancel}
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition-colors"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
   const [searchTerm, setSearchTerm] = useState('');
@@ -694,6 +1486,12 @@ export default function AdminDashboard() {
   const [expandedUser, setExpandedUser] = useState<number | null>(null);
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [showAddStokvelModal, setShowAddStokvelModal] = useState(false);
+  const [showEditUserModal, setShowEditUserModal] = useState<User | null>(null);
+  const [showDeleteUserConfirm, setShowDeleteUserConfirm] = useState<number | null>(null);
+  const [showEditStokvelModal, setShowEditStokvelModal] = useState<Stokvel | null>(null);
+  const [showDeleteStokvelConfirm, setShowDeleteStokvelConfirm] = useState<number | null>(null);
+  const [showApproveUserModal, setShowApproveUserModal] = useState<User | null>(null);
+  const [showConfirmContributionModal, setShowConfirmContributionModal] = useState<Contribution | null>(null);
   const [showSuccessMessage, setShowSuccessMessage] = useState('');
 
   // Mock Stokvels Data
@@ -868,7 +1666,7 @@ export default function AdminDashboard() {
   ]);
 
   // Mock Contributions Data
-  const [contributions] = useState<Contribution[]>([
+  const [contributions, setContributions] = useState<Contribution[]>([
     {
       id: 1,
       userId: 1,
@@ -983,10 +1781,6 @@ export default function AdminDashboard() {
   const pendingUsers = users.filter(u => u.status === 'pending');
   const pendingContributions = contributions.filter(c => c.status === 'pending');
 
-  const handleConfirmContribution = (contributionId: number) => {
-    alert(`Contribution ${contributionId} confirmed! (Demo)`);
-  };
-
   const handleAddUser = (newUser: any) => {
     setUsers([...users, newUser]);
     setShowAddUserModal(false);
@@ -998,6 +1792,85 @@ export default function AdminDashboard() {
     setStokvels([...stokvels, newStokvel]);
     setShowAddStokvelModal(false);
     setShowSuccessMessage(`Stokvel ${newStokvel.name} created successfully!`);
+    setTimeout(() => setShowSuccessMessage(''), 3000);
+  };
+
+  const handleEditUser = (updatedUser: User) => {
+    setUsers(users.map(u => u.id === updatedUser.id ? updatedUser : u));
+    setShowEditUserModal(null);
+    setShowSuccessMessage(`User ${updatedUser.name} updated successfully!`);
+    setTimeout(() => setShowSuccessMessage(''), 3000);
+  };
+
+  const handleDeleteUser = (userId: number) => {
+    const user = users.find(u => u.id === userId);
+    setUsers(users.filter(u => u.id !== userId));
+    setShowDeleteUserConfirm(null);
+    setShowSuccessMessage(`User ${user?.name} deleted successfully!`);
+    setTimeout(() => setShowSuccessMessage(''), 3000);
+  };
+
+  const handleEditStokvel = (updatedStokvel: Stokvel) => {
+    setStokvels(stokvels.map(s => s.id === updatedStokvel.id ? updatedStokvel : s));
+    setShowEditStokvelModal(null);
+    setShowSuccessMessage(`Stokvel ${updatedStokvel.name} updated successfully!`);
+    setTimeout(() => setShowSuccessMessage(''), 3000);
+  };
+
+  const handleDeleteStokvel = (stokvelId: number) => {
+    const stokvel = stokvels.find(s => s.id === stokvelId);
+    setStokvels(stokvels.filter(s => s.id !== stokvelId));
+    setShowDeleteStokvelConfirm(null);
+    setShowSuccessMessage(`Stokvel ${stokvel?.name} deleted successfully!`);
+    setTimeout(() => setShowSuccessMessage(''), 3000);
+  };
+
+  const handleApproveUser = (userId: number, selectedStokvels: number[]) => {
+    setUsers(users.map(u => 
+      u.id === userId 
+        ? { 
+            ...u, 
+            status: 'active', 
+            lastActive: 'Just now',
+            profiles: selectedStokvels.map(stokvelId => {
+              const stokvel = stokvels.find(s => s.id === stokvelId);
+              return {
+                id: `p${Date.now()}-${stokvelId}`,
+                stokvelId,
+                stokvelName: stokvel?.name || '',
+                role: 'member',
+                targetAmount: stokvel?.targetAmount || 0,
+                savedAmount: 0,
+                joinedDate: u.joinedDate
+              };
+            })
+          }
+        : u
+    ));
+    setShowApproveUserModal(null);
+    setShowSuccessMessage(`User approved successfully!`);
+    setTimeout(() => setShowSuccessMessage(''), 3000);
+  };
+
+  const handleConfirmContribution = (contributionId: number) => {
+    setContributions(contributions.map(c =>
+      c.id === contributionId
+        ? {
+            ...c,
+            status: 'confirmed',
+            confirmedBy: 'Admin',
+            confirmedAt: new Date().toLocaleString('en-ZA', {
+              day: 'numeric',
+              month: 'short',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            })
+          }
+        : c
+    ));
+    setShowConfirmContributionModal(null);
+    setShowSuccessMessage(`Payment confirmed successfully!`);
     setTimeout(() => setShowSuccessMessage(''), 3000);
   };
 
@@ -1183,7 +2056,7 @@ export default function AdminDashboard() {
                           <p className="text-xs text-gray-400 mt-1">Registered: {user.joinedDate}</p>
                         </div>
                         <button
-                          onClick={() => alert(`Approve user: ${user.name} - This will open approval modal`)}
+                          onClick={() => setShowApproveUserModal(user)}
                           className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
                         >
                           Review & Approve
@@ -1217,10 +2090,10 @@ export default function AdminDashboard() {
                         </div>
                       </div>
                       <button
-                        onClick={() => handleConfirmContribution(c.id)}
+                        onClick={() => setShowConfirmContributionModal(c)}
                         className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                       >
-                        Confirm Payment
+                        Review Payment
                       </button>
                     </div>
                   ))}
@@ -1343,13 +2216,13 @@ export default function AdminDashboard() {
                         <td className="px-6 py-4 text-sm text-gray-600">{user.lastActive}</td>
                         <td className="px-6 py-4 text-right space-x-2">
                           <button
-                            onClick={() => alert(`Edit user: ${user.name}`)}
+                            onClick={() => setShowEditUserModal(user)}
                             className="text-blue-600 hover:text-blue-800 p-1"
                           >
                             <Edit2 className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => alert(`Delete user: ${user.name}`)}
+                            onClick={() => setShowDeleteUserConfirm(user.id)}
                             className="text-red-600 hover:text-red-800 p-1"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -1414,6 +2287,24 @@ export default function AdminDashboard() {
                         <span className="font-medium capitalize">{stokvel.cycle} {stokvel.meetingDay ? `(${stokvel.meetingDay})` : ''}</span>
                       </div>
                     </div>
+                    
+                    {/* Edit/Delete buttons for stokvels */}
+                    <div className="flex justify-end space-x-2 mt-3 pt-3 border-t border-gray-200">
+                      <button
+                        onClick={() => setShowEditStokvelModal(stokvel)}
+                        className="text-blue-600 hover:text-blue-800 p-1"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setShowDeleteStokvelConfirm(stokvel.id)}
+                        className="text-red-600 hover:text-red-800 p-1"
+                        disabled={stokvel.currentMembers > 0}
+                        title={stokvel.currentMembers > 0 ? "Cannot delete stokvel with members" : ""}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1436,17 +2327,38 @@ export default function AdminDashboard() {
                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Date</th>
                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Status</th>
                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Method</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {contributions.map(c => (
                       <tr key={c.id}>
-                        <td className="px-4 py-3 text-sm">{c.userName}</td>
+                        <td className="px-4 py-3 text-sm">
+                          <div className="flex items-center space-x-2">
+                            <div className="w-6 h-6 bg-primary-100 rounded-full flex items-center justify-center">
+                              <span className="text-xs font-medium text-primary-700">{c.userInitials}</span>
+                            </div>
+                            <span>{c.userName}</span>
+                          </div>
+                        </td>
                         <td className="px-4 py-3 text-sm text-gray-600">{c.stokvelName}</td>
                         <td className="px-4 py-3 text-sm font-medium">{formatCurrency(c.amount)}</td>
                         <td className="px-4 py-3 text-sm text-gray-600">{c.date}</td>
                         <td className="px-4 py-3">{getStatusBadge(c.status)}</td>
                         <td className="px-4 py-3 text-sm text-gray-600 capitalize">{c.paymentMethod}</td>
+                        <td className="px-4 py-3">
+                          {c.status === 'pending' && (
+                            <button
+                              onClick={() => setShowConfirmContributionModal(c)}
+                              className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full hover:bg-green-200 transition-colors"
+                            >
+                              Confirm
+                            </button>
+                          )}
+                          {c.status === 'confirmed' && (
+                            <span className="text-xs text-gray-400">Confirmed</span>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -1471,6 +2383,64 @@ export default function AdminDashboard() {
         <AddStokvelModal
           onClose={() => setShowAddStokvelModal(false)}
           onAdd={handleAddStokvel}
+        />
+      )}
+
+      {/* Edit User Modal */}
+      {showEditUserModal && (
+        <EditUserModal
+          user={showEditUserModal}
+          onClose={() => setShowEditUserModal(null)}
+          onSave={handleEditUser}
+          stokvels={stokvels}
+        />
+      )}
+
+      {/* Delete User Confirmation */}
+      {showDeleteUserConfirm && (
+        <DeleteConfirmModal
+          title="Delete User"
+          message="Are you sure you want to delete this user? This action cannot be undone."
+          onConfirm={() => handleDeleteUser(showDeleteUserConfirm)}
+          onCancel={() => setShowDeleteUserConfirm(null)}
+        />
+      )}
+
+      {/* Edit Stokvel Modal */}
+      {showEditStokvelModal && (
+        <EditStokvelModal
+          stokvel={showEditStokvelModal}
+          onClose={() => setShowEditStokvelModal(null)}
+          onSave={handleEditStokvel}
+        />
+      )}
+
+      {/* Delete Stokvel Confirmation */}
+      {showDeleteStokvelConfirm && (
+        <DeleteConfirmModal
+          title="Delete Stokvel"
+          message="Are you sure you want to delete this stokvel? This action cannot be undone."
+          onConfirm={() => handleDeleteStokvel(showDeleteStokvelConfirm)}
+          onCancel={() => setShowDeleteStokvelConfirm(null)}
+        />
+      )}
+
+      {/* Approve User Modal */}
+      {showApproveUserModal && (
+        <ApproveUserModal
+          user={showApproveUserModal}
+          onClose={() => setShowApproveUserModal(null)}
+          onApprove={handleApproveUser}
+          stokvels={stokvels}
+        />
+      )}
+
+      {/* Confirm Contribution Modal */}
+      {showConfirmContributionModal && (
+        <ConfirmContributionModal
+          contribution={showConfirmContributionModal}
+          onClose={() => setShowConfirmContributionModal(null)}
+          onConfirm={handleConfirmContribution}
         />
       )}
     </div>

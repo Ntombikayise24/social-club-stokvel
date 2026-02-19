@@ -11,7 +11,9 @@ import {
   Bell,
   User,
   DollarSign,
-  Calendar
+  Calendar,
+  Settings,
+  LogOut
 } from 'lucide-react';
 import ProfileSwitcher from './ProfileSwitcher';
 
@@ -40,6 +42,7 @@ interface StokvelData {
 export default function MainDashboard() {
   const [showAddContribution, setShowAddContribution] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
   
   // Constants
   const TARGET_DATE = "06 Dec 2026";
@@ -148,6 +151,7 @@ export default function MainDashboard() {
     { id: 1, message: `Contribution of R200 confirmed for ${activeProfile.stokvelName}`, time: '2 hours ago', read: false },
     { id: 2, message: 'Loan repayment due in 3 days', time: '1 day ago', read: false },
     { id: 3, message: 'Welcome to HENNESSY SOCIAL CLUB!', time: '2 days ago', read: true },
+    { id: 4, message: 'Weekly meeting this Sunday at 10am', time: '3 days ago', read: true },
   ];
 
   const unreadCount = notifications.filter(n => !n.read).length;
@@ -175,7 +179,7 @@ export default function MainDashboard() {
               </div>
             </div>
 
-            {/* Right Side - Notifications & Profile Switcher */}
+            {/* Right Side - Notifications, User Menu & Profile Switcher */}
             <div className="flex items-center space-x-3">
               {/* Notifications */}
               <div className="relative">
@@ -201,14 +205,17 @@ export default function MainDashboard() {
                       )}
                     </div>
                     <div className="max-h-96 overflow-y-auto">
-                      {notifications.map(notif => (
+                      {notifications.slice(0, 3).map(notif => (
                         <div key={notif.id} className={`p-3 hover:bg-gray-50 border-b border-gray-100 last:border-0 ${!notif.read ? 'bg-primary-50/50' : ''}`}>
                           <p className="text-sm text-gray-800">{notif.message}</p>
                           <p className="text-xs text-gray-500 mt-1">{notif.time}</p>
                         </div>
                       ))}
                     </div>
-                    <Link to="/notifications" className="block p-3 text-center text-sm text-primary-600 hover:text-primary-700 border-t border-gray-100">
+                    <Link 
+                      to="/notifications" 
+                      className="block p-3 text-center text-sm text-primary-600 hover:text-primary-700 border-t border-gray-100"
+                    >
                       View All Notifications
                     </Link>
                   </div>
@@ -224,6 +231,59 @@ export default function MainDashboard() {
                   alert('Navigate to add profile page');
                 }}
               />
+
+              {/* User Menu */}
+              <div className="relative">
+                <button 
+                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  className="flex items-center space-x-2 hover:bg-gray-100 rounded-lg p-2 transition-colors"
+                >
+                  <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
+                    <span className="text-sm font-medium text-primary-700">
+                      {activeProfile.name.split(' ').map(n => n[0]).join('')}
+                    </span>
+                  </div>
+                </button>
+
+                {/* User Dropdown Menu */}
+                {showUserMenu && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 z-20">
+                    <Link 
+                      to="/profile" 
+                      className="flex items-center space-x-2 px-4 py-3 hover:bg-gray-50 transition-colors"
+                      onClick={() => setShowUserMenu(false)}
+                    >
+                      <User className="w-4 h-4 text-gray-500" />
+                      <span className="text-sm text-gray-700">Your Profile</span>
+                    </Link>
+                    <Link 
+                      to="/settings" 
+                      className="flex items-center space-x-2 px-4 py-3 hover:bg-gray-50 transition-colors"
+                      onClick={() => setShowUserMenu(false)}
+                    >
+                      <Settings className="w-4 h-4 text-gray-500" />
+                      <span className="text-sm text-gray-700">Settings</span>
+                    </Link>
+                    <Link 
+                      to="/help" 
+                      className="flex items-center space-x-2 px-4 py-3 hover:bg-gray-50 transition-colors"
+                      onClick={() => setShowUserMenu(false)}
+                    >
+                      <HelpCircle className="w-4 h-4 text-gray-500" />
+                      <span className="text-sm text-gray-700">Help Center</span>
+                    </Link>
+                    <div className="border-t border-gray-100 my-1"></div>
+                    <Link 
+                      to="/" 
+                      className="flex items-center space-x-2 px-4 py-3 hover:bg-gray-50 text-red-600 transition-colors"
+                      onClick={() => setShowUserMenu(false)}
+                    >
+                      <LogOut className="w-4 h-4" />
+                      <span className="text-sm">Logout</span>
+                    </Link>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -459,9 +519,9 @@ export default function MainDashboard() {
                   <span className="text-xs font-medium text-gray-700">Profile</span>
                 </Link>
                 
-                <Link to="/help" className="flex flex-col items-center p-4 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors group">
-                  <HelpCircle className="w-6 h-6 text-gray-600 mb-2 group-hover:scale-110 transition-transform" />
-                  <span className="text-xs font-medium text-gray-700">Help</span>
+                <Link to="/notifications" className="flex flex-col items-center p-4 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors group">
+                  <Bell className="w-6 h-6 text-gray-600 mb-2 group-hover:scale-110 transition-transform" />
+                  <span className="text-xs font-medium text-gray-700">Notifications</span>
                 </Link>
               </div>
             </div>

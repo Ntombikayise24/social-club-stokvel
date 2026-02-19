@@ -1,21 +1,55 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Mail, Lock, ArrowLeft, Users } from 'lucide-react';
+import { Mail, Lock, ArrowLeft, Users, AlertCircle } from 'lucide-react';
 
 export default function Login() {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
+  const [loginError, setLoginError] = useState('');
   const [formData, setFormData] = useState({
     email: '',
-    password: ''
+    password: '',
+    rememberMe: false
   });
+
+  // Mock users database - in real app, this would be an API call
+  const mockUsers = [
+    { email: 'nkulumo.nkuna@email.com', password: 'password', status: 'active' },
+    { email: 'mary.johnson@email.com', password: 'password', status: 'pending' },
+    { email: 'peter.williams@email.com', password: 'password', status: 'pending' },
+  ];
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
-    // Simulate login
+    setLoginError('');
+
+    // Simulate API call
     setTimeout(() => {
+      // Find user
+      const user = mockUsers.find(u => u.email === formData.email);
+      
+      if (!user) {
+        setLoginError('Invalid email or password');
+        setIsLoading(false);
+        return;
+      }
+
+      // Check password (mock)
+      if (user.password !== formData.password) {
+        setLoginError('Invalid email or password');
+        setIsLoading(false);
+        return;
+      }
+
+      // Check user status
+      if (user.status === 'pending') {
+        setLoginError('Your account is pending approval. Please wait for admin to activate your account.');
+        setIsLoading(false);
+        return;
+      }
+
+      // Successful login
       setIsLoading(false);
       navigate('/dashboard');
     }, 1500);
@@ -32,7 +66,15 @@ export default function Login() {
         </div>
 
         <h2 className="text-2xl font-bold text-center text-gray-800 mb-2">Welcome Back</h2>
-        <p className="text-center text-gray-500 mb-8">Sign in to your SOCIAL CLUB account</p>
+        <p className="text-center text-gray-500 mb-8">Sign in to your HENNESSY SOCIAL CLUB account</p>
+
+        {/* Error Message */}
+        {loginError && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 flex items-start space-x-3">
+            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-red-700">{loginError}</p>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -63,6 +105,21 @@ export default function Login() {
                 onChange={(e) => setFormData({...formData, password: e.target.value})}
               />
             </div>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                checked={formData.rememberMe}
+                onChange={(e) => setFormData({...formData, rememberMe: e.target.checked})}
+              />
+              <span className="ml-2 text-sm text-gray-600">Remember me</span>
+            </label>
+            <Link to="/forgot-password" className="text-sm text-primary-600 hover:text-primary-700">
+              Forgot password?
+            </Link>
           </div>
 
           <button
