@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>STOCKVEL - Backend & Frontend Architecture</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f5f5;
+            padding: 40px 20px;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-radius: 8px;
+        }
+        
+        h1 {
+            color: #2c3e50;
+            border-bottom: 4px solid #3498db;
+            padding-bottom: 15px;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+        
+        h2 {
+            color: #34495e;
+            border-left: 4px solid #27ae60;
+            padding-left: 15px;
+            margin-top: 35px;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+        }
+        
+        h3 {
+            color: #2980b9;
+            margin-top: 25px;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+        
+        .section {
+            margin-bottom: 40px;
+            page-break-inside: avoid;
+        }
+        
+        .subsection {
+            margin-left: 20px;
+            margin-bottom: 25px;
+        }
+        
+        p {
+            margin-bottom: 12px;
+            text-align: justify;
+        }
+        
+        ul, ol {
+            margin-left: 30px;
+            margin-bottom: 15px;
+        }
+        
+        li {
+            margin-bottom: 8px;
+        }
+        
+        .code-block {
+            background: #f8f9fa;
+            border-left: 4px solid #e74c3c;
+            padding: 15px;
+            margin: 20px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            overflow-x: auto;
+            border-radius: 4px;
+        }
+        
+        .feature-box {
+            background: #ecf0f1;
+            border: 1px solid #bdc3c7;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 0.95em;
+        }
+        
+        th {
+            background: #3498db;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: bold;
+        }
+        
+        td {
+            border: 1px solid #bdc3c7;
+            padding: 12px;
+        }
+        
+        tr:nth-child(even) {
+            background: #ecf0f1;
+        }
+        
+        .flow-diagram {
+            background: #fff3cd;
+            border: 2px dashed #ffc107;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            line-height: 1.8;
+            color: #856404;
+        }
+        
+        .highlight {
+            background: #ffffcc;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            margin: 2px 5px 2px 0;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+        
+        .badge-success {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .badge-warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .badge-info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        
+        .toc {
+            background: #ecf0f1;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 40px;
+        }
+        
+        .toc h3 {
+            margin-top: 0;
+        }
+        
+        .toc ol {
+            margin-left: 25px;
+        }
+        
+        .toc li {
+            margin-bottom: 10px;
+        }
+        
+        .date-stamp {
+            text-align: right;
+            color: #7f8c8d;
+            font-size: 0.9em;
+            margin-top: 40px;
+            border-top: 1px solid #ecf0f1;
+            padding-top: 20px;
+        }
+        
+        .page-break {
+            page-break-after: always;
+        }
+        
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            
+            .container {
+                box-shadow: none;
+                max-width: 100%;
+                padding: 20px;
+            }
+            
+            h1, h2, h3 {
+                page-break-after: avoid;
+            }
+            
+            .section, .subsection {
+                page-break-inside: avoid;
+            }
+            
+            table {
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏗️ STOCKVEL Architecture Documentation</h1>
+        <p style="text-align: center; color: #7f8c8d; margin-bottom: 30px; font-size: 1.1em;">
+            Complete Backend & Frontend Integration Guide
+        </p>
+        
+        <!-- Table of Contents -->
+        <div class="toc">
+            <h3>📑 Table of Contents</h3>
+            <ol>
+                <li>Frontend Stack Overview</li>
+                <li>Network Layer</li>
+                <li>Backend Stack Overview</li>
+                <li>Database Layer</li>
+                <li>Authentication Flow</li>
+                <li>Page-by-Page Integration</li>
+                <li>Key Features & Safeguards</li>
+                <li>Environment Configuration</li>
+                <li>Project Status</li>
+                <li>Testing Guide</li>
+            </ol>
+        </div>
+        
+        <!-- Section 1: Frontend -->
+        <div class="section">
+            <h2>1. FRONTEND STACK (React 19 + TypeScript + Vite)</h2>
+            
+            <div class="subsection">
+                <h3>🎨 Running Environment</h3>
+                <ul>
+                    <li><span class="highlight">Dev Server</span>: Port <strong>5174</strong> (Vite)</li>
+                    <li><span class="highlight">Build Output</span>: Compiled to <code>dist/</code> folder</li>
+                    <li><span class="highlight">Proxy Config</span>: <code>/api</code> routes → <code>http://localhost:5000</code></li>
+                </ul>
+            </div>
+            
+            <div class="subsection">
+                <h3>🔐 Authentication Layer</h3>
+                <p><strong>File:</strong> <code>src/context/AuthContext.tsx</code></p>
+                <p>Central auth state management using React Context API.</p>
+                
+                <h4>State Variables:</h4>
+                <ul>
+                    <li><code>user</code>: Current logged-in user data (id, fullName, email, phone, role, status, memberSince)</li>
+                    <li><code>profiles</code>: Array of stokvels the user is a member of</li>
+                    <li><code>token</code>: JWT access token stored in localStorage</li>
+                    <li><code>isAuthenticated</code>: Computed boolean (!!token && !!user)</li>
+                </ul>
+                
+                <h4>Methods:</h4>
+                <ul>
+                    <li><code>login(email, password)</code> → Calls backend, stores token, returns {success, message}</li>
+                    <li><code>register(...)</code> → New user signup with preferred stokvels</li>
+                    <li><code>logout()</code> → Clears state and localStorage</li>
+                    <li><code>refreshUser()</code> → Calls <code>/api/auth/me</code> to sync state with server</li>
+                </ul>
+            </div>
+            
+            <div class="subsection">
+                <h3>🔌 API Service Layer</h3>
+                <p><strong>File:</strong> <code>src/services/api.ts</code></p>
+                <p>Centralized axios instance with JWT interceptors and error handling.</p>
+                
+                <h4>Request Interceptor:</h4>
+                <div class="feature-box">
+                    → Automatically attaches JWT token from localStorage to all requests<br>
+                    → Skips login/register endpoints (public routes)<br>
+                    → Header: <code>Authorization: Bearer &lt;token&gt;</code>
+                </div>
+                
+                <h4>Response Interceptor:</h4>
+                <div class="feature-box">
+                    → Catches 401 Unauthorized responses<br>
+                    → Clears localStorage on 401<br>
+                    → Redirects to <code>/login</code> if token expires
+                </div>
+                
+                <h4>Available API Objects:</h4>
+                <ul>
+                    <li><code>authAPI</code>: login, register, getMe</li>
+                    <li><code>stokvelAPI</code>: getAll, getPublic, getById</li>
+                    <li><code>contributionAPI</code>: getByMembership, create</li>
+                    <li><code>loanAPI</code>: getByMembership, request</li>
+                    <li><code>notificationAPI</code>: getAll, markAsRead</li>
+                    <li><code>profileAPI</code>: update</li>
+                    <li><code>adminAPI</code>: getDashboard, getPendingUsers, approveUser, rejectUser</li>
+                </ul>
+            </div>
+            
+            <div class="subsection">
+                <h3>📱 Pages & Components</h3>
+                <p><strong>Location:</strong> <code>src/pages/</code></p>
+                <ul>
+                    <li><strong>Login</strong>: Email + password form → calls AuthContext.login() → redirects based on role</li>
+                    <li><strong>Register</strong>: Full signup form → fetches stokvels from <code>/api/stokvels/public</code></li>
+                    <li><strong>MainDashboard</strong>: Member's main page with profile, savings, loans, stokvel details</li>
+                    <li><strong>AdminDashboard</strong>: Admin panel for user approvals and statistics</li>
+                    <li><strong>Other Pages</strong>: MemberProfile, LoanHistory, LoanRequest, ContributionHistory</li>
+                </ul>
+            </div>
+            
+            <div class="subsection">
+                <h3>💾 Data Persistence</h3>
+                <p><strong>Storage:</strong> Browser localStorage</p>
+                <div class="feature-box">
+                    <strong>Keys:</strong><br>
+                    • <code>token</code>: JWT access token<br>
+                    • <code>user</code>: Serialized user object<br>
+                    • <code>profiles</code>: Serialized array of memberships/stokvel profiles
+                </div>
+            </div>
+        </div>
+        
+        <!-- Section 2: Network -->
+        <div class="section">
+            <h2>2. NETWORK LAYER</h2>
+            
+            <div class="subsection">
+                <h3>🌐 Communication Flow</h3>
+                <div class="flow-diagram">Frontend (Port 5174)
+    ↓ (Vite Proxy)
+/api → http://localhost:5000
+    ↓
+Backend Server (Port 5000)
+                </div>
+            </div>
+            
+            <div class="subsection">
+                <h3>⚙️ Vite Proxy Configuration</h3>
+                <p><strong>File:</strong> <code>vite.config.ts</code></p>
+                <div class="code-block">server: {
+  proxy: {
+    '/api': {
+      target: 'http://localhost:5000',
+      changeOrigin: true,
+    },
+  },
+}</div>
+                <p><strong>Purpose:</strong> Rewrites Host header to origin, enables frontend to call backend without CORS issues during development.</p>
+            </div>
+            
+            <div class="subsection">
+                <h3>📨 Request/Response Format</h3>
+                <ul>
+                    <li><strong>Content-Type</strong>: <code>application/json</code></li>
+                    <li><strong>Auth Header</strong>: <code>Authorization: Bearer &lt;JWT_TOKEN&gt;</code></li>
+                    <li><strong>Response Format</strong>:
+                        <div class="code-block">{
+  success: true,
+  message: "...",
+  data: { /* payload */ }
+}</div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="page-break"></div>
+        
+        <!-- Section 3: Backend -->
+        <div class="section">
+            <h2>3. BACKEND STACK (Node.js + Express + MySQL)</h2>
+            
+            <div class="subsection">
+                <h3>🚀 Server Setup</h3>
+                <p><strong>File:</strong> <code>backend/src/server.js</code></p>
+                <ul>
+                    <li><strong>Port</strong>: 5000</li>
+                    <li><strong>CORS</strong>: Allow requests from <code>http://localhost:5173</code> or <code>http://localhost:5174</code></li>
+                    <li><strong>Database</strong>: MySQL (auto-initialized on startup)</li>
+                </ul>
+                
+                <h4>Middleware Stack:</h4>
+                <ol>
+                    <li>CORS headers (configurable origin)</li>
+                    <li><code>express.json()</code> - Parse JSON body</li>
+                    <li><code>express.urlencoded()</code> - Parse form data</li>
+                    <li>Morgan logging (development only)</li>
+                </ol>
+            </div>
+            
+            <div class="subsection">
+                <h3>🛣️ Route Structure</h3>
+                <table>
+                    <tr>
+                        <th>Endpoint</th>
+                        <th>Methods</th>
+                        <th>Purpose</th>
+                    </tr>
+                    <tr>
+                        <td>/api/auth</td>
+                        <td>POST /login, POST /register, GET /me</td>
+                        <td>User authentication</td>
+                    </tr>
+                    <tr>
+                        <td>/api/stokvels</td>
+                        <td>GET /, GET /public, GET /:id</td>
+                        <td>Stokvel management</td>
+                    </tr>
+                    <tr>
+                        <td>/api/contributions</td>
+                        <td>GET /membership/:id, POST /</td>
+                        <td>Member contributions</td>
+                    </tr>
+                    <tr>
+                        <td>/api/loans</td>
+                        <td>GET /membership/:id, POST /</td>
+                        <td>Loan requests & management</td>
+                    </tr>
+                    <tr>
+                        <td>/api/notifications</td>
+                        <td>GET /, PUT /:id/read</td>
+                        <td>User notifications</td>
+                    </tr>
+                    <tr>
+                        <td>/api/profile</td>
+                        <td>PUT /</td>
+                        <td>User profile updates</td>
+                    </tr>
+                    <tr>
+                        <td>/api/admin</td>
+                        <td>GET /dashboard, GET /pending-users, POST /approve/:id, POST /reject/:id</td>
+                        <td>Admin operations</td>
+                    </tr>
+                    <tr>
+                        <td>/api/health</td>
+                        <td>GET /</td>
+                        <td>Health check</td>
+                    </tr>
+                </table>
+            </div>
+            
+            <div class="subsection">
+                <h3>🔒 Middleware</h3>
+                
+                <h4>JWT Protection (auth.js)</h4>
+                <p><code>protect</code> middleware validates JWT tokens on protected routes:</p>
+                <ul>
+                    <li>Extracts token from <code>Authorization: Bearer &lt;token&gt;</code> header</li>
+                    <li>Verifies token using <code>process.env.JWT_SECRET</code></li>
+                    <li>Decodes user ID from token payload</li>
+                    <li>Checks user exists and is active</li>
+                    <li>Attaches <code>req.user</code> to request object</li>
+                </ul>
+                
+                <h4>Return Codes:</h4>
+                <div class="feature-box">
+                    <span class="badge badge-success">200 OK</span> → Valid token, proceed<br>
+                    <span class="badge badge-warning">401 Unauthorized</span> → No token, invalid, expired, or user not found<br>
+                    <span class="badge badge-warning">403 Forbidden</span> → User status not active
+                </div>
+                
+                <h4>Validation Middleware (validate.js)</h4>
+                <ul>
+                    <li>Uses <code>express-validator</code> library</li>
+                    <li>Validates email, password, phone, etc.</li>
+                    <li>Returns 400 with validation errors on failure</li>
+                </ul>
+            </div>
+            
+            <div class="subsection">
+                <h3>🎮 Controllers</h3>
+                <p><strong>Location:</strong> <code>backend/src/controllers/</code></p>
+                
+                <h4>authController.js</h4>
+                <ul>
+                    <li><code>register()</code>: Creates new user with 'pending' status, assigns stokvels, notifies admins</li>
+                    <li><code>login()</code>: Validates credentials, generates JWT, returns user + profiles</li>
+                    <li><code>getMe()</code>: (Protected) Returns current user + memberships</li>
+                </ul>
+                
+                <h4>Other Controllers</h4>
+                <ul>
+                    <li><code>stokvelController</code>: CRUD on stokvels</li>
+                    <li><code>contributionController</code>: Track member savings</li>
+                    <li><code>loanController</code>: Manage loan requests</li>
+                    <li><code>notificationController</code>: Fetch & mark as read</li>
+                    <li><code>profileController</code>: Update user profile</li>
+                    <li><code>adminController</code>: User approval, dashboard stats</li>
+                </ul>
+            </div>
+            
+            <div class="subsection">
+                <h3>🔗 Database Connection</h3>
+                <p><strong>File:</strong> <code>backend/src/config/db.js</code></p>
+                <ul>
+                    <li><strong>Library</strong>: <code>mysql2/promise</code></li>
+                    <li><strong>Connection Pool</strong>: 10 connections, auto-queuing</li>
+                    <li><strong>Default Credentials</strong>:
+                        <ul>
+                            <li>Host: <code>localhost</code></li>
+                            <li>Port: <code>3306</code></li>
+                            <li>User: <code>root</code></li>
+                            <li>Password: (empty in XAMPP)</li>
+                            <li>Database: <code>social_club</code></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- Section 4: Database -->
+        <div class="section">
+            <h2>4. DATABASE LAYER (MySQL 8.2.12)</h2>
+            
+            <div class="subsection">
+                <h3>💾 Database: social_club</h3>
+                <p><strong>Server:</strong> XAMPP (Port 3306)</p>
+                
+                <h4>Database Tables:</h4>
+                <table>
+                    <tr>
+                        <th>Table Name</th>
+                        <th>Key Columns</th>
+                        <th>Purpose</th>
+                    </tr>
+                    <tr>
+                        <td><strong>users</strong></td>
+                        <td>id, full_name, email, phone, password_hash, role, status, created_at, updated_at, last_active</td>
+                        <td>User accounts</td>
+                    </tr>
+                    <tr>
+                        <td><strong>stokvels</strong></td>
+                        <td>id, name, icon, color, cycle, groupTarget, currentMembers</td>
+                        <td>Stokvel groups</td>
+                    </tr>
+                    <tr>
+                        <td><strong>memberships</strong></td>
+                        <td>id, user_id, stokvel_id, role, target_amount, saved_amount, joined_date</td>
+                        <td>User-stokvel relationships</td>
+                    </tr>
+                    <tr>
+                        <td><strong>contributions</strong></td>
+                        <td>id, membership_id, amount, payment_method, date, status</td>
+                        <td>Member contributions/savings</td>
+                    </tr>
+                    <tr>
+                        <td><strong>loans</strong></td>
+                        <td>id, membership_id, amount, reason, status, requested_date, approved_date</td>
+                        <td>Loan requests</td>
+                    </tr>
+                    <tr>
+                        <td><strong>notifications</strong></td>
+                        <td>id, user_id, message, type, read, related_id, related_model, created_at</td>
+                        <td>System notifications</td>
+                    </tr>
+                    <tr>
+                        <td><strong>user_preferred_groups</strong></td>
+                        <td>user_id, stokvel_id</td>
+                        <td>Preferred stokvels (signup)</td>
+                    </tr>
+                </table>
+            </div>
+            
+            <div class="subsection">
+                <h3>📊 Current Seeded Data</h3>
+                <ul>
+                    <li><strong>13 Users</strong>: 1 admin + 12 members</li>
+                    <li><strong>3 Stokvels</strong>: COLLECTIVE POT, SUMMER SAVERS, HOLIDAY FUND</li>
+                    <li><strong>11 Memberships</strong>: Users assigned to stokvels</li>
+                    <li><strong>10 Contributions</strong>: Savings records</li>
+                    <li><strong>6 Loans</strong>: Loan requests</li>
+                    <li><strong>5 Notifications</strong>: System messages</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="page-break"></div>
+        
+        <!-- Section 5: Authentication Flow -->
+        <div class="section">
+            <h2>5. AUTHENTICATION FLOW</h2>
+            
+            <div class="subsection">
+                <h3>🔑 Login Flow</h3>
+                <div class="flow-diagram">User enters email + password in Login form
+              ↓
+Form calls AuthContext.login(email, password)
+              ↓
+API Service sends POST /api/auth/login (NO token in header)
+              ↓
+Backend authController.login() validates password
+              ↓
+Backend generates JWT token (payload: {id, iat, exp})
+              ↓
+Response: {token, user, profiles}
+              ↓
+AuthContext stores in:
+   • React state (token, user, profiles)
+   • localStorage (token, user, profiles)
+              ↓
+Frontend redirects to /dashboard (or /admin for admins)
+                </div>
+            </div>
+            
+            <div class="subsection">
+                <h3>🔐 Authenticated Request Flow</h3>
+                <div class="flow-diagram">Component calls API method 
+  (e.g., contributionAPI.getByMembership(123))
+              ↓
+axios request interceptor reads token from localStorage
+              ↓
+Adds header: Authorization: Bearer <token>
+              ↓
+Sends request to backend /api/...
+              ↓
+Backend 'protect' middleware validates token
+              ↓
+If valid: Attaches req.user and proceeds
+If invalid: Returns 401
+              ↓
+If 401: axios response interceptor 
+  clears localStorage + redirects to /login
+                </div>
+            </div>
+            
+            <div class="subsection">
+                <h3>📝 Token Details</h3>
+                <ul>
+                    <li><strong>Algorithm</strong>: HS256 (HMAC SHA-256)</li>
+                    <li><strong>Secret</strong>: <code>process.env.JWT_SECRET</code></li>
+                    <li><strong>Payload</strong>: <code>{id: userId, iat: issuedAt, exp: expiresAt}</code></li>
+                    <li><strong>Expiration</strong>: 7 days from issuance</li>
+                    <li><strong>Storage Location</strong>: Browser localStorage (key: <code>token</code>)</li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- Section 6: Page Integration -->
+        <div class="section">
+            <h2>6. PAGE-BY-PAGE INTEGRATION</h2>
+            
+            <div class="subsection">
+                <h3>🔓 Login Page</h3>
+                <p><strong>File:</strong> <code>src/pages/auth/Login.tsx</code></p>
+                <ul>
+                    <li><strong>Form Fields</strong>: email, password</li>
+                    <li><strong>API Call</strong>: <code>useAuth().login(email, password)</code></li>
+                    <li><strong>On Success</strong>: Redirects based on <code>user.role</code>
+                        <ul>
+                            <li>admin → <code>/admin</code></li>
+                            <li>member → <code>/dashboard</code></li>
+                        </ul>
+                    </li>
+                    <li><strong>On Error</strong>: Shows error toast notification</li>
+                </ul>
+            </div>
+            
+            <div class="subsection">
+                <h3>📝 Register Page</h3>
+                <p><strong>File:</strong> <code>src/pages/auth/Register.tsx</code></p>
+                <ul>
+                    <li><strong>Form Fields</strong>: fullName, email, phone, password, preferredGroups</li>
+                    <li><strong>API Calls</strong>:
+                        <ul>
+                            <li><code>GET /api/stokvels/public</code> - List available stokvels (no auth)</li>
+                            <li><code>useAuth().register(data)</code> - Submit registration</li>
+                        </ul>
+                    </li>
+                    <li><strong>On Success</strong>: Redirects to login with success message</li>
+                    <li><strong>On Error</strong>: Shows error toast</li>
+                </ul>
+            </div>
+            
+            <div class="subsection">
+                <h3>📊 Main Dashboard</h3>
+                <p><strong>File:</strong> <code>src/pages/dashboard/MainDashboard.tsx</code></p>
+                <ul>
+                    <li><strong>Content</strong>: Selected stokvel profile, savings progress, loan info</li>
+                    <li><strong>API Calls</strong>:
+                        <ul>
+                            <li><code>GET /api/stokvels/:id</code> - Stokvel details</li>
+                            <li><code>GET /api/notifications</code> - User notifications</li>
+                            <li>Other: contributions/loans endpoints</li>
+                        </ul>
+                    </li>
+                    <li><strong>Protection</strong>: Shows "Loading..." until <code>activeProfile</code> loads</li>
+                    <li><strong>Features</strong>: Add contributions, request loans, view notifications</li>
+                </ul>
+            </div>
+            
+            <div class="subsection">
+                <h3>⚙️ Admin Dashboard</h3>
+                <p><strong>File:</strong> <code>src/pages/admin/AdminDashboard.tsx</code></p>
+                <ul>
+                    <li><strong>API Calls</strong>:
+                        <ul>
+                            <li><code>GET /api/admin/dashboard</code> - Dashboard stats</li>
+                            <li><code>GET /api/admin/pending-users</code> - Pending registrations</li>
+                        </ul>
+                    </li>
+                    <li><strong>Actions</strong>: Approve/reject user registrations</li>
+                    <li><strong>Protection</strong>: <code>&lt;ProtectedRoute adminOnly={true}&gt;</code></li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- Section 7: Security -->
+        <div class="section">
+            <h2>7. KEY FEATURES & SAFEGUARDS</h2>
+            
+            <div class="subsection">
+                <h3>🔐 Security Features</h3>
+                <div class="feature-box">
+                    <span class="badge badge-success">✓</span> Passwords hashed with bcryptjs<br>
+                    <span class="badge badge-success">✓</span> JWT tokens signed with secret key<br>
+                    <span class="badge badge-success">✓</span> Protected routes require valid token<br>
+                    <span class="badge badge-success">✓</span> CORS configured for frontend domain only<br>
+                    <span class="badge badge-success">✓</span> 401 responses clear localStorage and redirect to login<br>
+                    <span class="badge badge-success">✓</span> Login/register endpoints skip token validation
+                </div>
+            </div>
+            
+            <div class="subsection">
+                <h3>⚠️ Error Handling</h3>
+                <ul>
+                    <li>Global error handler on backend (returns 500 with error message)</li>
+                    <li>axios response interceptor catches 401 and logs user out</li>
+                    <li>Components wrapped in try-catch blocks</li>
+                    <li>User-facing error messages via toast notifications</li>
+                </ul>
+            </div>
+            
+            <div class="subsection">
+                <h3>✅ Data Validation</h3>
+                <ul>
+                    <li><strong>Frontend</strong>: React Hook Form with Zod schema validation</li>
+                    <li><strong>Backend</strong>: express-validator on all input routes</li>
+                    <li><strong>Validations</strong>: Email format, password length, phone format</li>
+                </ul>
+            </div>
+            
+            <div class="subsection">
+                <h3>🔄 State Consistency</h3>
+                <ul>
+                    <li>AuthContext persists to localStorage (survives page refresh)</li>
+                    <li>Components clear stale profiles on logout</li>
+                    <li>API interceptor refreshes auth on every request</li>
+                    <li>Early return + loading states prevent race conditions</li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- Section 8: Environment -->
+        <div class="section">
+            <h2>8. ENVIRONMENT CONFIGURATION</h2>
+            
+            <div class="subsection">
+                <h3>🎨 Frontend Configuration</h3>
+                <p><strong>Files:</strong> <code>.env</code> (not tracked)</p>
+                <p>The frontend uses Vite's dev proxy, so no explicit env variables are needed for development. The proxy automatically routes API calls to the backend.</p>
+            </div>
+            
+            <div class="subsection">
+                <h3>⚙️ Backend Configuration</h3>
+                <p><strong>File:</strong> <code>backend/.env</code></p>
+                <div class="code-block">PORT=5000
+NODE_ENV=development
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=
+DB_NAME=social_club
+JWT_SECRET=your-secret-key-here
+FRONTEND_URL=http://localhost:5174</div>
+                <p><strong>Note:</strong> Update <code>JWT_SECRET</code> in production with a strong, unique key.</p>
+            </div>
+        </div>
+        
+        <!-- Section 9: Project Status -->
+        <div class="section">
+            <h2>9. PROJECT STATUS</h2>
+            
+            <table>
+                <tr>
+                    <th>Component</th>
+                    <th>Status</th>
+                    <th>Notes</th>
+                </tr>
+                <tr>
+                    <td>Backend Server</td>
+                    <td><span class="badge badge-success">✅ Running</span></td>
+                    <td>Port 5000, all endpoints tested</td>
+                </tr>
+                <tr>
+                    <td>Frontend Dev Server</td>
+                    <td><span class="badge badge-success">✅ Running</span></td>
+                    <td>Port 5174, Vite proxy configured</td>
+                </tr>
+                <tr>
+                    <td>MySQL Database</td>
+                    <td><span class="badge badge-success">✅ Connected</span></td>
+                    <td>13 users, 3 stokvels, data seeded</td>
+                </tr>
+                <tr>
+                    <td>Login/Register</td>
+                    <td><span class="badge badge-success">✅ Working</span></td>
+                    <td>JWT auth fully implemented</td>
+                </tr>
+                <tr>
+                    <td>Dashboard Pages</td>
+                    <td><span class="badge badge-warning">⚠️ Partial</span></td>
+                    <td>MainDashboard wired, others need integration</td>
+                </tr>
+                <tr>
+                    <td>Protected Routes</td>
+                    <td><span class="badge badge-success">✅ Working</span></td>
+                    <td>ProtectedRoute component guards pages</td>
+                </tr>
+                <tr>
+                    <td>API Interceptors</td>
+                    <td><span class="badge badge-success">✅ Working</span></td>
+                    <td>Token auto-attachment, 401 handling</td>
+                </tr>
+            </table>
+        </div>
+        
+        <!-- Section 10: Testing -->
+        <div class="section">
+            <h2>10. TESTING GUIDE</h2>
+            
+            <div class="subsection">
+                <h3>🧪 How to Test the Connection</h3>
+                <div class="code-block"># 1. Start backend (if not running)
+cd backend
+npm run dev
+
+# 2. Start frontend (if not running)
+cd my-folder-name
+npm run dev
+
+# 3. Open browser: 
+http://localhost:5174/login
+
+# 4. Login with test credentials:
+Email: nkulumo.nkuna@email.com
+Password: Password123
+
+# 5. Check browser DevTools:
+# Network tab: See JWT in Authorization headers
+# Application > Storage > localStorage: See token, user, profiles</div>
+            </div>
+            
+            <div class="subsection">
+                <h3>🔍 Debugging Tips</h3>
+                <ul>
+                    <li><strong>Check Backend Logs</strong>: Terminal should show "🚀 SOCIAL CLUB API Server running on port 5000"</li>
+                    <li><strong>Check Frontend Build</strong>: No TypeScript errors in build output</li>
+                    <li><strong>Check Network Requests</strong>: DevTools Network tab should show requests to <code>/api/*</code> proxied to <code>http://localhost:5000/*</code></li>
+                    <li><strong>Check Database</strong>: Open phpMyAdmin and verify tables exist with data</li>
+                    <li><strong>Check localStorage</strong>: DevTools Application tab should show <code>token</code>, <code>user</code>, <code>profiles</code> after login</li>
+                </ul>
+            </div>
+            
+            <div class="subsection">
+                <h3>📋 Test Accounts</h3>
+                <table>
+                    <tr>
+                        <th>Email</th>
+                        <th>Password</th>
+                        <th>Role</th>
+                    </tr>
+                    <tr>
+                        <td>admin@example.com</td>
+                        <td>Password123</td>
+                        <td>Admin</td>
+                    </tr>
+                    <tr>
+                        <td>nkulumo.nkuna@email.com</td>
+                        <td>Password123</td>
+                        <td>Member</td>
+                    </tr>
+                </table>
+                <p><em>Additional test accounts are seeded in the database. Check <code>backend/src/seed.js</code> for full list.</em></p>
+            </div>
+        </div>
+        
+        <!-- Footer -->
+        <div class="date-stamp">
+            <p>📄 STOCKVEL Architecture Documentation</p>
+            <p>Generated: February 19, 2026</p>
+            <p><em>For developers working on the STOCKVEL Stokvel Management System</em></p>
+        </div>
+    </div>
+</body>
+</html>

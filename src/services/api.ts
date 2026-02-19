@@ -7,11 +7,14 @@ const api = axios.create({
   },
 });
 
-// Attach JWT token to every request automatically
+// Attach JWT token to every request automatically (except login/register)
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  // Don't attach token for login/register endpoints
+  if (config.url !== '/auth/login' && config.url !== '/auth/register') {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
   }
   return config;
 });

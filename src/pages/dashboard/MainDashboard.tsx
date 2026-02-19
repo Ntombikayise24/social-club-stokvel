@@ -62,29 +62,13 @@ export default function MainDashboard() {
     progress: p.progress,
   }));
   
-  // Active Profile State
-  const [activeProfile, setActiveProfile] = useState<Profile>(
-    mappedProfiles[0] || {
-      id: '0',
-      name: user?.fullName || 'User',
-      stokvelName: 'No Stokvel',
-      stokvelId: '0',
-      role: 'member',
-      targetAmount: 0,
-      savedAmount: 0,
-      progress: 0,
-    }
-  );
+  // Active Profile State - update when profiles change
+  const [activeProfile, setActiveProfile] = useState<Profile | null>(null);
 
   // Update active profile when auth profiles change (e.g. after refresh)
   useEffect(() => {
     if (mappedProfiles.length > 0) {
-      const current = mappedProfiles.find(p => p.id === activeProfile.id);
-      if (current) {
-        setActiveProfile(current);
-      } else {
-        setActiveProfile(mappedProfiles[0]);
-      }
+      setActiveProfile(mappedProfiles[0]);
     }
   }, [authProfiles]);
 
@@ -93,17 +77,20 @@ export default function MainDashboard() {
 
   useEffect(() => {
     const fetchStokvel = async () => {
+      if (!activeProfile || activeProfile.stokvelId === '0') {
+        setStokvelDetails(null);
+        return;
+      }
       try {
         const res = await stokvelAPI.getById(Number(activeProfile.stokvelId));
         setStokvelDetails(res.data.data);
-      } catch {
+      } catch (err) {
+        console.error('Failed to fetch stokvel:', err);
         setStokvelDetails(null);
       }
     };
-    if (activeProfile.stokvelId && activeProfile.stokvelId !== '0') {
-      fetchStokvel();
-    }
-  }, [activeProfile.stokvelId]);
+    fetchStokvel();
+  }, [activeProfile?.stokvelId]);
 
   // Notifications from API
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -112,8 +99,11 @@ export default function MainDashboard() {
     const fetchNotifications = async () => {
       try {
         const res = await notificationAPI.getAll();
-        setNotifications(res.data.data || []);
-      } catch {
+        // Ensure we always get an array
+        const notifData = Array.isArray(res.data.data) ? res.data.data : [];
+        setNotifications(notifData);
+      } catch (err) {
+        console.error('Failed to fetch notifications:', err);
         setNotifications([]);
       }
     };
@@ -125,6 +115,18 @@ export default function MainDashboard() {
     amount: '',
     paymentMethod: 'card'
   });
+
+  // Early return if activeProfile is not yet loaded
+  if (!activeProfile) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 font-medium">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Calculate remaining amount for this profile
   const remainingAmount = activeProfile.targetAmount - activeProfile.savedAmount;
@@ -170,7 +172,9 @@ export default function MainDashboard() {
 
   const currentStokvel = getStokvelData(activeProfile);
 
-  const unreadCount = notifications.filter((n: any) => !n.read && !n.is_read).length;
+  const unreadCount = Array.isArray(notifications) 
+    ? notifications.filter((n: any) => !n.read && !n.is_read).length 
+    : 0;
 
   const handleAddContribution = async () => {
     if (!contributionData.amount) return;
@@ -194,6 +198,17 @@ export default function MainDashboard() {
     logout();
     navigate('/login');
   };
+
+  // Show loading state while profiles are being loaded
+  if (!activeProfile) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-600 mb-4">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
