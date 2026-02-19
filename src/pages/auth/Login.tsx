@@ -1,24 +1,41 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Mail, Lock, ArrowLeft, Users } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { useAuth } from '../../context/AuthContext';
 
 export default function Login() {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
   const [formData, setFormData] = useState({
     email: '',
     password: ''
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
-    // Simulate login
-    setTimeout(() => {
-      setIsLoading(false);
-      navigate('/dashboard');
-    }, 1500);
+    setError('');
+
+    const result = await login(formData.email, formData.password);
+    setIsLoading(false);
+
+    if (result.success) {
+      toast.success('Login successful!');
+      // Check role from localStorage since state may not be updated yet
+      const stored = localStorage.getItem('user');
+      const userData = stored ? JSON.parse(stored) : null;
+      if (userData?.role === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/dashboard');
+      }
+    } else {
+      setError(result.message);
+      toast.error(result.message);
+    }
   };
 
   return (
@@ -33,6 +50,12 @@ export default function Login() {
 
         <h2 className="text-2xl font-bold text-center text-gray-800 mb-2">Welcome Back</h2>
         <p className="text-center text-gray-500 mb-8">Sign in to your SOCIAL CLUB account</p>
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">
+            {error}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

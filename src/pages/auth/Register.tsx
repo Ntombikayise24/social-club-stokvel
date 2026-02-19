@@ -1,12 +1,26 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { User, Mail, Lock, Phone, ArrowLeft, Users, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { useAuth } from '../../context/AuthContext';
+import { stokvelAPI } from '../../services/api';
+
+interface StokvelOption {
+  id: number;
+  name: string;
+  icon: string;
+  description: string;
+  capacity: string;
+  color: string;
+}
 
 export default function Register() {
   const navigate = useNavigate();
+  const { register } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [apiError, setApiError] = useState('');
   
   const [formData, setFormData] = useState({
     fullName: '',
@@ -23,12 +37,34 @@ export default function Register() {
     confirmPassword: ''
   });
 
-  // Available Stokvel groups - this would come from API in real app
-  const availableGroups = [
-    { id: 1, name: 'COLLECTIVE POT', icon: '🌱', description: '18 members · R7,000 target', capacity: '15/18 members', color: 'primary' },
-    { id: 2, name: 'HENNESSY SOCIAL CLUB', icon: '🥃', description: 'Flexible · Up to R15,000 target', capacity: '8/50 members', color: 'secondary' },
-    { id: 3, name: 'WINTER WARMTH SAVERS', icon: '❄️', description: 'Save for winter · R5,000 target', capacity: '0/15 members', color: 'blue' }
-  ];
+  // Fetch available stokvels from backend
+  const [availableGroups, setAvailableGroups] = useState<StokvelOption[]>([]);
+  const [loadingGroups, setLoadingGroups] = useState(true);
+
+  useEffect(() => {
+    const fetchStokvels = async () => {
+      try {
+        const res = await stokvelAPI.getPublic();
+        const stokvels = res.data.data;
+        setAvailableGroups(
+          stokvels.map((s: any) => ({
+            id: s.id,
+            name: s.name,
+            icon: s.icon || '🏦',
+            description: `${s.cycle} · R${s.targetAmount?.toLocaleString()} target`,
+            capacity: `${s.currentMembers}/${s.maxMembers} members`,
+            color: s.color || 'primary',
+          }))
+        );
+      } catch {
+        // If backend is unavailable, show a fallback message
+        setAvailableGroups([]);
+      } finally {
+        setLoadingGroups(false);
+      }
+    };
+    fetchStokvels();
+  }, []);
 
   const handleGroupToggle = (groupId: number) => {
     setFormData(prev => ({
@@ -63,7 +99,7 @@ export default function Register() {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Validate passwords match
@@ -77,18 +113,31 @@ export default function Register() {
 
     // Validate at least one group preference
     if (formData.preferredGroups.length === 0) {
-      alert('Please select at least one Stokvel preference');
+      toast.error('Please select at least one Stokvel preference');
       return;
     }
 
     setIsLoading(true);
+    setApiError('');
     
-    // Simulate registration
-    setTimeout(() => {
-      setIsLoading(false);
-      alert('Registration successful! Your preferences have been submitted for admin approval. You will receive an email once approved.');
+    const result = await register({
+      fullName: formData.fullName,
+      email: formData.email,
+      phone: formData.phone,
+      password: formData.password,
+      preferredGroups: formData.preferredGroups,
+      message: formData.message || undefined,
+    });
+
+    setIsLoading(false);
+
+    if (result.success) {
+      toast.success(result.message);
       navigate('/login');
-    }, 1500);
+    } else {
+      setApiError(result.message);
+      toast.error(result.message);
+    }
   };
 
   return (
@@ -103,6 +152,12 @@ export default function Register() {
 
         <h2 className="text-2xl font-bold text-center text-gray-800 mb-2">Join SOCIAL CLUB</h2>
         <p className="text-center text-gray-500 mb-6">Create your account and select your Stokvel preferences</p>
+
+        {apiError && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">
+            {apiError}
+          </div>
+        )}
 
         {/* Approval Process Notice */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 flex items-start space-x-3">
@@ -241,7 +296,12 @@ export default function Register() {
             </div>
             
             <div className="grid grid-cols-1 gap-3">
-              {availableGroups.map(group => (
+              {loadingGroups ? (
+                <div className="text-center py-6 text-gray-500">Loading available stokvels...</div>
+              ) : availableGroups.length === 0 ? (
+                <div className="text-center py-6 text-gray-500">No stokvels available. Please try again later.</div>
+              ) : (
+                availableGroups.map(group => (
                 <label
                   key={group.id}
                   className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all ${
@@ -269,7 +329,8 @@ export default function Register() {
                     <p className="text-sm text-gray-600 mt-1">{group.description}</p>
                   </div>
                 </label>
-              ))}
+              ))
+              )}
             </div>
           </div>
 

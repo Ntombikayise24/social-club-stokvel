@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { 
   Target, 
   Users, 
@@ -11,9 +11,13 @@ import {
   Bell,
   User,
   DollarSign,
-  Calendar
+  Calendar,
+  LogOut
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import ProfileSwitcher from './ProfileSwitcher';
+import { useAuth, type ProfileData } from '../../context/AuthContext';
+import { contributionAPI, notificationAPI, stokvelAPI } from '../../services/api';
 
 interface Profile {
   id: string;
@@ -38,47 +42,83 @@ interface StokvelData {
 }
 
 export default function MainDashboard() {
+  const { user, profiles: authProfiles, logout, refreshUser } = useAuth();
+  const navigate = useNavigate();
   const [showAddContribution, setShowAddContribution] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   
   // Constants
   const TARGET_DATE = "06 Dec 2026";
+
+  // Convert auth profiles to the component's Profile format
+  const mappedProfiles: Profile[] = authProfiles.map((p: ProfileData) => ({
+    id: String(p.id),
+    name: user?.fullName || 'User',
+    stokvelName: p.stokvelName,
+    stokvelId: String(p.stokvelId),
+    role: p.role as 'member' | 'admin',
+    targetAmount: p.targetAmount,
+    savedAmount: p.savedAmount,
+    progress: p.progress,
+  }));
   
   // Active Profile State
-  const [activeProfile, setActiveProfile] = useState<Profile>({
-    id: '1',
-    name: 'Nkulumo Nkuna',
-    stokvelName: 'COLLECTIVE POT',
-    stokvelId: 'collective-pot',
-    role: 'member',
-    targetAmount: 7000,
-    savedAmount: 1070,
-    progress: 13
-  });
-
-  // Mock profiles data
-  const mockProfiles: Profile[] = [
-    {
-      id: '1',
-      name: 'Nkulumo Nkuna',
-      stokvelName: 'COLLECTIVE POT',
-      stokvelId: 'collective-pot',
+  const [activeProfile, setActiveProfile] = useState<Profile>(
+    mappedProfiles[0] || {
+      id: '0',
+      name: user?.fullName || 'User',
+      stokvelName: 'No Stokvel',
+      stokvelId: '0',
       role: 'member',
-      targetAmount: 7000,
-      savedAmount: 1070,
-      progress: 13
-    },
-    {
-      id: '2',
-      name: 'Nkulumo Nkuna',
-      stokvelName: 'SUMMER SAVERS',
-      stokvelId: 'summer-savers',
-      role: 'member',
-      targetAmount: 5000,
-      savedAmount: 850,
-      progress: 17
+      targetAmount: 0,
+      savedAmount: 0,
+      progress: 0,
     }
-  ];
+  );
+
+  // Update active profile when auth profiles change (e.g. after refresh)
+  useEffect(() => {
+    if (mappedProfiles.length > 0) {
+      const current = mappedProfiles.find(p => p.id === activeProfile.id);
+      if (current) {
+        setActiveProfile(current);
+      } else {
+        setActiveProfile(mappedProfiles[0]);
+      }
+    }
+  }, [authProfiles]);
+
+  // Stokvel details from API
+  const [stokvelDetails, setStokvelDetails] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchStokvel = async () => {
+      try {
+        const res = await stokvelAPI.getById(Number(activeProfile.stokvelId));
+        setStokvelDetails(res.data.data);
+      } catch {
+        setStokvelDetails(null);
+      }
+    };
+    if (activeProfile.stokvelId && activeProfile.stokvelId !== '0') {
+      fetchStokvel();
+    }
+  }, [activeProfile.stokvelId]);
+
+  // Notifications from API
+  const [notifications, setNotifications] = useState<any[]>([]);
+  
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        const res = await notificationAPI.getAll();
+        setNotifications(res.data.data || []);
+      } catch {
+        setNotifications([]);
+      }
+    };
+    fetchNotifications();
+  }, []);
 
   // Contribution form state
   const [contributionData, setContributionData] = useState({
@@ -102,60 +142,57 @@ export default function MainDashboard() {
     progress: Math.min(100, Math.floor((borrowedSoFar / maxBorrowable) * 100)) || 0
   };
 
-  // Stokvel data based on active profile
+  // Stokvel data based on active profile — use API data when available
   const getStokvelData = (profile: Profile): StokvelData => {
-    switch(profile.stokvelId) {
-      case 'collective-pot':
-        return {
-          name: 'COLLECTIVE POT',
-          total: 9800,
-          target: 126000,
-          progress: 8,
-          memberCount: 18,
-          cycle: "Weekly (Sunday)",
-          nextPayout: TARGET_DATE,
-          individualTarget: profile.targetAmount
-        };
-      case 'summer-savers':
-        return {
-          name: 'SUMMER SAVERS',
-          total: 4250,
-          target: 40000,
-          progress: 11,
-          memberCount: 8,
-          cycle: "Monthly",
-          nextPayout: "31 Dec 2026",
-          individualTarget: profile.targetAmount
-        };
-      default:
-        return {
-          name: profile.stokvelName,
-          total: 0,
-          target: 0,
-          progress: 0,
-          memberCount: 0,
-          cycle: "Weekly",
-          nextPayout: TARGET_DATE,
-          individualTarget: profile.targetAmount
-        };
+    if (stokvelDetails) {
+      return {
+        name: stokvelDetails.name || profile.stokvelName,
+        total: stokvelDetails.totalSaved || 0,
+        target: stokvelDetails.groupTarget || 0,
+        progress: stokvelDetails.progress || 0,
+        memberCount: stokvelDetails.currentMembers || 0,
+        cycle: stokvelDetails.cycle || 'Weekly',
+        nextPayout: stokvelDetails.nextPayout || TARGET_DATE,
+        individualTarget: profile.targetAmount,
+      };
     }
+    return {
+      name: profile.stokvelName,
+      total: 0,
+      target: 0,
+      progress: 0,
+      memberCount: 0,
+      cycle: 'Weekly',
+      nextPayout: TARGET_DATE,
+      individualTarget: profile.targetAmount,
+    };
   };
 
   const currentStokvel = getStokvelData(activeProfile);
 
-  // Mock notifications
-  const notifications = [
-    { id: 1, message: `Contribution of R200 confirmed for ${activeProfile.stokvelName}`, time: '2 hours ago', read: false },
-    { id: 2, message: 'Loan repayment due in 3 days', time: '1 day ago', read: false },
-    { id: 3, message: 'Welcome to HENNESSY SOCIAL CLUB!', time: '2 days ago', read: true },
-  ];
+  const unreadCount = notifications.filter((n: any) => !n.read && !n.is_read).length;
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const handleAddContribution = async () => {
+    if (!contributionData.amount) return;
+    try {
+      await contributionAPI.create({
+        membershipId: Number(activeProfile.id),
+        amount: parseInt(contributionData.amount),
+        paymentMethod: contributionData.paymentMethod,
+      });
+      toast.success(`Contribution of R${contributionData.amount} submitted!`);
+      setShowAddContribution(false);
+      setContributionData({ amount: '', paymentMethod: 'card' });
+      // Refresh user data to update saved amounts
+      await refreshUser();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to submit contribution');
+    }
+  };
 
-  const handleAddContribution = () => {
-    alert(`Contribution of R ${contributionData.amount} to ${activeProfile.stokvelName} submitted! (Demo)`);
-    setShowAddContribution(false);
-    setContributionData({ amount: '', paymentMethod: 'card' });
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
   };
 
   return (
@@ -201,10 +238,12 @@ export default function MainDashboard() {
                       )}
                     </div>
                     <div className="max-h-96 overflow-y-auto">
-                      {notifications.map(notif => (
-                        <div key={notif.id} className={`p-3 hover:bg-gray-50 border-b border-gray-100 last:border-0 ${!notif.read ? 'bg-primary-50/50' : ''}`}>
+                      {notifications.length === 0 ? (
+                        <div className="p-4 text-center text-sm text-gray-500">No notifications</div>
+                      ) : notifications.map((notif: any) => (
+                        <div key={notif.id} className={`p-3 hover:bg-gray-50 border-b border-gray-100 last:border-0 ${!(notif.read || notif.is_read) ? 'bg-primary-50/50' : ''}`}>
                           <p className="text-sm text-gray-800">{notif.message}</p>
-                          <p className="text-xs text-gray-500 mt-1">{notif.time}</p>
+                          <p className="text-xs text-gray-500 mt-1">{notif.time || notif.created_at}</p>
                         </div>
                       ))}
                     </div>
@@ -217,13 +256,22 @@ export default function MainDashboard() {
 
               {/* Profile Switcher */}
               <ProfileSwitcher 
-                profiles={mockProfiles}
+                profiles={mappedProfiles}
                 activeProfile={activeProfile}
                 onSwitch={setActiveProfile}
                 onAddProfile={() => {
                   alert('Navigate to add profile page');
                 }}
               />
+              
+              {/* Logout Button */}
+              <button
+                onClick={handleLogout}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Logout"
+              >
+                <LogOut className="w-5 h-5 text-gray-600" />
+              </button>
             </div>
           </div>
         </div>

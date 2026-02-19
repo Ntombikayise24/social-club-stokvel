@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { 
   User, 
   Mail, 
@@ -15,6 +15,9 @@ import {
   Target,
   LogOut
 } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { useAuth, type ProfileData } from '../../context/AuthContext';
+import { profileAPI } from '../../services/api';
 
 interface Profile {
   id: string;
@@ -38,41 +41,31 @@ interface UserData {
 }
 
 export default function MemberProfile() {
+  const { user, profiles: authProfiles, logout, refreshUser } = useAuth();
+  const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
-  
-  // Mock user data with the two profiles we've been using
-  const [userData, setUserData] = useState<UserData>({
-    fullName: "Nkulumo Nkuna",
-    email: "nkulumo.nkuna@email.com",
-    phone: "082 123 4567",
-    mainMemberSince: "21 January 2026",
-    profiles: [
-      {
-        id: '1',
-        stokvelName: 'COLLECTIVE POT',
-        stokvelId: 'collective-pot',
-        role: 'member',
-        targetAmount: 7000,
-        savedAmount: 1070,
-        progress: 13,
-        joinedDate: '21 Jan 2026',
-        icon: '🌱',
-        color: 'primary'
-      },
-      {
-        id: '2',
-        stokvelName: 'SUMMER SAVERS',
-        stokvelId: 'summer-savers',
-        role: 'member',
-        targetAmount: 5000,
-        savedAmount: 850,
-        progress: 17,
-        joinedDate: '05 Feb 2026',
-        icon: '💰',
-        color: 'secondary'
-      }
-    ]
+
+  // Build user data from auth context
+  const buildUserData = (): UserData => ({
+    fullName: user?.fullName || 'User',
+    email: user?.email || '',
+    phone: user?.phone || '',
+    mainMemberSince: user?.memberSince ? new Date(user.memberSince).toLocaleDateString('en-ZA', { day: '2-digit', month: 'long', year: 'numeric' }) : '',
+    profiles: authProfiles.map((p: ProfileData) => ({
+      id: String(p.id),
+      stokvelName: p.stokvelName,
+      stokvelId: String(p.stokvelId),
+      role: p.role as 'member' | 'admin',
+      targetAmount: p.targetAmount,
+      savedAmount: p.savedAmount,
+      progress: p.progress,
+      joinedDate: p.joinedDate ? new Date(p.joinedDate).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' }) : '',
+      icon: p.stokvelIcon || '🏦',
+      color: p.stokvelColor || 'primary',
+    })),
   });
+
+  const [userData, setUserData] = useState<UserData>(buildUserData());
 
   const [editedUserData, setEditedUserData] = useState({ ...userData });
 
@@ -82,9 +75,19 @@ export default function MemberProfile() {
     activeGroups: userData.profiles.length
   };
 
-  const handleSave = () => {
-    setUserData(editedUserData);
-    setIsEditing(false);
+  const handleSave = async () => {
+    try {
+      await profileAPI.update({
+        fullName: editedUserData.fullName,
+        phone: editedUserData.phone,
+      });
+      setUserData(editedUserData);
+      setIsEditing(false);
+      toast.success('Profile updated successfully!');
+      await refreshUser();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to update profile');
+    }
   };
 
   const handleCancel = () => {
@@ -364,13 +367,13 @@ export default function MemberProfile() {
 
         {/* Logout */}
         <div className="mt-6 text-center">
-          <Link 
-            to="/" 
+          <button 
+            onClick={() => { logout(); navigate('/login'); }}
             className="inline-flex items-center space-x-2 text-red-600 hover:text-red-700 text-sm font-medium"
           >
             <LogOut className="w-4 h-4" />
             <span>Logout</span>
-          </Link>
+          </button>
         </div>
       </main>
     </div>

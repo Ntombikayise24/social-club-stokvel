@@ -8,7 +8,8 @@ import ContributionHistory from "../pages/history/ContributionHistory";
 import LoanHistory from "../pages/loans/LoanHistory";
 import LoanRequest from "../pages/loans/LoanRequest";
 import AdminDashboard from "../pages/admin/AdminDashboard";
-import GroupDetails from "../pages/groups/GroupDetails"; // Add this import
+import GroupDetails from "../pages/groups/GroupDetails";
+import ProtectedRoute from "../components/ProtectedRoute";
 
 const router = createBrowserRouter([
   {
@@ -25,31 +26,59 @@ const router = createBrowserRouter([
   },
   {
     path: "/dashboard",
-    element: <MainDashboard />,
+    element: (
+      <ProtectedRoute>
+        <MainDashboard />
+      </ProtectedRoute>
+    ),
   },
   {
     path: "/profile",
-    element: <MemberProfile />,
+    element: (
+      <ProtectedRoute>
+        <MemberProfile />
+      </ProtectedRoute>
+    ),
   },
   {
     path: "/contributions",
-    element: <ContributionHistory />,
+    element: (
+      <ProtectedRoute>
+        <ContributionHistory />
+      </ProtectedRoute>
+    ),
   },
   {
     path: "/loans",
-    element: <LoanHistory />,
+    element: (
+      <ProtectedRoute>
+        <LoanHistory />
+      </ProtectedRoute>
+    ),
   },
   {
     path: "/loans/request",
-    element: <LoanRequest />,
+    element: (
+      <ProtectedRoute>
+        <LoanRequest />
+      </ProtectedRoute>
+    ),
   },
   {
     path: "/admin",
-    element: <AdminDashboard />,
+    element: (
+      <ProtectedRoute adminOnly>
+        <AdminDashboard />
+      </ProtectedRoute>
+    ),
   },
   {
-    path: "/group/:groupId", // Add this route
-    element: <GroupDetails />,
+    path: "/group/:groupId",
+    element: (
+      <ProtectedRoute>
+        <GroupDetails />
+      </ProtectedRoute>
+    ),
   },
 ]);
 
