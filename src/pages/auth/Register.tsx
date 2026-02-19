@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { User, Mail, Lock, Phone, ArrowLeft, Users, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { User, Mail, Lock, Phone, ArrowLeft, Users, Eye, EyeOff, AlertCircle, Info } from 'lucide-react';
 
 export default function Register() {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showInfo, setShowInfo] = useState(false); // New state for info section
   
   const [formData, setFormData] = useState({
     fullName: '',
@@ -26,7 +27,7 @@ export default function Register() {
   // Available Stokvel groups - this would come from API in real app
   const availableGroups = [
     { id: 1, name: 'COLLECTIVE POT', icon: '🌱', description: '18 members · R7,000 target', capacity: '15/18 members', color: 'primary' },
-    { id: 2, name: 'HENNESSY SOCIAL CLUB', icon: '🥃', description: 'Flexible · Up to R15,000 target', capacity: '8/50 members', color: 'secondary' },
+    { id: 2, name: 'SUMMER SAVERS', icon: '🥃', description: 'Flexible · Up to R15,000 target', capacity: '8/50 members', color: 'secondary' },
     { id: 3, name: 'WINTER WARMTH SAVERS', icon: '❄️', description: 'Save for winter · R5,000 target', capacity: '0/15 members', color: 'blue' }
   ];
 
@@ -101,22 +102,35 @@ export default function Register() {
           </div>
         </div>
 
-        <h2 className="text-2xl font-bold text-center text-gray-800 mb-2">Join SOCIAL CLUB</h2>
+        <h2 className="text-2xl font-bold text-center text-gray-800 mb-2">Join HENNESSY SOCIAL CLUB</h2>
         <p className="text-center text-gray-500 mb-6">Create your account and select your Stokvel preferences</p>
 
-        {/* Approval Process Notice */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 flex items-start space-x-3">
-          <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-medium text-blue-800">How it works:</p>
-            <p className="text-xs text-blue-700 mt-1">
-              1. Select which Stokvel(s) you'd like to join<br />
-              2. Admin will review your request<br />
-              3. You'll be approved based on capacity and eligibility<br />
-              4. You can be added to multiple Stokvels
-            </p>
+        {/* How It Works Button */}
+        <button
+          onClick={() => setShowInfo(!showInfo)}
+          className="w-full mb-4 px-4 py-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg flex items-center justify-center space-x-2 transition-colors group"
+        >
+          <Info className={`w-5 h-5 transition-colors ${showInfo ? 'text-blue-600' : 'text-gray-500 group-hover:text-blue-600'}`} />
+          <span className={`font-medium transition-colors ${showInfo ? 'text-blue-600' : 'text-gray-700 group-hover:text-blue-600'}`}>
+            {showInfo ? 'Hide Process Info' : 'How It Works'}
+          </span>
+        </button>
+
+        {/* Approval Process Notice - Conditionally shown */}
+        {showInfo && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 flex items-start space-x-3 animate-fadeIn">
+            <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-blue-800">Registration Process:</p>
+              <p className="text-xs text-blue-700 mt-1">
+                1. Select which Stokvel(s) you'd like to join<br />
+                2. Admin will review your request<br />
+                3. You'll be approved based on capacity and eligibility<br />
+                4. You can be added to multiple Stokvels
+              </p>
+            </div>
           </div>
-        </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Personal Information */}
@@ -315,6 +329,24 @@ export default function Register() {
           Back to Home
         </button>
       </div>
+
+      {/* Add animation styles */}
+      <style>{`
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(-10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        
+        .animate-fadeIn {
+          animation: fadeIn 0.3s ease-out;
+        }
+      `}</style>
     </div>
   );
 }

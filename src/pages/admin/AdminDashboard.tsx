@@ -18,7 +18,12 @@ import {
   Download,
   RefreshCw,
   Mail,
-  Phone
+  Phone,
+  X,
+  CheckCircle,
+  AlertCircle,
+  Tag,
+  Users as UsersIcon
 } from 'lucide-react';
 
 // Types
@@ -78,14 +83,621 @@ interface Contribution {
   reference?: string;
 }
 
+// Add User Modal Component
+interface AddUserModalProps {
+  onClose: () => void;
+  onAdd: (user: any) => void;
+  stokvels: Stokvel[];
+}
+
+function AddUserModal({ onClose, onAdd, stokvels }: AddUserModalProps) {
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    status: 'pending' as 'active' | 'pending',
+    selectedStokvels: [] as number[]
+  });
+
+  const [errors, setErrors] = useState({
+    name: '',
+    email: '',
+    phone: ''
+  });
+
+  const validateForm = () => {
+    const newErrors = {
+      name: '',
+      email: '',
+      phone: ''
+    };
+    let isValid = true;
+
+    if (!formData.name.trim()) {
+      newErrors.name = 'Name is required';
+      isValid = false;
+    }
+
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email is required';
+      isValid = false;
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = 'Email is invalid';
+      isValid = false;
+    }
+
+    if (!formData.phone.trim()) {
+      newErrors.phone = 'Phone is required';
+      isValid = false;
+    } else if (!/^[0-9\s\+\-\(\)]{10,}$/.test(formData.phone)) {
+      newErrors.phone = 'Phone number is invalid';
+      isValid = false;
+    }
+
+    setErrors(newErrors);
+    return isValid;
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!validateForm()) return;
+
+    const newUser = {
+      id: Date.now(),
+      name: formData.name,
+      email: formData.email,
+      phone: formData.phone,
+      status: formData.status,
+      joinedDate: new Date().toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }),
+      lastActive: formData.status === 'active' ? 'Just now' : 'Never',
+      profiles: formData.selectedStokvels.map(stokvelId => {
+        const stokvel = stokvels.find(s => s.id === stokvelId);
+        return {
+          id: `p${Date.now()}-${stokvelId}`,
+          stokvelId,
+          stokvelName: stokvel?.name || '',
+          role: 'member',
+          targetAmount: stokvel?.targetAmount || 0,
+          savedAmount: 0,
+          joinedDate: new Date().toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })
+        };
+      })
+    };
+
+    onAdd(newUser);
+  };
+
+  const toggleStokvel = (stokvelId: number) => {
+    setFormData(prev => ({
+      ...prev,
+      selectedStokvels: prev.selectedStokvels.includes(stokvelId)
+        ? prev.selectedStokvels.filter(id => id !== stokvelId)
+        : [...prev.selectedStokvels, stokvelId]
+    }));
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-gray-800">Add New User</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {/* Basic Information */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-medium text-gray-700 uppercase tracking-wider">Basic Information</h3>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Full Name *
+              </label>
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData({...formData, name: e.target.value})}
+                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 ${
+                  errors.name ? 'border-red-500' : 'border-gray-300'
+                }`}
+                placeholder="John Doe"
+              />
+              {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name}</p>}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Email Address *
+              </label>
+              <input
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({...formData, email: e.target.value})}
+                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 ${
+                  errors.email ? 'border-red-500' : 'border-gray-300'
+                }`}
+                placeholder="john@example.com"
+              />
+              {errors.email && <p className="mt-1 text-xs text-red-600">{errors.email}</p>}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Phone Number *
+              </label>
+              <input
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 ${
+                  errors.phone ? 'border-red-500' : 'border-gray-300'
+                }`}
+                placeholder="082 123 4567"
+              />
+              {errors.phone && <p className="mt-1 text-xs text-red-600">{errors.phone}</p>}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Status
+              </label>
+              <select
+                value={formData.status}
+                onChange={(e) => setFormData({...formData, status: e.target.value as 'active' | 'pending'})}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              >
+                <option value="pending">Pending (Requires Approval)</option>
+                <option value="active">Active (Immediate Access)</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Stokvel Assignment */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-medium text-gray-700 uppercase tracking-wider">Assign to Stokvels</h3>
+            <p className="text-xs text-gray-500">Select which stokvels this user should join</p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {stokvels.filter(s => s.status === 'active').map(stokvel => (
+                <label
+                  key={stokvel.id}
+                  className={`flex items-center p-4 border rounded-lg cursor-pointer transition-colors ${
+                    formData.selectedStokvels.includes(stokvel.id)
+                      ? `border-${stokvel.color}-500 bg-${stokvel.color}-50`
+                      : 'border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={formData.selectedStokvels.includes(stokvel.id)}
+                    onChange={() => toggleStokvel(stokvel.id)}
+                    className="hidden"
+                  />
+                  <div className="flex items-center space-x-3 flex-1">
+                    <span className="text-2xl">{stokvel.icon}</span>
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-800">{stokvel.name}</p>
+                      <p className="text-xs text-gray-500">
+                        Target: R {stokvel.targetAmount.toLocaleString()} • {stokvel.currentMembers}/{stokvel.maxMembers} members
+                      </p>
+                    </div>
+                    {formData.selectedStokvels.includes(stokvel.id) && (
+                      <CheckCircle className={`w-5 h-5 text-${stokvel.color}-600`} />
+                    )}
+                  </div>
+                </label>
+              ))}
+            </div>
+            
+            {formData.selectedStokvels.length === 0 && (
+              <p className="text-xs text-yellow-600 flex items-center">
+                <AlertCircle className="w-3 h-3 mr-1" />
+                User will have no stokvel access until assigned
+              </p>
+            )}
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center space-x-2"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>Create User</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// Add Stokvel Modal Component
+interface AddStokvelModalProps {
+  onClose: () => void;
+  onAdd: (stokvel: any) => void;
+}
+
+function AddStokvelModal({ onClose, onAdd }: AddStokvelModalProps) {
+  const [formData, setFormData] = useState({
+    name: '',
+    type: 'traditional' as 'traditional' | 'flexible',
+    description: '',
+    targetAmount: '',
+    maxMembers: '',
+    cycle: 'weekly' as 'weekly' | 'monthly' | 'quarterly',
+    meetingDay: '',
+    icon: '',
+    color: 'primary',
+    status: 'upcoming' as 'active' | 'upcoming'
+  });
+
+  const [errors, setErrors] = useState({
+    name: '',
+    targetAmount: '',
+    maxMembers: ''
+  });
+
+  const iconOptions = [
+    { value: '💰', label: 'Money Bag' },
+    { value: '🌱', label: 'Seedling' },
+    { value: '❄️', label: 'Snowflake' },
+    { value: '🏖️', label: 'Beach' },
+    { value: '🎄', label: 'Christmas' },
+    { value: '🏦', label: 'Bank' },
+    { value: '📈', label: 'Growth' },
+    { value: '💎', label: 'Diamond' }
+  ];
+
+  const cycleDays = {
+    weekly: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+    monthly: ['1st', '5th', '10th', '15th', '20th', '25th', 'Last day'],
+    quarterly: ['Jan', 'Apr', 'Jul', 'Oct']
+  };
+
+  const validateForm = () => {
+    const newErrors = {
+      name: '',
+      targetAmount: '',
+      maxMembers: ''
+    };
+    let isValid = true;
+
+    if (!formData.name.trim()) {
+      newErrors.name = 'Stokvel name is required';
+      isValid = false;
+    }
+
+    if (!formData.targetAmount) {
+      newErrors.targetAmount = 'Target amount is required';
+      isValid = false;
+    } else if (parseInt(formData.targetAmount) < 1000) {
+      newErrors.targetAmount = 'Minimum target is R 1,000';
+      isValid = false;
+    }
+
+    if (!formData.maxMembers) {
+      newErrors.maxMembers = 'Maximum members is required';
+      isValid = false;
+    } else if (parseInt(formData.maxMembers) < 5) {
+      newErrors.maxMembers = 'Minimum 5 members required';
+      isValid = false;
+    }
+
+    setErrors(newErrors);
+    return isValid;
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!validateForm()) return;
+
+    const newStokvel = {
+      id: Date.now(),
+      name: formData.name.toUpperCase(),
+      type: formData.type,
+      description: formData.description || `New ${formData.type} Stokvel - Save and grow together`,
+      targetAmount: parseInt(formData.targetAmount),
+      maxMembers: parseInt(formData.maxMembers),
+      currentMembers: 0,
+      interestRate: 30,
+      cycle: formData.cycle,
+      meetingDay: formData.meetingDay || (formData.cycle === 'weekly' ? 'Monday' : undefined),
+      nextPayout: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }),
+      status: formData.status,
+      icon: formData.icon || '💰',
+      color: formData.color,
+      createdAt: new Date().toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }),
+      createdBy: 'Admin'
+    };
+
+    onAdd(newStokvel);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-gray-800">Create New Stokvel</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {/* Basic Information */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-medium text-gray-700 uppercase tracking-wider">Stokvel Details</h3>
+            
+            {/* Name and Icon */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Stokvel Name *
+                </label>
+                <div className="relative">
+                  <Tag className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData({...formData, name: e.target.value})}
+                    className={`w-full pl-9 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 ${
+                      errors.name ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    placeholder="WINTER WARMTH"
+                  />
+                </div>
+                {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name}</p>}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Icon
+                </label>
+                <select
+                  value={formData.icon}
+                  onChange={(e) => setFormData({...formData, icon: e.target.value})}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="">Select an icon</option>
+                  {iconOptions.map(icon => (
+                    <option key={icon.value} value={icon.value}>
+                      {icon.value} {icon.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Description */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Description
+              </label>
+              <textarea
+                value={formData.description}
+                onChange={(e) => setFormData({...formData, description: e.target.value})}
+                rows={2}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                placeholder="Describe the purpose of this Stokvel..."
+              />
+            </div>
+
+            {/* Type and Status */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Stokvel Type
+                </label>
+                <select
+                  value={formData.type}
+                  onChange={(e) => setFormData({...formData, type: e.target.value as 'traditional' | 'flexible'})}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="traditional">Traditional (Fixed)</option>
+                  <option value="flexible">Flexible</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Status
+                </label>
+                <select
+                  value={formData.status}
+                  onChange={(e) => setFormData({...formData, status: e.target.value as 'active' | 'upcoming'})}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="upcoming">Upcoming (Not yet active)</option>
+                  <option value="active">Active (Immediately)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Financial Settings */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-medium text-gray-700 uppercase tracking-wider">Financial Settings</h3>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Target Amount (R) *
+                </label>
+                <div className="relative">
+                  <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="number"
+                    value={formData.targetAmount}
+                    onChange={(e) => setFormData({...formData, targetAmount: e.target.value})}
+                    className={`w-full pl-9 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 ${
+                      errors.targetAmount ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    placeholder="3000"
+                    min="1000"
+                    step="100"
+                  />
+                </div>
+                {errors.targetAmount && <p className="mt-1 text-xs text-red-600">{errors.targetAmount}</p>}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Max Members *
+                </label>
+                <div className="relative">
+                  <UsersIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="number"
+                    value={formData.maxMembers}
+                    onChange={(e) => setFormData({...formData, maxMembers: e.target.value})}
+                    className={`w-full pl-9 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 ${
+                      errors.maxMembers ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    placeholder="12"
+                    min="5"
+                    max="50"
+                  />
+                </div>
+                {errors.maxMembers && <p className="mt-1 text-xs text-red-600">{errors.maxMembers}</p>}
+              </div>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <p className="text-xs text-blue-700 flex items-center">
+                <AlertCircle className="w-3 h-3 mr-1" />
+                Interest rate is fixed at 30% for all Stokvels
+              </p>
+            </div>
+          </div>
+
+          {/* Cycle Settings */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-medium text-gray-700 uppercase tracking-wider">Cycle Settings</h3>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Contribution Cycle
+                </label>
+                <select
+                  value={formData.cycle}
+                  onChange={(e) => {
+                    setFormData({...formData, cycle: e.target.value as 'weekly' | 'monthly' | 'quarterly', meetingDay: ''});
+                  }}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                  <option value="quarterly">Quarterly</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Meeting Day
+                </label>
+                <select
+                  value={formData.meetingDay}
+                  onChange={(e) => setFormData({...formData, meetingDay: e.target.value})}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="">Select day</option>
+                  {cycleDays[formData.cycle].map(day => (
+                    <option key={day} value={day}>{day}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Preview Section */}
+          <div className="space-y-2">
+            <h3 className="text-sm font-medium text-gray-700 uppercase tracking-wider">Preview</h3>
+            <div className={`border rounded-lg p-4 ${
+              formData.status === 'upcoming' ? 'border-blue-200 bg-blue-50' : 'border-green-200 bg-green-50'
+            }`}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center space-x-2">
+                  <span className="text-2xl">{formData.icon || '💰'}</span>
+                  <h4 className="font-semibold text-gray-800">{formData.name || 'NEW STOKVEL'}</h4>
+                </div>
+                <span className={`px-2 py-1 text-xs rounded-full ${
+                  formData.status === 'upcoming' 
+                    ? 'bg-blue-100 text-blue-700' 
+                    : 'bg-green-100 text-green-700'
+                }`}>
+                  {formData.status === 'upcoming' ? 'Upcoming' : 'Active'}
+                </span>
+              </div>
+              <p className="text-sm text-gray-600 mb-3">
+                {formData.description || 'New Stokvel - Save and grow together'}
+              </p>
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Members:</span>
+                  <span className="font-medium">0/{formData.maxMembers || '12'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Target:</span>
+                  <span className="font-medium">R {(parseInt(formData.targetAmount) || 3000).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Cycle:</span>
+                  <span className="font-medium capitalize">
+                    {formData.cycle} {formData.meetingDay ? `(${formData.meetingDay})` : ''}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center space-x-2"
+            >
+              <PlusCircle className="w-4 h-4" />
+              <span>Create Stokvel</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStokvel, setSelectedStokvel] = useState('all');
   const [expandedUser, setExpandedUser] = useState<number | null>(null);
+  const [showAddUserModal, setShowAddUserModal] = useState(false);
+  const [showAddStokvelModal, setShowAddStokvelModal] = useState(false);
+  const [showSuccessMessage, setShowSuccessMessage] = useState('');
 
-  // Mock Stokvels Data - CONSISTENT with our two main stokvels
-  const [stokvels] = useState<Stokvel[]>([
+  // Mock Stokvels Data
+  const [stokvels, setStokvels] = useState<Stokvel[]>([
     {
       id: 1,
       name: 'COLLECTIVE POT',
@@ -142,8 +754,8 @@ export default function AdminDashboard() {
     }
   ]);
 
-  // Mock Users Data - CONSISTENT with our member pages
-  const [users] = useState<User[]>([
+  // Mock Users Data
+  const [users, setUsers] = useState<User[]>([
     {
       id: 1,
       name: 'Nkulumo Nkuna',
@@ -255,7 +867,7 @@ export default function AdminDashboard() {
     }
   ]);
 
-  // Mock Contributions Data - CONSISTENT with member pages
+  // Mock Contributions Data
   const [contributions] = useState<Contribution[]>([
     {
       id: 1,
@@ -375,6 +987,20 @@ export default function AdminDashboard() {
     alert(`Contribution ${contributionId} confirmed! (Demo)`);
   };
 
+  const handleAddUser = (newUser: any) => {
+    setUsers([...users, newUser]);
+    setShowAddUserModal(false);
+    setShowSuccessMessage(`User ${newUser.name} created successfully!`);
+    setTimeout(() => setShowSuccessMessage(''), 3000);
+  };
+
+  const handleAddStokvel = (newStokvel: any) => {
+    setStokvels([...stokvels, newStokvel]);
+    setShowAddStokvelModal(false);
+    setShowSuccessMessage(`Stokvel ${newStokvel.name} created successfully!`);
+    setTimeout(() => setShowSuccessMessage(''), 3000);
+  };
+
   const formatCurrency = (amount: number) => {
     return `R ${amount.toLocaleString()}`;
   };
@@ -398,6 +1024,14 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-100">
+      {/* Success Message Toast */}
+      {showSuccessMessage && (
+        <div className="fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg shadow-lg z-50 flex items-center">
+          <CheckCircle className="w-5 h-5 mr-2" />
+          {showSuccessMessage}
+        </div>
+      )}
+
       {/* Header */}
       <header className="bg-primary-800 text-white shadow-lg sticky top-0 z-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -417,7 +1051,7 @@ export default function AdminDashboard() {
                 <Settings className="w-5 h-5" />
               </button>
               <Link
-                to="/"  // ✅ Now goes to Landing Page
+                to="/"
                 className="p-2 hover:bg-primary-700 rounded-lg transition-colors"
               >
                 <LogOut className="w-5 h-5" />
@@ -549,7 +1183,7 @@ export default function AdminDashboard() {
                           <p className="text-xs text-gray-400 mt-1">Registered: {user.joinedDate}</p>
                         </div>
                         <button
-                          onClick={() => alert(`Approve user: ${user.name}`)}
+                          onClick={() => alert(`Approve user: ${user.name} - This will open approval modal`)}
                           className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
                         >
                           Review & Approve
@@ -597,7 +1231,7 @@ export default function AdminDashboard() {
             {/* Quick Actions */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <button
-                onClick={() => alert('Add User functionality')}
+                onClick={() => setShowAddUserModal(true)}
                 className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary-300 transition-colors text-left"
               >
                 <UserPlus className="w-8 h-8 text-primary-600 mb-3" />
@@ -606,7 +1240,7 @@ export default function AdminDashboard() {
               </button>
               
               <button
-                onClick={() => alert('Create Stokvel functionality')}
+                onClick={() => setShowAddStokvelModal(true)}
                 className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary-300 transition-colors text-left"
               >
                 <PlusCircle className="w-8 h-8 text-primary-600 mb-3" />
@@ -615,7 +1249,7 @@ export default function AdminDashboard() {
               </button>
               
               <button
-                onClick={() => alert('Generate Report functionality')}
+                onClick={() => alert('Generate Report functionality - Coming soon!')}
                 className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary-300 transition-colors text-left"
               >
                 <Download className="w-8 h-8 text-primary-600 mb-3" />
@@ -635,7 +1269,7 @@ export default function AdminDashboard() {
                 <h3 className="text-lg font-semibold text-gray-800">User Management</h3>
                 <div className="flex space-x-2">
                   <button
-                    onClick={() => alert('Add User functionality')}
+                    onClick={() => setShowAddUserModal(true)}
                     className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors flex items-center space-x-2"
                   >
                     <UserPlus className="w-5 h-5" />
@@ -743,7 +1377,7 @@ export default function AdminDashboard() {
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-lg font-semibold text-gray-800">Stokvel Management</h3>
                 <button
-                  onClick={() => alert('Create new stokvel')}
+                  onClick={() => setShowAddStokvelModal(true)}
                   className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors flex items-center space-x-2"
                 >
                   <PlusCircle className="w-5 h-5" />
@@ -822,6 +1456,23 @@ export default function AdminDashboard() {
           </div>
         )}
       </main>
+
+      {/* Add User Modal */}
+      {showAddUserModal && (
+        <AddUserModal
+          onClose={() => setShowAddUserModal(false)}
+          onAdd={handleAddUser}
+          stokvels={stokvels}
+        />
+      )}
+
+      {/* Add Stokvel Modal */}
+      {showAddStokvelModal && (
+        <AddStokvelModal
+          onClose={() => setShowAddStokvelModal(false)}
+          onAdd={handleAddStokvel}
+        />
+      )}
     </div>
   );
 }
