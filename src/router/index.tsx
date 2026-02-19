@@ -8,6 +8,7 @@ import ContributionHistory from "../pages/history/ContributionHistory";
 import LoanHistory from "../pages/loans/LoanHistory";
 import LoanRequest from "../pages/loans/LoanRequest";
 import AdminDashboard from "../pages/admin/AdminDashboard";
+import GroupDetails from "../pages/groups/GroupDetails"; // Add this import
 
 const router = createBrowserRouter([
   {
@@ -45,6 +46,10 @@ const router = createBrowserRouter([
   {
     path: "/admin",
     element: <AdminDashboard />,
+  },
+  {
+    path: "/group/:groupId", // Add this route
+    element: <GroupDetails />,
   },
 ]);
 
