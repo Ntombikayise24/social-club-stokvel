@@ -2,6 +2,7 @@ import { createBrowserRouter } from "react-router-dom";
 import App from "../App";
 import Login from "../pages/auth/Login";
 import Register from "../pages/auth/Register";
+import RegistrationSuccess from "../pages/auth/RegistrationSuccess";
 import MainDashboard from "../pages/dashboard/MainDashboard";
 import MemberProfile from "../pages/profile/MemberProfile";
 import ContributionHistory from "../pages/history/ContributionHistory";
@@ -9,7 +10,12 @@ import LoanHistory from "../pages/loans/LoanHistory";
 import LoanRequest from "../pages/loans/LoanRequest";
 import AdminDashboard from "../pages/admin/AdminDashboard";
 import GroupDetails from "../pages/groups/GroupDetails";
-import ProtectedRoute from "../components/ProtectedRoute";
+import Notifications from "../pages/notifications/Notifications";
+import Settings from "../pages/settings/Settings";
+import HelpCenter from "../pages/help/HelpCenter";
+import ForgotPassword from "../pages/auth/ForgotPassword";
+import Terms from "../pages/legal/Terms";
+import Privacy from "../pages/legal/Privacy";
 
 const router = createBrowserRouter([
   {
@@ -25,61 +31,61 @@ const router = createBrowserRouter([
     element: <Register />,
   },
   {
+    path: "/registration-success",
+    element: <RegistrationSuccess />,
+  },
+  {
     path: "/dashboard",
-    element: (
-      <ProtectedRoute>
-        <MainDashboard />
-      </ProtectedRoute>
-    ),
+    element: <MainDashboard />,
   },
   {
     path: "/profile",
-    element: (
-      <ProtectedRoute>
-        <MemberProfile />
-      </ProtectedRoute>
-    ),
+    element: <MemberProfile />,
   },
   {
     path: "/contributions",
-    element: (
-      <ProtectedRoute>
-        <ContributionHistory />
-      </ProtectedRoute>
-    ),
+    element: <ContributionHistory />,
   },
   {
     path: "/loans",
-    element: (
-      <ProtectedRoute>
-        <LoanHistory />
-      </ProtectedRoute>
-    ),
+    element: <LoanHistory />,
   },
   {
     path: "/loans/request",
-    element: (
-      <ProtectedRoute>
-        <LoanRequest />
-      </ProtectedRoute>
-    ),
+    element: <LoanRequest />,
   },
   {
     path: "/admin",
-    element: (
-      <ProtectedRoute adminOnly>
-        <AdminDashboard />
-      </ProtectedRoute>
-    ),
+    element: <AdminDashboard />,
   },
   {
     path: "/group/:groupId",
-    element: (
-      <ProtectedRoute>
-        <GroupDetails />
-      </ProtectedRoute>
-    ),
+    element: <GroupDetails />,
   },
+  {
+    path: "/notifications", // Add this route
+    element: <Notifications />,
+  },
+  {
+  path: "/settings",
+  element: <Settings />,
+},
+{
+  path: "/help",
+  element: <HelpCenter />,
+},
+{
+  path: "/forgot-password",
+  element: <ForgotPassword />,
+},
+{
+  path: "/terms",
+  element: <Terms />,
+},
+{
+  path: "/privacy",
+  element: <Privacy />,
+},
 ]);
 
 export default router;

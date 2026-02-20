@@ -1,9 +1,166 @@
-import { Link } from "react-router-dom";
-import { Users, Target, Wallet, Shield, ArrowRight } from 'lucide-react';
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { Users, Target, Wallet, Shield, ArrowRight, Settings, X, Mail, Lock, AlertCircle, Eye, EyeOff } from 'lucide-react';
 
 function App() {
+  const navigate = useNavigate();
+  const [showAdminModal, setShowAdminModal] = useState(false);
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Admin credentials (hidden from UI but working)
+  const ADMIN_EMAIL = 'admin@admin.com';
+  const ADMIN_PASSWORD = 'admin@123';
+
+  const handleAdminClick = () => {
+    setShowAdminModal(true);
+    setLoginError('');
+    setAdminEmail('');
+    setAdminPassword('');
+    setShowPassword(false);
+  };
+
+  const handleAdminLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setLoginError('');
+
+    // Simulate API call
+    setTimeout(() => {
+      if (adminEmail === ADMIN_EMAIL && adminPassword === ADMIN_PASSWORD) {
+        // Successful login
+        setShowAdminModal(false);
+        navigate('/admin');
+      } else {
+        // Failed login
+        setLoginError('Invalid email or password');
+      }
+      setIsLoading(false);
+    }, 1000);
+  };
+
+  const closeModal = () => {
+    setShowAdminModal(false);
+    setLoginError('');
+    setAdminEmail('');
+    setAdminPassword('');
+    setShowPassword(false);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 to-primary-100">
+      {/* Admin Login Modal */}
+      {showAdminModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full relative animate-fadeIn">
+            {/* Close Button */}
+            <button
+              onClick={closeModal}
+              className="absolute right-4 top-4 text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Modal Header */}
+            <div className="p-6 border-b border-gray-100">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
+                  <Shield className="w-5 h-5 text-primary-600" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-800">Admin Access</h3>
+                  <p className="text-sm text-gray-500">Enter your admin credentials</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <form onSubmit={handleAdminLogin} className="p-6 space-y-4">
+              {/* Error Message */}
+              {loginError && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start space-x-2">
+                  <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-red-700">{loginError}</p>
+                </div>
+              )}
+
+              {/* Email Field */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Email Address
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="email"
+                    required
+                    value={adminEmail}
+                    onChange={(e) => setAdminEmail(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    placeholder="admin email"
+                  />
+                </div>
+              </div>
+
+              {/* Password Field with Toggle */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Password
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    required
+                    value={adminPassword}
+                    onChange={(e) => setAdminPassword(e.target.value)}
+                    className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    placeholder="••••••••"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+                {/* Hint that password can be viewed */}
+                <p className="text-xs text-gray-400 mt-1">
+                  Click the eye icon to {showPassword ? 'hide' : 'view'} password
+                </p>
+              </div>
+
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full bg-primary-600 text-white py-3 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 font-medium flex items-center justify-center"
+              >
+                {isLoading ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                    Verifying...
+                  </>
+                ) : (
+                  'Access Admin Dashboard'
+                )}
+              </button>
+            </form>
+
+            {/* Modal Footer */}
+            <div className="p-6 bg-gray-50 rounded-b-2xl border-t border-gray-100">
+              <p className="text-xs text-gray-500 text-center">
+                This area is restricted to administrators only.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Navigation Bar */}
       <nav className="bg-white/80 backdrop-blur-sm shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -13,9 +170,17 @@ function App() {
               <div className="w-10 h-10 bg-primary-600 rounded-xl flex items-center justify-center">
                 <Users className="w-6 h-6 text-white" />
               </div>
-              <span className="text-xl font-bold text-primary-800">SOCIAL CLUB</span>
+              <span className="text-xl font-bold text-primary-800">HENNESSY SOCIAL CLUB</span>
             </div>
             <div className="flex items-center space-x-4">
+              {/* Admin Button - Now opens modal */}
+              <button
+                onClick={handleAdminClick}
+                className="flex items-center space-x-2 px-4 py-2 bg-primary-100 text-primary-700 rounded-lg hover:bg-primary-200 transition-colors"
+              >
+                <Settings className="w-4 h-4" />
+                <span className="font-medium">Admin</span>
+              </button>
               <Link to="/login" className="text-gray-600 hover:text-primary-600 transition-colors">
                 Login
               </Link>
@@ -125,6 +290,24 @@ function App() {
           </p>
         </div>
       </footer>
+
+      {/* Animation Styles */}
+      <style>{`
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: scale(0.95);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+        
+        .animate-fadeIn {
+          animation: fadeIn 0.2s ease-out;
+        }
+      `}</style>
     </div>
   );
 }

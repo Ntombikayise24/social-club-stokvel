@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { 
   Target, 
   Users, 
@@ -12,12 +12,10 @@ import {
   User,
   DollarSign,
   Calendar,
+  Settings,
   LogOut
 } from 'lucide-react';
-import toast from 'react-hot-toast';
 import ProfileSwitcher from './ProfileSwitcher';
-import { useAuth, type ProfileData } from '../../context/AuthContext';
-import { contributionAPI, notificationAPI, stokvelAPI } from '../../services/api';
 
 interface Profile {
   id: string;
@@ -42,91 +40,54 @@ interface StokvelData {
 }
 
 export default function MainDashboard() {
-  const { user, profiles: authProfiles, logout, refreshUser } = useAuth();
-  const navigate = useNavigate();
   const [showAddContribution, setShowAddContribution] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
   
   // Constants
   const TARGET_DATE = "06 Dec 2026";
-
-  // Convert auth profiles to the component's Profile format
-  const mappedProfiles: Profile[] = authProfiles.map((p: ProfileData) => ({
-    id: String(p.id),
-    name: user?.fullName || 'User',
-    stokvelName: p.stokvelName,
-    stokvelId: String(p.stokvelId),
-    role: p.role as 'member' | 'admin',
-    targetAmount: p.targetAmount,
-    savedAmount: p.savedAmount,
-    progress: p.progress,
-  }));
   
-  // Active Profile State - update when profiles change
-  const [activeProfile, setActiveProfile] = useState<Profile | null>(null);
+  // Active Profile State
+  const [activeProfile, setActiveProfile] = useState<Profile>({
+    id: '1',
+    name: 'Nkulumo Nkuna',
+    stokvelName: 'COLLECTIVE POT',
+    stokvelId: 'collective-pot',
+    role: 'member',
+    targetAmount: 7000,
+    savedAmount: 1070,
+    progress: 13
+  });
 
-  // Update active profile when auth profiles change (e.g. after refresh)
-  useEffect(() => {
-    if (mappedProfiles.length > 0) {
-      setActiveProfile(mappedProfiles[0]);
+  // Mock profiles data
+  const mockProfiles: Profile[] = [
+    {
+      id: '1',
+      name: 'Nkulumo Nkuna',
+      stokvelName: 'COLLECTIVE POT',
+      stokvelId: 'collective-pot',
+      role: 'member',
+      targetAmount: 7000,
+      savedAmount: 1070,
+      progress: 13
+    },
+    {
+      id: '2',
+      name: 'Nkulumo Nkuna',
+      stokvelName: 'SUMMER SAVERS',
+      stokvelId: 'summer-savers',
+      role: 'member',
+      targetAmount: 5000,
+      savedAmount: 850,
+      progress: 17
     }
-  }, [authProfiles]);
-
-  // Stokvel details from API
-  const [stokvelDetails, setStokvelDetails] = useState<any>(null);
-
-  useEffect(() => {
-    const fetchStokvel = async () => {
-      if (!activeProfile || activeProfile.stokvelId === '0') {
-        setStokvelDetails(null);
-        return;
-      }
-      try {
-        const res = await stokvelAPI.getById(Number(activeProfile.stokvelId));
-        setStokvelDetails(res.data.data);
-      } catch (err) {
-        console.error('Failed to fetch stokvel:', err);
-        setStokvelDetails(null);
-      }
-    };
-    fetchStokvel();
-  }, [activeProfile?.stokvelId]);
-
-  // Notifications from API
-  const [notifications, setNotifications] = useState<any[]>([]);
-  
-  useEffect(() => {
-    const fetchNotifications = async () => {
-      try {
-        const res = await notificationAPI.getAll();
-        // Ensure we always get an array
-        const notifData = Array.isArray(res.data.data) ? res.data.data : [];
-        setNotifications(notifData);
-      } catch (err) {
-        console.error('Failed to fetch notifications:', err);
-        setNotifications([]);
-      }
-    };
-    fetchNotifications();
-  }, []);
+  ];
 
   // Contribution form state
   const [contributionData, setContributionData] = useState({
     amount: '',
     paymentMethod: 'card'
   });
-
-  // Early return if activeProfile is not yet loaded
-  if (!activeProfile) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 font-medium">Loading dashboard...</p>
-        </div>
-      </div>
-    );
-  }
 
   // Calculate remaining amount for this profile
   const remainingAmount = activeProfile.targetAmount - activeProfile.savedAmount;
@@ -144,71 +105,62 @@ export default function MainDashboard() {
     progress: Math.min(100, Math.floor((borrowedSoFar / maxBorrowable) * 100)) || 0
   };
 
-  // Stokvel data based on active profile — use API data when available
+  // Stokvel data based on active profile
   const getStokvelData = (profile: Profile): StokvelData => {
-    if (stokvelDetails) {
-      return {
-        name: stokvelDetails.name || profile.stokvelName,
-        total: stokvelDetails.totalSaved || 0,
-        target: stokvelDetails.groupTarget || 0,
-        progress: stokvelDetails.progress || 0,
-        memberCount: stokvelDetails.currentMembers || 0,
-        cycle: stokvelDetails.cycle || 'Weekly',
-        nextPayout: stokvelDetails.nextPayout || TARGET_DATE,
-        individualTarget: profile.targetAmount,
-      };
+    switch(profile.stokvelId) {
+      case 'collective-pot':
+        return {
+          name: 'COLLECTIVE POT',
+          total: 9800,
+          target: 126000,
+          progress: 8,
+          memberCount: 18,
+          cycle: "Weekly (Sunday)",
+          nextPayout: TARGET_DATE,
+          individualTarget: profile.targetAmount
+        };
+      case 'summer-savers':
+        return {
+          name: 'SUMMER SAVERS',
+          total: 4250,
+          target: 40000,
+          progress: 11,
+          memberCount: 8,
+          cycle: "Monthly",
+          nextPayout: "31 Dec 2026",
+          individualTarget: profile.targetAmount
+        };
+      default:
+        return {
+          name: profile.stokvelName,
+          total: 0,
+          target: 0,
+          progress: 0,
+          memberCount: 0,
+          cycle: "Weekly",
+          nextPayout: TARGET_DATE,
+          individualTarget: profile.targetAmount
+        };
     }
-    return {
-      name: profile.stokvelName,
-      total: 0,
-      target: 0,
-      progress: 0,
-      memberCount: 0,
-      cycle: 'Weekly',
-      nextPayout: TARGET_DATE,
-      individualTarget: profile.targetAmount,
-    };
   };
 
   const currentStokvel = getStokvelData(activeProfile);
 
-  const unreadCount = Array.isArray(notifications) 
-    ? notifications.filter((n: any) => !n.read && !n.is_read).length 
-    : 0;
+  // Mock notifications
+  const notifications = [
+    { id: 1, message: `Contribution of R200 confirmed for ${activeProfile.stokvelName}`, time: '2 hours ago', read: false },
+    { id: 2, message: 'Loan repayment due in 3 days', time: '1 day ago', read: false },
+    { id: 3, message: 'Welcome to HENNESSY SOCIAL CLUB!', time: '2 days ago', read: true },
+    { id: 4, message: 'Weekly meeting this Sunday at 10am', time: '3 days ago', read: true },
+  ];
 
-  const handleAddContribution = async () => {
-    if (!contributionData.amount) return;
-    try {
-      await contributionAPI.create({
-        membershipId: Number(activeProfile.id),
-        amount: parseInt(contributionData.amount),
-        paymentMethod: contributionData.paymentMethod,
-      });
-      toast.success(`Contribution of R${contributionData.amount} submitted!`);
-      setShowAddContribution(false);
-      setContributionData({ amount: '', paymentMethod: 'card' });
-      // Refresh user data to update saved amounts
-      await refreshUser();
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to submit contribution');
-    }
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  const handleAddContribution = () => {
+    alert(`Contribution of R ${contributionData.amount} to ${activeProfile.stokvelName} submitted! (Demo)`);
+    setShowAddContribution(false);
+    setContributionData({ amount: '', paymentMethod: 'card' });
   };
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
-
-  // Show loading state while profiles are being loaded
-  if (!activeProfile) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-600 mb-4">Loading dashboard...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -227,7 +179,7 @@ export default function MainDashboard() {
               </div>
             </div>
 
-            {/* Right Side - Notifications & Profile Switcher */}
+            {/* Right Side - Notifications, User Menu & Profile Switcher */}
             <div className="flex items-center space-x-3">
               {/* Notifications */}
               <div className="relative">
@@ -253,16 +205,17 @@ export default function MainDashboard() {
                       )}
                     </div>
                     <div className="max-h-96 overflow-y-auto">
-                      {notifications.length === 0 ? (
-                        <div className="p-4 text-center text-sm text-gray-500">No notifications</div>
-                      ) : notifications.map((notif: any) => (
-                        <div key={notif.id} className={`p-3 hover:bg-gray-50 border-b border-gray-100 last:border-0 ${!(notif.read || notif.is_read) ? 'bg-primary-50/50' : ''}`}>
+                      {notifications.slice(0, 3).map(notif => (
+                        <div key={notif.id} className={`p-3 hover:bg-gray-50 border-b border-gray-100 last:border-0 ${!notif.read ? 'bg-primary-50/50' : ''}`}>
                           <p className="text-sm text-gray-800">{notif.message}</p>
-                          <p className="text-xs text-gray-500 mt-1">{notif.time || notif.created_at}</p>
+                          <p className="text-xs text-gray-500 mt-1">{notif.time}</p>
                         </div>
                       ))}
                     </div>
-                    <Link to="/notifications" className="block p-3 text-center text-sm text-primary-600 hover:text-primary-700 border-t border-gray-100">
+                    <Link 
+                      to="/notifications" 
+                      className="block p-3 text-center text-sm text-primary-600 hover:text-primary-700 border-t border-gray-100"
+                    >
                       View All Notifications
                     </Link>
                   </div>
@@ -271,22 +224,66 @@ export default function MainDashboard() {
 
               {/* Profile Switcher */}
               <ProfileSwitcher 
-                profiles={mappedProfiles}
+                profiles={mockProfiles}
                 activeProfile={activeProfile}
                 onSwitch={setActiveProfile}
                 onAddProfile={() => {
                   alert('Navigate to add profile page');
                 }}
               />
-              
-              {/* Logout Button */}
-              <button
-                onClick={handleLogout}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                title="Logout"
-              >
-                <LogOut className="w-5 h-5 text-gray-600" />
-              </button>
+
+              {/* User Menu */}
+              <div className="relative">
+                <button 
+                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  className="flex items-center space-x-2 hover:bg-gray-100 rounded-lg p-2 transition-colors"
+                >
+                  <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
+                    <span className="text-sm font-medium text-primary-700">
+                      {activeProfile.name.split(' ').map(n => n[0]).join('')}
+                    </span>
+                  </div>
+                </button>
+
+                {/* User Dropdown Menu */}
+                {showUserMenu && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 z-20">
+                    <Link 
+                      to="/profile" 
+                      className="flex items-center space-x-2 px-4 py-3 hover:bg-gray-50 transition-colors"
+                      onClick={() => setShowUserMenu(false)}
+                    >
+                      <User className="w-4 h-4 text-gray-500" />
+                      <span className="text-sm text-gray-700">Your Profile</span>
+                    </Link>
+                    <Link 
+                      to="/settings" 
+                      className="flex items-center space-x-2 px-4 py-3 hover:bg-gray-50 transition-colors"
+                      onClick={() => setShowUserMenu(false)}
+                    >
+                      <Settings className="w-4 h-4 text-gray-500" />
+                      <span className="text-sm text-gray-700">Settings</span>
+                    </Link>
+                    <Link 
+                      to="/help" 
+                      className="flex items-center space-x-2 px-4 py-3 hover:bg-gray-50 transition-colors"
+                      onClick={() => setShowUserMenu(false)}
+                    >
+                      <HelpCircle className="w-4 h-4 text-gray-500" />
+                      <span className="text-sm text-gray-700">Help Center</span>
+                    </Link>
+                    <div className="border-t border-gray-100 my-1"></div>
+                    <Link 
+                      to="/" 
+                      className="flex items-center space-x-2 px-4 py-3 hover:bg-gray-50 text-red-600 transition-colors"
+                      onClick={() => setShowUserMenu(false)}
+                    >
+                      <LogOut className="w-4 h-4" />
+                      <span className="text-sm">Logout</span>
+                    </Link>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -522,9 +519,9 @@ export default function MainDashboard() {
                   <span className="text-xs font-medium text-gray-700">Profile</span>
                 </Link>
                 
-                <Link to="/help" className="flex flex-col items-center p-4 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors group">
-                  <HelpCircle className="w-6 h-6 text-gray-600 mb-2 group-hover:scale-110 transition-transform" />
-                  <span className="text-xs font-medium text-gray-700">Help</span>
+                <Link to="/notifications" className="flex flex-col items-center p-4 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors group">
+                  <Bell className="w-6 h-6 text-gray-600 mb-2 group-hover:scale-110 transition-transform" />
+                  <span className="text-xs font-medium text-gray-700">Notifications</span>
                 </Link>
               </div>
             </div>
