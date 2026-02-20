@@ -9,7 +9,8 @@ import {
   Calendar,
   Percent,
   Clock,
-  AlertTriangle
+  AlertTriangle,
+  CreditCard
 } from 'lucide-react';
 
 export default function LoanRequest() {
@@ -19,6 +20,7 @@ export default function LoanRequest() {
   
   const [loanAmount, setLoanAmount] = useState('');
   const [purpose, setPurpose] = useState('');
+  const [selectedCard, setSelectedCard] = useState('card_4242');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
@@ -51,6 +53,12 @@ export default function LoanRequest() {
     }
   };
 
+  // Mock cards data
+  const cards = [
+    { id: 'card_4242', type: 'visa', last4: '4242', label: 'Visa •••• 4242', isDefault: true },
+    { id: 'card_8888', type: 'mastercard', last4: '8888', label: 'Mastercard •••• 8888', isDefault: false },
+  ];
+
   const currentProfile = profiles[profileId as keyof typeof profiles] || profiles['1'];
   
   // Calculate loan amounts
@@ -71,7 +79,7 @@ export default function LoanRequest() {
   });
   
   const isValidAmount = requestedAmount >= 100 && requestedAmount <= remainingToBorrow;
-  const isFormValid = isValidAmount && acceptTerms;
+  const isFormValid = isValidAmount && acceptTerms && selectedCard !== 'new';
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,6 +93,13 @@ export default function LoanRequest() {
     setTimeout(() => {
       setIsSubmitting(false);
       setShowConfirmation(false);
+      
+      // Get card details for success message
+      const card = cards.find(c => c.id === selectedCard);
+      const cardMessage = card ? `${card.type === 'visa' ? 'Visa' : 'Mastercard'} •••• ${card.last4}` : 'Card';
+      
+      alert(`✅ Loan Successful!\n\nR ${requestedAmount} loan from ${currentProfile.stokvelName}\nWill be sent to: ${cardMessage}\nInterest: R ${interestAmount}\nTotal to repay: R ${totalRepayable}\nDue: ${formattedDueDate}\n\nReference: LOAN-${Math.floor(Math.random() * 10000)}`);
+      
       navigate(`/loans?profile=${profileId}`, { 
         state: { 
           success: true, 
@@ -244,6 +259,39 @@ export default function LoanRequest() {
               />
             </div>
 
+            {/* Card Selection - Where to send the money */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Send Money To
+              </label>
+              <select 
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                value={selectedCard}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === 'new') {
+                    navigate('/cards');
+                  } else {
+                    setSelectedCard(value);
+                  }
+                }}
+              >
+                {cards.map(card => (
+                  <option key={card.id} value={card.id}>
+                    💳 {card.label} {card.isDefault ? '(Default)' : ''}
+                  </option>
+                ))}
+                <option value="new">➕ Add New Card</option>
+              </select>
+              
+              <div className="flex justify-between items-center mt-2">
+                <Link to="/cards" className="text-xs text-primary-600 hover:text-primary-700">
+                  Manage Cards →
+                </Link>
+                <span className="text-xs text-gray-400">🔒 Funds sent securely</span>
+              </div>
+            </div>
+
             {/* Loan Summary */}
             {isValidAmount && (
               <div className="bg-gray-50 rounded-lg p-4 space-y-3">
@@ -265,6 +313,17 @@ export default function LoanRequest() {
                 <div className="flex justify-between text-sm pt-2 border-t border-gray-200">
                   <span className="font-medium text-gray-700">Total to Repay:</span>
                   <span className="font-bold text-primary-700">{formatCurrency(totalRepayable)}</span>
+                </div>
+
+                {/* Selected Card Info */}
+                <div className="flex justify-between text-sm bg-blue-50 p-2 rounded-lg">
+                  <span className="text-gray-600 flex items-center">
+                    <CreditCard className="w-4 h-4 mr-1 text-blue-600" />
+                    Sending to:
+                  </span>
+                  <span className="font-bold text-blue-700">
+                    {cards.find(c => c.id === selectedCard)?.label || 'Card'}
+                  </span>
                 </div>
 
                 <div className="flex justify-between text-sm bg-blue-50 p-2 rounded-lg">
@@ -368,6 +427,12 @@ export default function LoanRequest() {
               <div className="flex justify-between">
                 <span className="text-gray-600">Interest (30%):</span>
                 <span className="font-bold text-secondary-600">{formatCurrency(interestAmount)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Sending to:</span>
+                <span className="font-bold text-gray-800">
+                  {cards.find(c => c.id === selectedCard)?.label || 'Card'}
+                </span>
               </div>
               <div className="flex justify-between pt-2 border-t border-gray-200">
                 <span className="font-medium">Total to Repay:</span>

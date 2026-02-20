@@ -16,6 +16,7 @@ import HelpCenter from "../pages/help/HelpCenter";
 import ForgotPassword from "../pages/auth/ForgotPassword";
 import Terms from "../pages/legal/Terms";
 import Privacy from "../pages/legal/Privacy";
+import Cards from "../pages/payments/Cards";  // ← Add this line
 
 const router = createBrowserRouter([
   {
@@ -63,29 +64,33 @@ const router = createBrowserRouter([
     element: <GroupDetails />,
   },
   {
-    path: "/notifications", // Add this route
+    path: "/notifications",
     element: <Notifications />,
   },
   {
-  path: "/settings",
-  element: <Settings />,
-},
-{
-  path: "/help",
-  element: <HelpCenter />,
-},
-{
-  path: "/forgot-password",
-  element: <ForgotPassword />,
-},
-{
-  path: "/terms",
-  element: <Terms />,
-},
-{
-  path: "/privacy",
-  element: <Privacy />,
-},
+    path: "/settings",
+    element: <Settings />,
+  },
+  {
+    path: "/help",
+    element: <HelpCenter />,
+  },
+  {
+    path: "/forgot-password",
+    element: <ForgotPassword />,
+  },
+  {
+    path: "/terms",
+    element: <Terms />,
+  },
+  {
+    path: "/privacy",
+    element: <Privacy />,
+  },
+  {
+    path: "/cards",           // ← Add this route
+    element: <Cards />,
+  },
 ]);
 
 export default router;

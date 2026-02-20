@@ -14,7 +14,7 @@ import {
   AlertTriangle,
   CreditCard,
   Download,
-  Users
+  Users,
 } from 'lucide-react';
 
 interface Loan {
@@ -34,6 +34,14 @@ interface Loan {
   daysRemaining?: number;
 }
 
+interface Card {
+  id: string;
+  type: 'visa' | 'mastercard';
+  last4: string;
+  label: string;
+  isDefault: boolean;
+}
+
 export default function LoanHistory() {
   const [searchParams] = useSearchParams();
   const profileId = searchParams.get('profile') || '1';
@@ -41,12 +49,20 @@ export default function LoanHistory() {
   const [expandedLoan, setExpandedLoan] = useState<number | null>(null);
   const [filter, setFilter] = useState('all');
   const [showRepayModal, setShowRepayModal] = useState<Loan | null>(null);
+  const [selectedCard, setSelectedCard] = useState('card_4242');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [repaymentSuccess, setRepaymentSuccess] = useState(false);
 
   // Mock profiles
   const profiles = [
     { id: '1', name: 'Nkulumo Nkuna', stokvelName: 'COLLECTIVE POT' },
     { id: '2', name: 'Nkulumo Nkuna', stokvelName: 'SUMMER SAVERS' }
+  ];
+
+  // Mock cards data
+  const cards: Card[] = [
+    { id: 'card_4242', type: 'visa', last4: '4242', label: 'Visa •••• 4242', isDefault: true },
+    { id: 'card_8888', type: 'mastercard', last4: '8888', label: 'Mastercard •••• 8888', isDefault: false },
   ];
 
   const activeProfile = profiles.find(p => p.id === profileId) || profiles[0];
@@ -196,6 +212,8 @@ export default function LoanHistory() {
 
   const handleRepay = (loan: Loan) => {
     setShowRepayModal(loan);
+    setSelectedCard('card_4242'); // Reset to default card
+    setRepaymentSuccess(false);
   };
 
   const confirmRepayment = () => {
@@ -203,7 +221,16 @@ export default function LoanHistory() {
     
     setIsProcessing(true);
     
+    // Simulate payment processing
     setTimeout(() => {
+      // Get card details for success message
+      const card = cards.find(c => c.id === selectedCard);
+      const cardMessage = card ? `${card.type === 'visa' ? 'Visa' : 'Mastercard'} •••• ${card.last4}` : 'Card';
+      
+      // Show success message
+      alert(`✅ Repayment Successful!\n\nR ${showRepayModal.totalRepayable} paid for loan #${showRepayModal.id}\nPaid from: ${cardMessage}\nReference: PAY-${Math.floor(Math.random() * 10000)}`);
+      
+      // Update loan status
       setLoans(prevLoans => 
         prevLoans.map(loan => 
           loan.id === showRepayModal.id 
@@ -220,8 +247,14 @@ export default function LoanHistory() {
         )
       );
       
+      setRepaymentSuccess(true);
       setIsProcessing(false);
-      setShowRepayModal(null);
+      
+      // Close modal after success
+      setTimeout(() => {
+        setShowRepayModal(null);
+        setRepaymentSuccess(false);
+      }, 1500);
     }, 2000);
   };
 
@@ -570,21 +603,71 @@ export default function LoanHistory() {
               </div>
             </div>
 
-            <div className="flex space-x-3">
-              <button
-                onClick={() => setShowRepayModal(null)}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            {/* Card Selection - Where to take money from */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Pay From
+              </label>
+              <select 
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                value={selectedCard}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === 'new') {
+                    window.location.href = '/cards';
+                  } else {
+                    setSelectedCard(value);
+                  }
+                }}
               >
-                Cancel
-              </button>
-              <button
-                onClick={confirmRepayment}
-                disabled={isProcessing}
-                className="flex-1 bg-primary-600 text-white py-2 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
-              >
-                {isProcessing ? 'Processing...' : 'Confirm Payment'}
-              </button>
+                {cards.map(card => (
+                  <option key={card.id} value={card.id}>
+                    💳 {card.label} {card.isDefault ? '(Default)' : ''}
+                  </option>
+                ))}
+                <option value="new">➕ Add New Card</option>
+              </select>
+              
+              <div className="flex justify-between items-center mt-2">
+                <Link to="/cards" className="text-xs text-primary-600 hover:text-primary-700">
+                  Manage Cards →
+                </Link>
+                <span className="text-xs text-gray-400">🔒 Secured payment</span>
+              </div>
             </div>
+
+            {/* Success State */}
+            {repaymentSuccess ? (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4 text-center">
+                <CheckCircle className="w-8 h-8 text-green-600 mx-auto mb-2" />
+                <p className="text-green-700 font-medium">Payment Successful!</p>
+                <p className="text-xs text-green-600 mt-1">Your loan has been repaid</p>
+              </div>
+            ) : (
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => setShowRepayModal(null)}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  disabled={isProcessing}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmRepayment}
+                  disabled={isProcessing}
+                  className="flex-1 bg-primary-600 text-white py-2 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 flex items-center justify-center"
+                >
+                  {isProcessing ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                      Processing...
+                    </>
+                  ) : (
+                    'Confirm Payment'
+                  )}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

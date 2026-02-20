@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { 
   Target, 
   Users, 
@@ -13,7 +13,8 @@ import {
   DollarSign,
   Calendar,
   Settings,
-  LogOut
+  LogOut,
+  CreditCard
 } from 'lucide-react';
 import ProfileSwitcher from './ProfileSwitcher';
 
@@ -40,6 +41,7 @@ interface StokvelData {
 }
 
 export default function MainDashboard() {
+  const navigate = useNavigate();
   const [showAddContribution, setShowAddContribution] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -86,7 +88,7 @@ export default function MainDashboard() {
   // Contribution form state
   const [contributionData, setContributionData] = useState({
     amount: '',
-    paymentMethod: 'card'
+    paymentMethod: 'card_4242'
   });
 
   // Calculate remaining amount for this profile
@@ -157,9 +159,30 @@ export default function MainDashboard() {
   const unreadCount = notifications.filter(n => !n.read).length;
 
   const handleAddContribution = () => {
-    alert(`Contribution of R ${contributionData.amount} to ${activeProfile.stokvelName} submitted! (Demo)`);
+    // Check if amount is valid
+    if (!contributionData.amount || parseInt(contributionData.amount) < 100 || parseInt(contributionData.amount) > remainingAmount) {
+      return;
+    }
+
+    // Simulate payment processing
     setShowAddContribution(false);
-    setContributionData({ amount: '', paymentMethod: 'card' });
+    
+    // Show a success message based on selected card
+    const cardSelected = contributionData.paymentMethod;
+    let cardMessage = '';
+    
+    if (cardSelected === 'card_4242') {
+      cardMessage = 'Visa •••• 4242';
+    } else if (cardSelected === 'card_8888') {
+      cardMessage = 'Mastercard •••• 8888';
+    } else {
+      cardMessage = 'Card';
+    }
+    
+    alert(`✅ Payment Successful!\n\nR ${contributionData.amount} paid to ${activeProfile.stokvelName}\nCard: ${cardMessage}\n\nReference: TRX-${Math.floor(Math.random() * 10000)}`);
+    
+    // Reset form
+    setContributionData({ amount: '', paymentMethod: 'card_4242' });
   };
 
   return (
@@ -518,10 +541,10 @@ export default function MainDashboard() {
                   <User className="w-6 h-6 text-purple-600 mb-2 group-hover:scale-110 transition-transform" />
                   <span className="text-xs font-medium text-gray-700">Profile</span>
                 </Link>
-                
-                <Link to="/notifications" className="flex flex-col items-center p-4 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors group">
-                  <Bell className="w-6 h-6 text-gray-600 mb-2 group-hover:scale-110 transition-transform" />
-                  <span className="text-xs font-medium text-gray-700">Notifications</span>
+
+                <Link to="/cards" className="flex flex-col items-center p-4 bg-green-50 hover:bg-green-100 rounded-xl transition-colors group">
+                  <CreditCard className="w-6 h-6 text-green-600 mb-2 group-hover:scale-110 transition-transform" />
+                  <span className="text-xs font-medium text-gray-700">Cards</span>
                 </Link>
               </div>
             </div>
@@ -579,20 +602,35 @@ export default function MainDashboard() {
                 </div>
               </div>
 
-              {/* Payment Method */}
+              {/* Payment Method - Card Selection */}
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Payment Method
+                  Select Card
                 </label>
                 <select 
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   value={contributionData.paymentMethod}
-                  onChange={(e) => setContributionData({...contributionData, paymentMethod: e.target.value})}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === 'new') {
+                      setShowAddContribution(false);
+                      navigate('/cards');
+                    } else {
+                      setContributionData({...contributionData, paymentMethod: value});
+                    }
+                  }}
                 >
-                  <option value="card">Credit/Debit Card</option>
-                  <option value="bank">Bank Transfer</option>
-                  <option value="cash">Cash (Admin will confirm)</option>
+                  <option value="card_4242">💳 Visa •••• 4242 (Default)</option>
+                  <option value="card_8888">💳 Mastercard •••• 8888</option>
+                  <option value="new">➕ Add New Card</option>
                 </select>
+                
+                <div className="flex justify-between items-center mt-2">
+                  <Link to="/cards" className="text-xs text-primary-600 hover:text-primary-700">
+                    Manage Cards →
+                  </Link>
+                  <span className="text-xs text-gray-400">🔒 Secured by SSL</span>
+                </div>
               </div>
 
               {/* Summary */}
