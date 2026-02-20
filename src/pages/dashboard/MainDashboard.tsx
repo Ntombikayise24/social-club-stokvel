@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { 
   Target, 
   Users, 
@@ -15,7 +15,10 @@ import {
   Settings,
   LogOut
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import ProfileSwitcher from './ProfileSwitcher';
+import { useAuth } from '../../context/AuthContext';
+import { PaymentAPI } from '../../services/api';
 
 interface Profile {
   id: string;
@@ -40,9 +43,12 @@ interface StokvelData {
 }
 
 export default function MainDashboard() {
+  const navigate = useNavigate();
+  const { user, profiles } = useAuth();
   const [showAddContribution, setShowAddContribution] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   
   // Constants
   const TARGET_DATE = "06 Dec 2026";
@@ -156,10 +162,56 @@ export default function MainDashboard() {
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
-  const handleAddContribution = () => {
-    alert(`Contribution of R ${contributionData.amount} to ${activeProfile.stokvelName} submitted! (Demo)`);
-    setShowAddContribution(false);
-    setContributionData({ amount: '', paymentMethod: 'card' });
+  const handleAddContribution = async () => {
+    // Validate input
+    if (!contributionData.amount || parseInt(contributionData.amount) < 100) {
+      toast.error('Please enter a valid amount (minimum R100)');
+      return;
+    }
+
+    if (parseInt(contributionData.amount) > remainingAmount) {
+      toast.error('Amount exceeds remaining target');
+      return;
+    }
+
+    // Find the membership ID for the active profile
+    const membership = profiles?.find(p => p.stokvelName === activeProfile.stokvelName);
+    if (!membership) {
+      toast.error('Membership not found');
+      return;
+    }
+
+    // Handle card payment
+    if (contributionData.paymentMethod === 'card') {
+      try {
+        setIsProcessingPayment(true);
+        
+        // Initialize payment with Paystack
+        const response = await PaymentAPI.initializePayment({
+          membershipId: membership.id,
+          amount: parseInt(contributionData.amount),
+          email: user?.email || '',
+        });
+
+        if (response.data.success && response.data.data?.authorization_url) {
+          toast.success('Redirecting to payment gateway...');
+          // Redirect to Paystack
+          window.location.href = response.data.data.authorization_url;
+        } else {
+          toast.error(response.data.message || 'Failed to initialize payment');
+        }
+      } catch (error: any) {
+        console.error('Payment error:', error);
+        toast.error(error.response?.data?.message || 'Error initiating payment');
+      } finally {
+        setIsProcessingPayment(false);
+      }
+    } else {
+      // For bank transfer and cash, show confirmation
+      toast.success(`Contribution of R${contributionData.amount} submitted for ${contributionData.paymentMethod.toUpperCase()}`);
+      setShowAddContribution(false);
+      setContributionData({ amount: '', paymentMethod: 'card' });
+    }
   };
 
   return (
@@ -623,10 +675,10 @@ export default function MainDashboard() {
                 </button>
                 <button 
                   className="flex-1 bg-gradient-to-r from-primary-600 to-primary-700 text-white py-3 rounded-lg hover:from-primary-700 hover:to-primary-800 transition-all font-medium shadow-sm hover:shadow disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={!contributionData.amount || parseInt(contributionData.amount) < 100 || parseInt(contributionData.amount) > remainingAmount}
+                  disabled={!contributionData.amount || parseInt(contributionData.amount) < 100 || parseInt(contributionData.amount) > remainingAmount || isProcessingPayment}
                   onClick={handleAddContribution}
                 >
-                  Add Contribution
+                  {isProcessingPayment ? 'Processing Payment...' : 'Add Contribution'}
                 </button>
               </div>
             </div>

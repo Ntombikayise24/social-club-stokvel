@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Mail, Lock, ArrowLeft, Users, AlertCircle } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 export default function Login() {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [loginError, setLoginError] = useState('');
   const [formData, setFormData] = useState({
@@ -12,47 +14,26 @@ export default function Login() {
     rememberMe: false
   });
 
-  // Mock users database - in real app, this would be an API call
-  const mockUsers = [
-    { email: 'nkulumo.nkuna@email.com', password: 'password', status: 'active' },
-    { email: 'mary.johnson@email.com', password: 'password', status: 'pending' },
-    { email: 'peter.williams@email.com', password: 'password', status: 'pending' },
-  ];
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setLoginError('');
 
-    // Simulate API call
-    setTimeout(() => {
-      // Find user
-      const user = mockUsers.find(u => u.email === formData.email);
+    try {
+      const result = await login(formData.email, formData.password);
       
-      if (!user) {
-        setLoginError('Invalid email or password');
-        setIsLoading(false);
-        return;
+      if (result.success) {
+        // Navigate to dashboard on successful login
+        navigate('/dashboard');
+      } else {
+        setLoginError(result.message);
       }
-
-      // Check password (mock)
-      if (user.password !== formData.password) {
-        setLoginError('Invalid email or password');
-        setIsLoading(false);
-        return;
-      }
-
-      // Check user status
-      if (user.status === 'pending') {
-        setLoginError('Your account is pending approval. Please wait for admin to activate your account.');
-        setIsLoading(false);
-        return;
-      }
-
-      // Successful login
+    } catch (error: any) {
+      setLoginError('An unexpected error occurred. Please try again.');
+      console.error('Login error:', error);
+    } finally {
       setIsLoading(false);
-      navigate('/dashboard');
-    }, 1500);
+    }
   };
 
   return (

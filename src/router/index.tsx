@@ -16,6 +16,7 @@ import HelpCenter from "../pages/help/HelpCenter";
 import ForgotPassword from "../pages/auth/ForgotPassword";
 import Terms from "../pages/legal/Terms";
 import Privacy from "../pages/legal/Privacy";
+import PaymentVerification from "../pages/payments/PaymentVerification";
 
 const router = createBrowserRouter([
   {
@@ -85,6 +86,10 @@ const router = createBrowserRouter([
 {
   path: "/privacy",
   element: <Privacy />,
+},
+{
+  path: "/payments/verify",
+  element: <PaymentVerification />,
 },
 ]);
 
