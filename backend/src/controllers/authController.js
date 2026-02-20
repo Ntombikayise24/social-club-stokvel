@@ -77,24 +77,29 @@ exports.register = async (req, res) => {
 exports.login = async (req, res) => {
     try {
         const { email, password } = req.body;
+        console.log(`Login attempt for: ${email}`);
 
         // Find user with password
         const user = await User.findByEmailWithPassword(email);
         if (!user) {
+            console.log(`User not found: ${email}`);
             return res.status(401).json({
                 success: false,
                 message: 'Invalid email or password',
             });
         }
+        console.log(`User found: ${user.id}, status: ${user.status}`);
 
         // Check password
         const isMatch = await User.comparePassword(password, user.password);
         if (!isMatch) {
+            console.log(`Password mismatch for: ${email}`);
             return res.status(401).json({
                 success: false,
                 message: 'Invalid email or password',
             });
         }
+        console.log(`Password verified for: ${email}`);
 
         // Check if account is pending
         if (user.status === 'pending') {
@@ -114,9 +119,11 @@ exports.login = async (req, res) => {
 
         // Update last active
         await User.updateById(user.id, { lastActive: new Date() });
+        console.log(`Last active updated for user: ${user.id}`);
 
         // Get user's memberships (profiles)
         const memberships = await Membership.findByUser(user.id);
+        console.log(`Found ${memberships.length} memberships for user: ${user.id}`);
 
         const profiles = memberships.map((m) => ({
             id: m.id,
@@ -129,9 +136,11 @@ exports.login = async (req, res) => {
             savedAmount: m.savedAmount,
             progress: m.targetAmount > 0 ? Math.round((m.savedAmount / m.targetAmount) * 100) : 0,
         }));
+        console.log(`Profiles mapped: ${profiles.length}`);
 
         // Generate token
         const token = generateToken(user.id);
+        console.log(`Token generated for user: ${user.id}`);
 
         res.json({
             success: true,
