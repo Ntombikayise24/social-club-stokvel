@@ -13,6 +13,7 @@ const loanRoutes = require('./routes/loans');
 const profileRoutes = require('./routes/profile');
 const notificationRoutes = require('./routes/notifications');
 const adminRoutes = require('./routes/admin');
+const paymentRoutes = require('./routes/payments');
 
 const app = express();
 
@@ -54,6 +55,7 @@ const startServer = async () => {
     app.use('/api/profile', profileRoutes);
     app.use('/api/notifications', notificationRoutes);
     app.use('/api/admin', adminRoutes);
+    app.use('/api/payments', paymentRoutes);
 
     // 404 handler
     app.use((req, res) => {

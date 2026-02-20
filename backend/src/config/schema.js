@@ -144,6 +144,29 @@ const initializeDatabase = async () => {
         )
     `);
 
+    // Payment Transactions table
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS payment_transactions (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            stokvel_id INT NOT NULL,
+            membership_id INT NOT NULL,
+            amount DECIMAL(12,2) NOT NULL,
+            payment_method ENUM('card', 'bank', 'cash', 'mobile') DEFAULT 'card',
+            reference VARCHAR(100) UNIQUE,
+            paystack_reference VARCHAR(100) UNIQUE,
+            status ENUM('pending', 'completed', 'failed', 'cancelled') DEFAULT 'pending',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (stokvel_id) REFERENCES stokvels(id) ON DELETE CASCADE,
+            FOREIGN KEY (membership_id) REFERENCES memberships(id) ON DELETE CASCADE,
+            INDEX idx_status (status),
+            INDEX idx_user_id (user_id),
+            INDEX idx_paystack_ref (paystack_reference)
+        )
+    `);
+
     console.log('Database tables initialized successfully');
 };
 

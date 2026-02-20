@@ -97,4 +97,18 @@ export const adminAPI = {
   rejectUser: (userId: number) => api.post(`/admin/reject/${userId}`),
 };
 
+// ─── Payments (Paystack) ────────────────────────────────
+export const PaymentAPI = {
+  initializePayment: (data: { membershipId: number; amount: number; email: string }) =>
+    api.post('/payments/initialize', data),
+  verifyPayment: (data: { reference: string }) =>
+    api.post('/payments/verify', data),
+  getPaymentHistory: () =>
+    api.get('/payments/history'),
+  getTransaction: (transactionId: number) =>
+    api.get(`/payments/transaction/${transactionId}`),
+  getPaymentStats: (stokvelId: number) =>
+    api.get(`/payments/stats/${stokvelId}`),
+};
+
 export default api;
