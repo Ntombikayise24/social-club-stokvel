@@ -61,21 +61,44 @@ backend/
 ### Prerequisites
 
 - Node.js (v14 or higher)
-- MongoDB (local or cloud instance)
+- MySQL (v5.7 or higher)
 - npm or yarn
 
 ### Environment Variables
 
-Create a `.env` file in the backend root directory:
+1. Copy `.env.example` to `.env` in the backend root directory:
+   ```bash
+   cp .env.example .env
+   ```
 
-```env
-NODE_ENV=development
-PORT=5000
-MONGODB_URI=mongodb://localhost:27017/social-club
-JWT_SECRET=your-super-secret-jwt-key-here
-JWT_EXPIRE=30d
-FRONTEND_URL=http://localhost:5173
-```
+2. Update the `.env` file with your configuration:
+   ```env
+   # Database Configuration
+   DB_HOST=localhost
+   DB_PORT=3306
+   DB_USER=root
+   DB_PASSWORD=your_password
+   DB_NAME=social_club
+   
+   # Server Configuration
+   PORT=5000
+   NODE_ENV=development
+   FRONTEND_URL=http://localhost:5173
+   
+   # JWT Configuration (REQUIRED for authentication)
+   JWT_SECRET=your-super-secret-jwt-key-here
+   JWT_EXPIRES_IN=7d
+   
+   # Paystack Configuration (optional for development)
+   PAYSTACK_PUBLIC_KEY=pk_test_your_public_key
+   PAYSTACK_SECRET_KEY=sk_test_your_secret_key
+   
+   # Admin Credentials (used by seed script)
+   ADMIN_EMAIL=admin@socialclub.co.za
+   ADMIN_PASSWORD=Admin@2026
+   ```
+
+**Note**: The `.env` file is listed in `.gitignore` and should never be committed to version control.
 
 ### Installation
 
@@ -93,7 +116,7 @@ npm run dev
 # Production mode
 npm start
 
-# Seed database with sample data
+# Seed database with sample data (creates tables and inserts test data)
 npm run seed
 ```
 
