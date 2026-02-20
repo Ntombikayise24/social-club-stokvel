@@ -2,14 +2,35 @@ const Contribution = require('../models/Contribution');
 const Membership = require('../models/Membership');
 const Notification = require('../models/Notification');
 const User = require('../models/User');
+const {
+    validateContributionAmount,
+    calculateProgress,
+    wouldCompleteTarget,
+    isValidPaymentMethod,
+    generateReference,
+} = require('../utils/helpers');
 
 /**
  * POST /api/contributions
- * Add a new contribution
+ * Add a new contribution with comprehensive validation
+ * BUSINESS LOGIC:
+ * - Validate amount against remaining target
+ * - Check payment method validity
+ * - Generate transaction reference
+ * - Notify admins for approval
+ * - Trigger notifications if target would be met
  */
 exports.addContribution = async (req, res) => {
     try {
         const { membershipId, amount, paymentMethod } = req.body;
+
+        // Validate input
+        if (!membershipId || !amount) {
+            return res.status(400).json({
+                success: false,
+                message: 'membershipId and amount are required',
+            });
+        }
 
         // Find the membership
         const membership = await Membership.findByIdWithStokvel(membershipId);
@@ -28,47 +49,77 @@ exports.addContribution = async (req, res) => {
             });
         }
 
-        // Check remaining amount
+        // Parse amount as number
+        const contributionAmount = parseFloat(amount);
+
+        // BUSINESS LOGIC: Validate contribution amount
         const remaining = membership.targetAmount - membership.savedAmount;
-        if (amount > remaining) {
+        const validation = validateContributionAmount(contributionAmount, remaining, 50);
+        
+        if (!validation.isValid) {
             return res.status(400).json({
                 success: false,
-                message: `Amount exceeds remaining target. Max contribution: R${remaining}`,
+                message: validation.errors.join('; '),
             });
         }
 
-        // Create contribution
+        // BUSINESS LOGIC: Validate payment method
+        if (!isValidPaymentMethod(paymentMethod)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid payment method. Use: card, bank, cash, or mobile',
+            });
+        }
+
+        // Create contribution with generated reference
+        const reference = generateReference('CONT');
         const contribution = await Contribution.create({
             userId: req.user.id,
             stokvelId: membership.stokvelId,
             membershipId: membership.id,
-            amount,
+            amount: contributionAmount,
             paymentMethod: paymentMethod || 'card',
             status: 'pending',
+            reference,
         });
 
-        // Notify admins
+        // BUSINESS LOGIC: Check if contribution would complete target
+        const wouldComplete = wouldCompleteTarget(membership.savedAmount, contributionAmount, membership.targetAmount);
+
+        // Notify admins for approval
         const admins = await User.find({ role: 'admin', status: 'active' });
-        const notifications = admins.map((admin) => ({
+        const adminNotifications = admins.map((admin) => ({
             userId: admin.id,
-            message: `New contribution of R${amount} from ${req.user.full_name} to ${membership.stokvel.name}`,
+            message: `New contribution of R${contributionAmount} from ${req.user.full_name} to ${membership.stokvel.name} (${paymentMethod})`,
             type: 'contribution',
             relatedId: contribution.id,
             relatedModel: 'Contribution',
         }));
-        if (notifications.length > 0) {
-            await Notification.insertMany(notifications);
+        if (adminNotifications.length > 0) {
+            await Notification.insertMany(adminNotifications);
         }
+
+        // Notify user of submission
+        await Notification.create({
+            userId: req.user.id,
+            message: `Contribution of R${contributionAmount} to ${membership.stokvel.name} submitted for approval (Ref: ${reference})`,
+            type: 'submission',
+            relatedId: contribution.id,
+            relatedModel: 'Contribution',
+        });
 
         res.status(201).json({
             success: true,
-            message: `Contribution of R${amount} to ${membership.stokvel.name} submitted!`,
+            message: `Contribution of R${contributionAmount} to ${membership.stokvel.name} submitted for approval!`,
             data: {
                 id: contribution.id,
-                amount: contribution.amount,
+                amount: contributionAmount,
                 status: contribution.status,
-                reference: contribution.reference,
+                reference,
+                paymentMethod,
                 stokvelName: membership.stokvel.name,
+                wouldCompleteTarget: wouldComplete,
+                remainingAfterContribution: remaining - contributionAmount,
             },
         });
     } catch (error) {
@@ -157,7 +208,13 @@ exports.getContributions = async (req, res) => {
 
 /**
  * PUT /api/contributions/:id/confirm
- * Confirm a pending contribution (admin only)
+ * Confirm a pending contribution with comprehensive business logic
+ * BUSINESS LOGIC:
+ * - Verify contribution is pending
+ * - Update membership savings
+ * - Check if member completed their target (milestone)
+ * - Trigger notifications
+ * - Check if stokvel group target was reached
  */
 exports.confirmContribution = async (req, res) => {
     try {
@@ -176,28 +233,102 @@ exports.confirmContribution = async (req, res) => {
             });
         }
 
-        // Confirm
+        if (contribution.status === 'rejected') {
+            return res.status(400).json({
+                success: false,
+                message: 'Rejected contributions cannot be confirmed',
+            });
+        }
+
+        // Get membership and stokvel details
+        const membership = await Membership.findByIdWithStokvel(contribution.membershipId);
+        const user = await User.findById(contribution.userId);
+
+        // BUSINESS LOGIC: Confirm the contribution
         await Contribution.updateById(contribution.id, {
             status: 'confirmed',
             confirmedBy: req.user.id,
             confirmedAt: new Date(),
         });
 
-        // Update membership savedAmount
+        // Update membership savedAmount with new contribution
+        const newSavedAmount = membership.savedAmount + contribution.amount;
         await Membership.updateSavedAmount(contribution.membershipId, contribution.amount);
 
-        // Notify the user
+        // BUSINESS LOGIC: Check if member completed their individual target
+        const memberTargetMet = newSavedAmount >= membership.targetAmount;
+        
+        let milestone = null;
+        if (memberTargetMet) {
+            milestone = 'target_completed';
+        }
+
+        // BUSINESS LOGIC: Fetch updated membership to get group stats
+        const updatedMembership = await Membership.findByIdWithStokvel(contribution.membershipId);
+        const allMemberships = await Membership.findByStokvel(updatedMembership.stokvelId);
+        const totalGroupSaved = allMemberships.reduce((sum, m) => sum + m.savedAmount, 0);
+        const groupTarget = updatedMembership.stokvel.targetAmount * updatedMembership.stokvel.maxMembers;
+        const groupTargetMet = totalGroupSaved >= groupTarget;
+
+        // Notify the user of confirmation
+        const messages = [`Your contribution of R${contribution.amount} has been confirmed`];
+        if (memberTargetMet) {
+            messages.push(' - Congratulations! You have completed your individual target!');
+        }
+
         await Notification.create({
             userId: contribution.userId,
-            message: `Your contribution of R${contribution.amount} has been confirmed`,
+            message: messages.join(''),
             type: 'contribution',
             relatedId: contribution.id,
             relatedModel: 'Contribution',
         });
 
+        // If group target is met, notify all members
+        if (groupTargetMet) {
+            const groupMembers = allMemberships.map((m) => m.userId);
+            const groupNotifications = groupMembers
+                .filter((uid) => uid !== contribution.userId) // Don't double-notify
+                .map((userId) => ({
+                    userId,
+                    message: `${updatedMembership.stokvel.name} has reached its group target! Payout processing begins soon.`,
+                    type: 'milestone',
+                    relatedId: updatedMembership.stokvelId,
+                    relatedModel: 'Stokvel',
+                }));
+
+            if (groupNotifications.length > 0) {
+                await Notification.insertMany(groupNotifications);
+            }
+        }
+
         res.json({
             success: true,
             message: 'Contribution confirmed successfully',
+            data: {
+                id: contribution.id,
+                amount: contribution.amount,
+                status: 'confirmed',
+                reference: contribution.reference,
+                memberName: user.full_name,
+                memberTargetMet: memberTargetMet,
+                memberSavedAmount: newSavedAmount,
+                memberTargetAmount: membership.targetAmount,
+                groupTargetMet,
+                groupTotalSaved: totalGroupSaved,
+                groupTarget,
+                milestone,
+            },
+        });
+    } catch (error) {
+        console.error('ConfirmContribution error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to confirm contribution',
+            error: error.message,
+        });
+    }
+};
             data: {
                 id: contribution.id,
                 amount: contribution.amount,

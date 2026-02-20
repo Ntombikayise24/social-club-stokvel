@@ -1,15 +1,42 @@
 const Loan = require('../models/Loan');
 const Membership = require('../models/Membership');
 const Notification = require('../models/Notification');
-const { calculateLoanInterest, getLoanDueDate } = require('../utils/helpers');
+const User = require('../models/User');
+const {
+    calculateLoanInterest,
+    calculateOverdueInterest,
+    getLoanDueDate,
+    calculateDaysOverdue,
+    isLoanOverdue,
+    validateLoanRequest,
+    calculateMaxBorrowable,
+    roundMoney,
+    generateReference,
+    getDaysUntilDate,
+} = require('../utils/helpers');
 
 /**
  * POST /api/loans
- * Request a new loan (instant approval - based on savings)
+ * Request a new loan with comprehensive business logic
+ * BUSINESS LOGIC:
+ * - Validate based on savings (50% max)
+ * - Check for existing overdue loans (block if user has overdue)
+ * - Calculate interest
+ * - Set due date based on stokvel terms
+ * - Instant approval
+ * - Generate transaction reference
  */
 exports.requestLoan = async (req, res) => {
     try {
         const { membershipId, amount, purpose } = req.body;
+
+        // Validate input
+        if (!membershipId || !amount) {
+            return res.status(400).json({
+                success: false,
+                message: 'membershipId and amount are required',
+            });
+        }
 
         // Find membership
         const membership = await Membership.findByIdWithStokvel(membershipId);
@@ -29,35 +56,53 @@ exports.requestLoan = async (req, res) => {
         }
 
         const stokvel = membership.stokvel;
+        const loanAmount = parseFloat(amount);
 
-        // Calculate max borrowable (50% of savings)
-        const maxBorrowable = Math.floor(
-            membership.savedAmount * (stokvel.loanPercentageLimit / 100)
-        );
+        // BUSINESS LOGIC: Check for overdue loans (block if user has any overdue)
+        const userLoans = await Loan.findByMembership(membership.id);
+        const overdueLoans = userLoans.filter((l) => l.status === 'overdue');
+        
+        if (overdueLoans.length > 0) {
+            return res.status(400).json({
+                success: false,
+                message: `You have ${overdueLoans.length} overdue loan(s). Please repay before requesting new loans.`,
+                data: {
+                    overdueLoans: overdueLoans.map((l) => ({
+                        id: l.id,
+                        amount: l.amount,
+                        daysOverdue: calculateDaysOverdue(l.dueDate),
+                    })),
+                },
+            });
+        }
 
-        // Get total outstanding loans for this membership
-        const outstandingLoans = await Loan.findOutstandingByMembership(membership.id);
+        // BUSINESS LOGIC: Calculate max borrowable and validate
+        const maxBorrowable = calculateMaxBorrowable(membership.savedAmount, stokvel.loanPercentageLimit);
+        
+        // Get outstanding loans
+        const outstandingLoans = userLoans.filter((l) => l.status === 'active');
         const totalBorrowed = outstandingLoans.reduce((sum, l) => sum + l.amount, 0);
-        const remainingToBorrow = maxBorrowable - totalBorrowed;
+        const remainingToBorrow = roundMoney(maxBorrowable - totalBorrowed);
 
-        // Validate amount
-        if (amount < 100) {
+        // Validate loan request
+        const validation = validateLoanRequest(loanAmount, remainingToBorrow, 100);
+        if (!validation.isValid) {
             return res.status(400).json({
                 success: false,
-                message: 'Minimum loan amount is R100',
+                message: validation.errors.join('; '),
+                data: {
+                    maxBorrowable,
+                    alreadyBorrowed: totalBorrowed,
+                    remainingToBorrow,
+                    savedAmount: membership.savedAmount,
+                },
             });
         }
 
-        if (amount > remainingToBorrow) {
-            return res.status(400).json({
-                success: false,
-                message: `You can only borrow up to R${remainingToBorrow}. Max: R${maxBorrowable}, Already borrowed: R${totalBorrowed}`,
-            });
-        }
-
-        // Calculate interest
-        const loanCalc = calculateLoanInterest(amount, stokvel.interestRate);
+        // BUSINESS LOGIC: Calculate interest
+        const loanCalc = calculateLoanInterest(loanAmount, stokvel.interestRate);
         const dueDate = getLoanDueDate(stokvel.loanRepaymentDays);
+        const reference = generateReference('LOAN');
 
         // Create loan (instant approval)
         const loan = await Loan.create({
@@ -68,32 +113,52 @@ exports.requestLoan = async (req, res) => {
             interestRate: loanCalc.interestRate,
             interest: loanCalc.interest,
             totalRepayable: loanCalc.totalRepayable,
-            purpose: purpose || '',
+            purpose: purpose || 'General',
             dueDate,
             status: 'active',
+            reference,
         });
 
-        // Notify user
+        // Notify user with detailed information
+        const daysUntilDue = getDaysUntilDate(dueDate);
+        const user = await User.findById(req.user.id);
+        
         await Notification.create({
             userId: req.user.id,
-            message: `Loan of R${amount} from ${stokvel.name} approved! Repay R${loanCalc.totalRepayable} by ${dueDate.toLocaleDateString('en-ZA')}`,
+            message: `✅ Loan of R${loanAmount} approved from ${stokvel.name}! Total repayable: R${loanCalc.totalRepayable} by ${new Date(dueDate).toLocaleDateString('en-ZA')} (${daysUntilDue} days). Ref: ${reference}`,
             type: 'loan',
             relatedId: loan.id,
             relatedModel: 'Loan',
         });
 
+        // Notify admins
+        const admins = await User.find({ role: 'admin', status: 'active' });
+        const adminNotifications = admins.map((admin) => ({
+            userId: admin.id,
+            message: `New loan of R${loanAmount} from ${user.full_name} on ${stokvel.name} (Due: ${new Date(dueDate).toLocaleDateString('en-ZA')})`,
+            type: 'loan',
+            relatedId: loan.id,
+            relatedModel: 'Loan',
+        }));
+        if (adminNotifications.length > 0) {
+            await Notification.insertMany(adminNotifications);
+        }
+
         res.status(201).json({
             success: true,
-            message: `Loan of R${amount} from ${stokvel.name} successfully processed!`,
+            message: `Loan of R${loanAmount} successfully approved!`,
             data: {
                 id: loan.id,
-                amount: loan.amount,
-                interest: loan.interest,
-                interestRate: loan.interestRate,
-                totalRepayable: loan.totalRepayable,
-                dueDate: loan.dueDate,
-                status: loan.status,
+                reference,
+                amount: loanCalc.principal,
+                interest: loanCalc.interest,
+                interestRate: loanCalc.interestRate,
+                totalRepayable: loanCalc.totalRepayable,
+                dueDate,
+                daysUntilDue,
+                status: 'active',
                 stokvelName: stokvel.name,
+                newRemainingBorrowable: roundMoney(remainingToBorrow - loanAmount),
             },
         });
     } catch (error) {
@@ -179,7 +244,13 @@ exports.getLoans = async (req, res) => {
 
 /**
  * PUT /api/loans/:id/repay
- * Repay a loan
+ * Repay a loan with comprehensive business logic
+ * BUSINESS LOGIC:
+ * - Check if loan is overdue
+ * - Calculate penalty interest if overdue (60%)
+ * - Update loan status to repaid
+ * - Notify user and admins
+ * - Track repayment date
  */
 exports.repayLoan = async (req, res) => {
     try {
@@ -206,43 +277,86 @@ exports.repayLoan = async (req, res) => {
             });
         }
 
-        // Check if overdue - apply penalty interest
         const now = new Date();
-        const daysRemaining = Math.ceil((new Date(loan.dueDate) - now) / (1000 * 60 * 60 * 24));
+
+        // BUSINESS LOGIC: Check if loan is overdue and calculate penalties
+        const isOverdue = isLoanOverdue(loan.dueDate);
+        const daysOverdue = calculateDaysOverdue(loan.dueDate);
         let finalRepayable = loan.totalRepayable;
+        let penaltyCharged = false;
+        let overdueInterestAmount = 0;
 
-        const updates = { status: 'repaid', repaidDate: now };
+        const updates = { 
+            status: 'repaid', 
+            repaidDate: now,
+        };
 
-        if (daysRemaining < 0) {
-            // Overdue: recalculate with 60% interest
-            const overdueInterest = loan.amount * 0.6;
-            finalRepayable = loan.amount + overdueInterest;
-            updates.interest = overdueInterest;
-            updates.interestRate = 60;
+        if (isOverdue) {
+            // BUSINESS LOGIC: Apply overdue interest (60% instead of original 30%)
+            const overdueCalc = calculateOverdueInterest(
+                loan.amount,
+                daysOverdue,
+                loan.interestRate,
+                loan.stokvel?.overdueInterestRate || 60
+            );
+            
+            overdueInterestAmount = overdueCalc.overdueInterest;
+            finalRepayable = overdueCalc.totalAmount;
+            penaltyCharged = true;
+
+            // Update with overdue interest
+            updates.interest = overdueInterestAmount;
+            updates.interestRate = loan.stokvel?.overdueInterestRate || 60;
             updates.totalRepayable = finalRepayable;
         }
 
         await Loan.updateById(loan.id, updates);
+        const user = await User.findById(req.user.id);
 
-        // Notify user
+        // Notify user with details
+        const notificationMsg = penaltyCharged
+            ? `⚠️ Overdue loan of R${loan.amount} repaid. Penalty interest of R${roundMoney(overdueInterestAmount)} applied (${daysOverdue} days late). Total repaid: R${finalRepayable}`
+            : `✅ Loan of R${loan.amount} repaid successfully. Total repaid: R${finalRepayable}`;
+
         await Notification.create({
             userId: req.user.id,
-            message: `Loan of R${loan.amount} to ${loan.stokvel.name} repaid successfully (R${finalRepayable} total)`,
+            message: notificationMsg,
             type: 'loan',
             relatedId: loan.id,
             relatedModel: 'Loan',
         });
 
+        // Notify admins
+        if (penaltyCharged) {
+            const admins = await User.find({ role: 'admin', status: 'active' });
+            const adminNotifications = admins.map((admin) => ({
+                userId: admin.id,
+                message: `⚠️ Overdue loan repaid: ${user.full_name} repaid R${loan.amount} with penalty (${daysOverdue} days late). Penalty: R${roundMoney(overdueInterestAmount)}`,
+                type: 'loan',
+                relatedId: loan.id,
+                relatedModel: 'Loan',
+            }));
+            if (adminNotifications.length > 0) {
+                await Notification.insertMany(adminNotifications);
+            }
+        }
+
         res.json({
             success: true,
-            message: 'Loan repaid successfully',
+            message: penaltyCharged ? 'Loan repaid with overdue penalty applied' : 'Loan repaid successfully',
             data: {
                 id: loan.id,
                 amount: loan.amount,
-                interest: updates.interest || loan.interest,
-                totalRepaid: finalRepayable,
+                originalInterest: loan.interest,
+                originalInterestRate: loan.interestRate,
+                originalTotal: loan.totalRepayable,
+                finalInterest: updates.interest || loan.interest,
+                finalInterestRate: updates.interestRate || loan.interestRate,
+                finalTotalRepaid: finalRepayable,
+                penaltyApplied: penaltyCharged,
+                daysOverdue,
                 repaidDate: now,
-                wasOverdue: daysRemaining < 0,
+                reference: loan.reference,
             },
         });
     } catch (error) {
@@ -250,6 +364,7 @@ exports.repayLoan = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Failed to repay loan',
+            error: error.message,
         });
     }
 };
