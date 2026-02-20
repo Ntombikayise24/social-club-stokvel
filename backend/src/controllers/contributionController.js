@@ -329,17 +329,3 @@ exports.confirmContribution = async (req, res) => {
         });
     }
 };
-            data: {
-                id: contribution.id,
-                amount: contribution.amount,
-                status: 'confirmed',
-            },
-        });
-    } catch (error) {
-        console.error('ConfirmContribution error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to confirm contribution',
-        });
-    }
-};
