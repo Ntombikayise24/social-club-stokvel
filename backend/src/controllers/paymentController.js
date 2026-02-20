@@ -54,7 +54,7 @@ const initializePayment = async (req, res) => {
             amount,
             paymentMethod: 'card',
             reference,
-            paystackReference: '',
+            paystackReference: null,
             status: 'pending'
         });
 
