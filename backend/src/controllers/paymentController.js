@@ -49,7 +49,7 @@ const initializePayment = async (req, res) => {
         // Create payment transaction record
         const transaction = await PaymentTransaction.create({
             userId,
-            stokvelId: membership.stokvel_id,
+            stokvelId: membership.stokvelId,
             membershipId,
             amount,
             paymentMethod: 'card',
@@ -71,7 +71,7 @@ const initializePayment = async (req, res) => {
                 metadata: {
                     user_id: userId,
                     membership_id: membershipId,
-                    stokvel_id: membership.stokvel_id,
+                    stokvel_id: membership.stokvelId,
                     transaction_id: transaction.id,
                     description: `STOCKVEL Contribution - ${amount} ZAR`
                 }
