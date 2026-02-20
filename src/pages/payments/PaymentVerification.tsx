@@ -27,10 +27,10 @@ const PaymentVerification: React.FC = () => {
                     reference: reference,
                 });
 
-                if (response.success) {
+                if (response.data.success) {
                     setStatus('success');
                     setMessage('Payment verified successfully! Your contribution has been recorded.');
-                    setTransactionId(response.data?.transaction_id?.toString() || null);
+                    setTransactionId(response.data.data?.transaction_id?.toString() || null);
                     
                     // Show success toast
                     toast.success('Payment completed successfully!');
@@ -41,8 +41,8 @@ const PaymentVerification: React.FC = () => {
                     }, 3000);
                 } else {
                     setStatus('failed');
-                    setMessage(response.message || 'Payment verification failed');
-                    toast.error(response.message || 'Payment verification failed');
+                    setMessage(response.data.message || 'Payment verification failed');
+                    toast.error(response.data.message || 'Payment verification failed');
                 }
             } catch (error) {
                 console.error('Verification error:', error);

@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import toast from 'react-hot-toast';
 import { Loader } from 'lucide-react';
-import { PaymentAPI } from '../services/api';
+import { PaymentAPI } from '../../services/api';
 
 // Install @paystack/inline-js for this to work
 // npm install @paystack/inline-js
@@ -25,10 +25,9 @@ type PaymentFormData = z.infer<typeof paymentSchema>;
 
 interface PaymentComponentProps {
     memberships: any[];
-    onSuccess?: () => void;
 }
 
-const PaymentComponent: React.FC<PaymentComponentProps> = ({ memberships, onSuccess }) => {
+const PaymentComponent: React.FC<PaymentComponentProps> = ({ memberships }) => {
     const [isLoading, setIsLoading] = useState(false);
     const [paymentInitialized, setPaymentInitialized] = useState(false);
     const [currentTransactionId, setCurrentTransactionId] = useState<number | null>(null);
@@ -37,7 +36,6 @@ const PaymentComponent: React.FC<PaymentComponentProps> = ({ memberships, onSucc
         register,
         handleSubmit,
         formState: { errors },
-        reset,
     } = useForm<PaymentFormData>({
         resolver: zodResolver(paymentSchema),
     });
@@ -53,13 +51,13 @@ const PaymentComponent: React.FC<PaymentComponentProps> = ({ memberships, onSucc
                 email: data.email,
             });
 
-            if (!response.success || !response.data) {
-                toast.error(response.message || 'Failed to initialize payment');
+            if (!response.data.success || !response.data.data) {
+                toast.error(response.data.message || 'Failed to initialize payment');
                 return;
             }
 
-            const { authorization_url } = response.data;
-            setCurrentTransactionId(response.data.transaction_id);
+            const { authorization_url } = response.data.data;
+            setCurrentTransactionId(response.data.data.transaction_id);
             setPaymentInitialized(true);
 
             // Redirect to Paystack payment page
