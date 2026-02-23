@@ -1,0 +1,134 @@
+import { Router } from 'express';
+import { body } from 'express-validator';
+import { validate } from '../middleware/validate.js';
+import { authenticate } from '../middleware/auth.js';
+import pool from '../database/connection.js';
+
+const router = Router();
+router.use(authenticate);
+
+// ────────────────── LIST CARDS ──────────────────
+router.get('/', async (req, res) => {
+  try {
+    const [cards] = await pool.query(
+      'SELECT * FROM cards WHERE user_id = ? ORDER BY is_default DESC, created_at DESC',
+      [req.user.id]
+    );
+
+    res.json(cards.map(c => ({
+      id: c.id,
+      cardType: c.card_type,
+      last4: c.last4,
+      expiryMonth: c.expiry_month,
+      expiryYear: c.expiry_year,
+      cardholderName: c.cardholder_name,
+      isDefault: !!c.is_default,
+    })));
+  } catch (err) {
+    console.error('List cards error:', err);
+    res.status(500).json({ error: 'Failed to fetch cards' });
+  }
+});
+
+// ────────────────── ADD CARD ──────────────────
+router.post(
+  '/',
+  [
+    body('cardNumber').trim().isLength({ min: 13, max: 19 }).withMessage('Invalid card number'),
+    body('cardholderName').trim().notEmpty().withMessage('Cardholder name is required'),
+    body('expiryMonth').isInt({ min: 1, max: 12 }),
+    body('expiryYear').isInt({ min: new Date().getFullYear() }),
+    body('cvv').isLength({ min: 3, max: 4 }),
+    validate,
+  ],
+  async (req, res) => {
+    try {
+      const { cardNumber, cardholderName, expiryMonth, expiryYear } = req.body;
+
+      // Detect card type
+      const cleanNumber = cardNumber.replace(/\s/g, '');
+      let cardType = 'visa';
+      if (/^5[1-5]/.test(cleanNumber) || /^2[2-7]/.test(cleanNumber)) cardType = 'mastercard';
+      else if (/^3[47]/.test(cleanNumber)) cardType = 'amex';
+
+      const last4 = cleanNumber.slice(-4);
+
+      // Check if first card — make it default
+      const [existing] = await pool.query('SELECT id FROM cards WHERE user_id = ?', [req.user.id]);
+      const isDefault = existing.length === 0;
+
+      const [result] = await pool.query(
+        'INSERT INTO cards (user_id, card_type, last4, expiry_month, expiry_year, cardholder_name, is_default) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [req.user.id, cardType, last4, expiryMonth, expiryYear, cardholderName.toUpperCase(), isDefault]
+      );
+
+      res.status(201).json({
+        message: 'Card added successfully',
+        card: {
+          id: result.insertId,
+          cardType,
+          last4,
+          expiryMonth,
+          expiryYear,
+          cardholderName: cardholderName.toUpperCase(),
+          isDefault,
+        },
+      });
+    } catch (err) {
+      console.error('Add card error:', err);
+      res.status(500).json({ error: 'Failed to add card' });
+    }
+  }
+);
+
+// ────────────────── SET DEFAULT CARD ──────────────────
+router.put('/:id/default', async (req, res) => {
+  try {
+    const cardId = req.params.id;
+
+    // Verify ownership
+    const [cards] = await pool.query('SELECT id FROM cards WHERE id = ? AND user_id = ?', [cardId, req.user.id]);
+    if (cards.length === 0) {
+      return res.status(404).json({ error: 'Card not found' });
+    }
+
+    // Unset all defaults
+    await pool.query('UPDATE cards SET is_default = FALSE WHERE user_id = ?', [req.user.id]);
+    // Set new default
+    await pool.query('UPDATE cards SET is_default = TRUE WHERE id = ?', [cardId]);
+
+    res.json({ message: 'Default card updated' });
+  } catch (err) {
+    console.error('Set default card error:', err);
+    res.status(500).json({ error: 'Failed to update default card' });
+  }
+});
+
+// ────────────────── DELETE CARD ──────────────────
+router.delete('/:id', async (req, res) => {
+  try {
+    const cardId = req.params.id;
+
+    const [cards] = await pool.query('SELECT id, is_default FROM cards WHERE id = ? AND user_id = ?', [cardId, req.user.id]);
+    if (cards.length === 0) {
+      return res.status(404).json({ error: 'Card not found' });
+    }
+
+    await pool.query('DELETE FROM cards WHERE id = ?', [cardId]);
+
+    // If deleted card was default, set first remaining card as default
+    if (cards[0].is_default) {
+      await pool.query(
+        'UPDATE cards SET is_default = TRUE WHERE user_id = ? ORDER BY created_at ASC LIMIT 1',
+        [req.user.id]
+      );
+    }
+
+    res.json({ message: 'Card removed successfully' });
+  } catch (err) {
+    console.error('Delete card error:', err);
+    res.status(500).json({ error: 'Failed to delete card' });
+  }
+});
+
+export default router;
