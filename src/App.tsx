@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { 
-  Users, Target, Wallet, Shield, ArrowRight, Settings, X, Mail, Lock, 
+  Users, Target, Wallet, Shield, ArrowRight, ArrowLeft, Settings, X, Mail, Lock, 
   AlertCircle, Eye, EyeOff, TrendingUp, CheckCircle, Clock, Award,
   ChevronRight, Star, Facebook, Twitter, Instagram, Linkedin,
   Menu, Phone, MapPin, DollarSign, Bell
@@ -141,10 +141,14 @@ function App() {
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
       {/* Admin Login Modal */}
       {showAdminModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full relative animate-modalIn">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={closeModal}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full relative animate-modalIn" onClick={(e) => e.stopPropagation()}>
             <button onClick={closeModal} className="absolute right-4 top-4 text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-2 rounded-full transition-all z-10">
               <X className="w-5 h-5" />
+            </button>
+            <button onClick={closeModal} className="absolute left-4 top-4 text-white/80 hover:text-white hover:bg-white/20 p-2 rounded-full transition-all z-10 flex items-center gap-1">
+              <ArrowLeft className="w-5 h-5" />
+              <span className="text-sm font-medium">Back</span>
             </button>
 
             <div className="h-32 bg-gradient-to-r from-primary-600 to-primary-400 rounded-t-2xl relative overflow-hidden">
@@ -259,11 +263,6 @@ function App() {
             </Link>
 
             <div className="hidden md:flex items-center space-x-8">
-              <a href="#features" className="text-gray-600 hover:text-primary-600 transition-colors font-medium">Features</a>
-              <a href="#how-it-works" className="text-gray-600 hover:text-primary-600 transition-colors font-medium">How It Works</a>
-              <a href="#testimonials" className="text-gray-600 hover:text-primary-600 transition-colors font-medium">Testimonials</a>
-              <a href="#contact" className="text-gray-600 hover:text-primary-600 transition-colors font-medium">Contact</a>
-              
               <button
                 onClick={handleAdminClick}
                 className="flex items-center space-x-2 px-4 py-2 bg-primary-50 text-primary-700 rounded-xl hover:bg-primary-100 transition-all border-2 border-primary-200 hover:border-primary-300"
@@ -292,10 +291,6 @@ function App() {
         {mobileMenuOpen && (
           <div className="md:hidden bg-white border-t mt-3 py-4 px-4">
             <div className="flex flex-col space-y-3">
-              <a href="#features" className="text-gray-600 hover:text-primary-600 py-2">Features</a>
-              <a href="#how-it-works" className="text-gray-600 hover:text-primary-600 py-2">How It Works</a>
-              <a href="#testimonials" className="text-gray-600 hover:text-primary-600 py-2">Testimonials</a>
-              <a href="#contact" className="text-gray-600 hover:text-primary-600 py-2">Contact</a>
               <button
                 onClick={handleAdminClick}
                 className="flex items-center space-x-2 px-4 py-2 bg-primary-50 text-primary-700 rounded-lg"
