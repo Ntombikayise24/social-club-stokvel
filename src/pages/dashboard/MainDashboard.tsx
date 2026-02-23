@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { 
   Target, 
   Users, 
@@ -14,7 +14,13 @@ import {
   Calendar,
   Settings,
   LogOut,
-  CreditCard
+  CreditCard,
+  MoreVertical,
+  Search,
+  CheckCircle,
+  Clock,
+  XCircle,
+  AlertCircle
 } from 'lucide-react';
 import ProfileSwitcher from './ProfileSwitcher';
 
@@ -27,6 +33,7 @@ interface Profile {
   targetAmount: number;
   savedAmount: number;
   progress: number;
+  status?: 'active' | 'pending' | 'rejected';
 }
 
 interface StokvelData {
@@ -40,28 +47,30 @@ interface StokvelData {
   individualTarget: number;
 }
 
+interface AvailableStokvel {
+  id: string;
+  name: string;
+  description: string;
+  memberCount: number;
+  targetAmount: number;
+  cycle: string;
+  category: string;
+  status: 'active' | 'pending' | 'available';
+}
+
 export default function MainDashboard() {
-  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [showAddContribution, setShowAddContribution] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showDiscoverStokvels, setShowDiscoverStokvels] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('all');
   
   // Constants
   const TARGET_DATE = "06 Dec 2026";
   
-  // Active Profile State
-  const [activeProfile, setActiveProfile] = useState<Profile>({
-    id: '1',
-    name: 'Nkulumo Nkuna',
-    stokvelName: 'COLLECTIVE POT',
-    stokvelId: 'collective-pot',
-    role: 'member',
-    targetAmount: 7000,
-    savedAmount: 1070,
-    progress: 13
-  });
-
-  // Mock profiles data
+  // Mock profiles data with status
   const mockProfiles: Profile[] = [
     {
       id: '1',
@@ -71,7 +80,8 @@ export default function MainDashboard() {
       role: 'member',
       targetAmount: 7000,
       savedAmount: 1070,
-      progress: 13
+      progress: 13,
+      status: 'active'
     },
     {
       id: '2',
@@ -81,9 +91,147 @@ export default function MainDashboard() {
       role: 'member',
       targetAmount: 5000,
       savedAmount: 850,
-      progress: 17
+      progress: 17,
+      status: 'active'
+    },
+    {
+      id: '3',
+      name: 'Nkulumo Nkuna',
+      stokvelName: 'EDUCATION FUND',
+      stokvelId: 'education-fund',
+      role: 'member',
+      targetAmount: 10000,
+      savedAmount: 0,
+      progress: 0,
+      status: 'pending'
+    },
+    {
+      id: '4',
+      name: 'Nkulumo Nkuna',
+      stokvelName: 'EMERGENCY FUND',
+      stokvelId: 'emergency-fund',
+      role: 'member',
+      targetAmount: 5000,
+      savedAmount: 0,
+      progress: 0,
+      status: 'rejected'
     }
   ];
+
+  // Available stokvels in the system
+  const availableStokvels: AvailableStokvel[] = [
+    {
+      id: 'collective-pot',
+      name: 'COLLECTIVE POT',
+      description: 'Community savings for year-end celebrations',
+      memberCount: 18,
+      targetAmount: 7000,
+      cycle: 'Weekly (Sunday)',
+      category: 'Social',
+      status: 'active'
+    },
+    {
+      id: 'summer-savers',
+      name: 'SUMMER SAVERS',
+      description: 'Save for summer holidays and festivals',
+      memberCount: 8,
+      targetAmount: 5000,
+      cycle: 'Monthly',
+      category: 'Holiday',
+      status: 'active'
+    },
+    {
+      id: 'education-fund',
+      name: 'EDUCATION FUND',
+      description: 'Save for school fees and educational expenses',
+      memberCount: 12,
+      targetAmount: 10000,
+      cycle: 'Monthly',
+      category: 'Education',
+      status: 'pending'
+    },
+    {
+      id: 'emergency-fund',
+      name: 'EMERGENCY FUND',
+      description: 'Rainy day savings for unexpected expenses',
+      memberCount: 25,
+      targetAmount: 5000,
+      cycle: 'Weekly (Friday)',
+      category: 'Emergency',
+      status: 'available'
+    },
+    {
+      id: 'investment-club',
+      name: 'INVESTMENT CLUB',
+      description: 'Pool resources for property and stock investments',
+      memberCount: 10,
+      targetAmount: 20000,
+      cycle: 'Quarterly',
+      category: 'Investment',
+      status: 'available'
+    },
+    {
+      id: 'travel-stokvel',
+      name: 'TRAVEL STOKVEL',
+      description: 'Save for group travel and adventures',
+      memberCount: 15,
+      targetAmount: 15000,
+      cycle: 'Monthly',
+      category: 'Travel',
+      status: 'available'
+    },
+    {
+      id: 'business-starters',
+      name: 'BUSINESS STARTERS',
+      description: 'Fund small business ventures together',
+      memberCount: 7,
+      targetAmount: 25000,
+      cycle: 'Bi-weekly',
+      category: 'Business',
+      status: 'available'
+    }
+  ];
+
+  // Filter stokvels based on search and category
+  const filteredStokvels = availableStokvels.filter(stokvel => {
+    const matchesSearch = stokvel.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         stokvel.description.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = selectedCategory === 'all' || stokvel.category.toLowerCase() === selectedCategory.toLowerCase();
+    return matchesSearch && matchesCategory;
+  });
+
+  // Categories for filter
+  const categories = ['all', 'Social', 'Holiday', 'Education', 'Emergency', 'Investment', 'Travel', 'Business'];
+
+  // Get initial profile from URL params or localStorage
+  const getInitialProfile = (): Profile => {
+    const profileIdFromUrl = searchParams.get('profile');
+    
+    if (profileIdFromUrl) {
+      const foundProfile = mockProfiles.find(p => p.id === profileIdFromUrl);
+      if (foundProfile) return foundProfile;
+    }
+    
+    // Try to get from localStorage
+    const savedProfileId = localStorage.getItem('activeProfileId');
+    if (savedProfileId) {
+      const foundProfile = mockProfiles.find(p => p.id === savedProfileId);
+      if (foundProfile) return foundProfile;
+    }
+    
+    // Default to first profile
+    return mockProfiles[0];
+  };
+
+  // Active Profile State
+  const [activeProfile, setActiveProfile] = useState<Profile>(getInitialProfile);
+
+  // Update URL and localStorage when profile changes
+  const handleProfileSwitch = (profile: Profile) => {
+    setActiveProfile(profile);
+    setSearchParams({ profile: profile.id });
+    localStorage.setItem('activeProfileId', profile.id);
+  };
 
   // Contribution form state
   const [contributionData, setContributionData] = useState({
@@ -148,15 +296,38 @@ export default function MainDashboard() {
 
   const currentStokvel = getStokvelData(activeProfile);
 
-  // Mock notifications
+  // Handle join request
+  const handleJoinRequest = (stokvelId: string) => {
+    alert(`Join request sent to ${stokvelId} admin for approval! (Demo)`);
+    // In a real app, this would make an API call
+  };
+
+  // Regular notifications
   const notifications = [
     { id: 1, message: `Contribution of R200 confirmed for ${activeProfile.stokvelName}`, time: '2 hours ago', read: false },
     { id: 2, message: 'Loan repayment due in 3 days', time: '1 day ago', read: false },
     { id: 3, message: 'Welcome to HENNESSY SOCIAL CLUB!', time: '2 days ago', read: true },
     { id: 4, message: 'Weekly meeting this Sunday at 10am', time: '3 days ago', read: true },
+    { id: 5, message: 'Your request to join EDUCATION FUND is pending approval', time: '3 days ago', read: false },
   ];
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  // Get rejected profiles to show in notifications only
+  const rejectedProfiles = mockProfiles.filter(p => p.status === 'rejected');
+  
+  // Combine notifications with rejected profiles for display in notifications dropdown only
+  const allNotifications = [
+    ...notifications,
+    ...rejectedProfiles.map(profile => ({
+      id: `rejected-${profile.id}`,
+      message: `Your request to join ${profile.stokvelName} was not approved`,
+      time: '2 days ago',
+      read: false,
+      type: 'rejected',
+      profile
+    }))
+  ];
+
+  const unreadCount = allNotifications.filter(n => !n.read).length;
 
   const handleAddContribution = () => {
     // Check if amount is valid
@@ -202,7 +373,7 @@ export default function MainDashboard() {
               </div>
             </div>
 
-            {/* Right Side - Notifications, User Menu & Profile Switcher */}
+            {/* Right Side - Notifications, Profile Switcher & 3-Dots Menu */}
             <div className="flex items-center space-x-3">
               {/* Notifications */}
               <div className="relative">
@@ -228,12 +399,52 @@ export default function MainDashboard() {
                       )}
                     </div>
                     <div className="max-h-96 overflow-y-auto">
-                      {notifications.slice(0, 3).map(notif => (
-                        <div key={notif.id} className={`p-3 hover:bg-gray-50 border-b border-gray-100 last:border-0 ${!notif.read ? 'bg-primary-50/50' : ''}`}>
+                      {/* Regular notifications */}
+                      {notifications.slice(0, 2).map(notif => (
+                        <div key={notif.id} className={`p-3 hover:bg-gray-50 border-b border-gray-100 ${!notif.read ? 'bg-primary-50/50' : ''}`}>
                           <p className="text-sm text-gray-800">{notif.message}</p>
                           <p className="text-xs text-gray-500 mt-1">{notif.time}</p>
                         </div>
                       ))}
+                      
+                      {/* Rejected Profiles Section - Only shown in notifications */}
+                      {rejectedProfiles.length > 0 && (
+                        <>
+                          <div className="px-3 py-2 bg-red-50 border-t border-b border-red-100">
+                            <p className="text-xs font-medium text-red-600 flex items-center">
+                              <AlertCircle className="w-3 h-3 mr-1" />
+                              REJECTED REQUESTS
+                            </p>
+                          </div>
+                          {rejectedProfiles.map(profile => (
+                            <div key={`rejected-${profile.id}`} className="p-3 hover:bg-gray-50 border-b border-gray-100 bg-red-50/30">
+                              <div className="flex items-start space-x-2">
+                                <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+                                <div>
+                                  <p className="text-sm text-gray-800">
+                                    Your request to join <span className="font-semibold">{profile.stokvelName}</span> was not approved
+                                  </p>
+                                  <div className="flex items-center mt-2 text-xs">
+                                    <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded-full">
+                                      Rejected
+                                    </span>
+                                    <span className="text-gray-500 ml-2">2 days ago</span>
+                                  </div>
+                                  <button 
+                                    className="mt-2 text-xs text-primary-600 hover:text-primary-700 font-medium"
+                                    onClick={() => {
+                                      setShowNotifications(false);
+                                      setShowDiscoverStokvels(true);
+                                    }}
+                                  >
+                                    Browse other stokvels →
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </>
+                      )}
                     </div>
                     <Link 
                       to="/notifications" 
@@ -249,28 +460,27 @@ export default function MainDashboard() {
               <ProfileSwitcher 
                 profiles={mockProfiles}
                 activeProfile={activeProfile}
-                onSwitch={setActiveProfile}
-                onAddProfile={() => {
-                  alert('Navigate to add profile page');
-                }}
+                onSwitch={handleProfileSwitch}
+                onAddProfile={() => setShowDiscoverStokvels(true)}
               />
 
-              {/* User Menu */}
+              {/* 3-Dots Menu Button */}
               <div className="relative">
                 <button 
                   onClick={() => setShowUserMenu(!showUserMenu)}
-                  className="flex items-center space-x-2 hover:bg-gray-100 rounded-lg p-2 transition-colors"
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  aria-label="Menu"
                 >
-                  <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-                    <span className="text-sm font-medium text-primary-700">
-                      {activeProfile.name.split(' ').map(n => n[0]).join('')}
-                    </span>
-                  </div>
+                  <MoreVertical className="w-5 h-5 text-gray-600" />
                 </button>
 
                 {/* User Dropdown Menu */}
                 {showUserMenu && (
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 z-20">
+                    <div className="px-4 py-3 border-b border-gray-100">
+                      <p className="text-sm font-medium text-gray-800">{activeProfile.name}</p>
+                      <p className="text-xs text-gray-500">{activeProfile.stokvelName}</p>
+                    </div>
                     <Link 
                       to="/profile" 
                       className="flex items-center space-x-2 px-4 py-3 hover:bg-gray-50 transition-colors"
@@ -520,7 +730,7 @@ export default function MainDashboard() {
               </Link>
             </div>
 
-            {/* Quick Actions */}
+            {/* Quick Actions - NOW WITH BOTH CARDS AND DISCOVER */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
               <h3 className="font-semibold text-gray-700 mb-4">Quick Actions</h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -542,14 +752,157 @@ export default function MainDashboard() {
                   <span className="text-xs font-medium text-gray-700">Profile</span>
                 </Link>
 
+                {/* CARDS BUTTON - KEPT AS IS */}
                 <Link to="/cards" className="flex flex-col items-center p-4 bg-green-50 hover:bg-green-100 rounded-xl transition-colors group">
                   <CreditCard className="w-6 h-6 text-green-600 mb-2 group-hover:scale-110 transition-transform" />
                   <span className="text-xs font-medium text-gray-700">Cards</span>
                 </Link>
+
+                {/* DISCOVER BUTTON - ADDED AS EXTRA */}
+                <button 
+                  onClick={() => setShowDiscoverStokvels(true)}
+                  className="flex flex-col items-center p-4 bg-amber-50 hover:bg-amber-100 rounded-xl transition-colors group md:col-span-1"
+                >
+                  <Search className="w-6 h-6 text-amber-600 mb-2 group-hover:scale-110 transition-transform" />
+                  <span className="text-xs font-medium text-gray-700">Discover</span>
+                </button>
               </div>
             </div>
           </div>
         </div>
+
+        {/* Discover Stokvels Modal */}
+        {showDiscoverStokvels && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h3 className="text-2xl font-semibold text-gray-800">Discover Stokvels</h3>
+                    <p className="text-sm text-gray-500 mt-1">Browse and join stokvels in the system</p>
+                  </div>
+                  <button 
+                    onClick={() => setShowDiscoverStokvels(false)}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <XCircle className="w-6 h-6" />
+                  </button>
+                </div>
+
+                {/* Search and Filter */}
+                <div className="mt-4 flex flex-col sm:flex-row gap-3">
+                  <div className="flex-1 relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search stokvels by name or description..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    />
+                  </div>
+                  <select
+                    value={selectedCategory}
+                    onChange={(e) => setSelectedCategory(e.target.value)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                  >
+                    {categories.map(category => (
+                      <option key={category} value={category}>
+                        {category.charAt(0).toUpperCase() + category.slice(1)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Stokvel List */}
+              <div className="overflow-y-auto p-6 max-h-[calc(90vh-200px)]">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {filteredStokvels.map(stokvel => (
+                    <div key={stokvel.id} className="border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow">
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <h4 className="font-semibold text-gray-800">{stokvel.name}</h4>
+                          <p className="text-xs text-gray-500 mt-1">{stokvel.description}</p>
+                        </div>
+                        <span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded-full">
+                          {stokvel.category}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 my-3 text-sm">
+                        <div>
+                          <p className="text-xs text-gray-500">Members</p>
+                          <p className="font-medium">{stokvel.memberCount}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500">Target</p>
+                          <p className="font-medium">R{stokvel.targetAmount}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500">Cycle</p>
+                          <p className="font-medium">{stokvel.cycle}</p>
+                        </div>
+                      </div>
+
+                      <div className="mt-3">
+                        {stokvel.status === 'active' && (
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center text-green-600">
+                              <CheckCircle className="w-4 h-4 mr-1" />
+                              <span className="text-sm">Already a member</span>
+                            </div>
+                            <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
+                              Active
+                            </span>
+                          </div>
+                        )}
+                        {stokvel.status === 'pending' && (
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center text-yellow-600">
+                              <Clock className="w-4 h-4 mr-1" />
+                              <span className="text-sm">Request pending approval</span>
+                            </div>
+                            <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full">
+                              Pending
+                            </span>
+                          </div>
+                        )}
+                        {stokvel.status === 'available' && (
+                          <button
+                            onClick={() => handleJoinRequest(stokvel.id)}
+                            className="w-full bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium py-2 px-4 rounded-lg transition-colors"
+                          >
+                            Request to Join
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {filteredStokvels.length === 0 && (
+                  <div className="text-center py-12">
+                    <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                    <p className="text-gray-500">No stokvels found matching your criteria</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-6 border-t border-gray-200 bg-gray-50">
+                <div className="flex items-center justify-between text-sm text-gray-600">
+                  <span>Showing {filteredStokvels.length} stokvels</span>
+                  <button
+                    onClick={() => setShowDiscoverStokvels(false)}
+                    className="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Add Contribution Modal */}
         {showAddContribution && (
@@ -558,7 +911,7 @@ export default function MainDashboard() {
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-xl font-semibold text-gray-800">Add Contribution</h3>
                 <button onClick={() => setShowAddContribution(false)} className="text-gray-400 hover:text-gray-600">
-                  <HelpCircle className="w-5 h-5" />
+                  <XCircle className="w-5 h-5" />
                 </button>
               </div>
               
@@ -614,7 +967,7 @@ export default function MainDashboard() {
                     const value = e.target.value;
                     if (value === 'new') {
                       setShowAddContribution(false);
-                      navigate('/cards');
+                      window.location.href = '/cards';
                     } else {
                       setContributionData({...contributionData, paymentMethod: value});
                     }

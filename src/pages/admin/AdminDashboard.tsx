@@ -23,7 +23,9 @@ import {
   CheckCircle,
   AlertCircle,
   Tag,
-  Users as UsersIcon
+  Users as UsersIcon,
+  Archive,
+  RotateCcw
 } from 'lucide-react';
 
 // Types
@@ -32,9 +34,10 @@ interface User {
   name: string;
   email: string;
   phone: string;
-  status: 'active' | 'inactive' | 'pending';
+  status: 'active' | 'inactive' | 'pending' | 'deleted';
   joinedDate: string;
   lastActive?: string;
+  deletedAt?: string;
   profiles: Profile[];
 }
 
@@ -76,11 +79,23 @@ interface Contribution {
   stokvelName: string;
   amount: number;
   date: string;
-  status: 'confirmed' | 'pending';
+  status: 'confirmed' | 'pending' | 'deleted';
   confirmedBy?: string;
   confirmedAt?: string;
   paymentMethod: string;
   reference?: string;
+  deletedAt?: string;
+}
+
+interface DeletedUser {
+  id: number;
+  name: string;
+  email: string;
+  phone: string;
+  deletedAt: string;
+  deletedBy: string;
+  reason?: string;
+  originalData: User;
 }
 
 // Add User Modal Component
@@ -188,14 +203,11 @@ function AddUserModal({ onClose, onAdd, stokvels }: AddUserModalProps) {
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* Basic Information */}
           <div className="space-y-4">
             <h3 className="text-sm font-medium text-gray-700 uppercase tracking-wider">Basic Information</h3>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Full Name *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
               <input
                 type="text"
                 value={formData.name}
@@ -209,9 +221,7 @@ function AddUserModal({ onClose, onAdd, stokvels }: AddUserModalProps) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email Address *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email Address *</label>
               <input
                 type="email"
                 value={formData.email}
@@ -225,9 +235,7 @@ function AddUserModal({ onClose, onAdd, stokvels }: AddUserModalProps) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Phone Number *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number *</label>
               <input
                 type="tel"
                 value={formData.phone}
@@ -241,9 +249,7 @@ function AddUserModal({ onClose, onAdd, stokvels }: AddUserModalProps) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Status
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
               <select
                 value={formData.status}
                 onChange={(e) => setFormData({...formData, status: e.target.value as 'active' | 'pending'})}
@@ -255,7 +261,6 @@ function AddUserModal({ onClose, onAdd, stokvels }: AddUserModalProps) {
             </div>
           </div>
 
-          {/* Stokvel Assignment */}
           <div className="space-y-4">
             <h3 className="text-sm font-medium text-gray-700 uppercase tracking-wider">Assign to Stokvels</h3>
             <p className="text-xs text-gray-500">Select which stokvels this user should join</p>
@@ -300,19 +305,11 @@ function AddUserModal({ onClose, onAdd, stokvels }: AddUserModalProps) {
             )}
           </div>
 
-          {/* Action Buttons */}
           <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
+            <button type="button" onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
               Cancel
             </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center space-x-2"
-            >
+            <button type="submit" className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center space-x-2">
               <UserPlus className="w-4 h-4" />
               <span>Create User</span>
             </button>
@@ -437,15 +434,12 @@ function AddStokvelModal({ onClose, onAdd }: AddStokvelModalProps) {
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* Basic Information */}
           <div className="space-y-4">
             <h3 className="text-sm font-medium text-gray-700 uppercase tracking-wider">Stokvel Details</h3>
             
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Stokvel Name *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Stokvel Name *</label>
                 <div className="relative">
                   <Tag className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input
@@ -462,9 +456,7 @@ function AddStokvelModal({ onClose, onAdd }: AddStokvelModalProps) {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Icon
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Icon</label>
                 <select
                   value={formData.icon}
                   onChange={(e) => setFormData({...formData, icon: e.target.value})}
@@ -481,9 +473,7 @@ function AddStokvelModal({ onClose, onAdd }: AddStokvelModalProps) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Description
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
               <textarea
                 value={formData.description}
                 onChange={(e) => setFormData({...formData, description: e.target.value})}
@@ -495,9 +485,7 @@ function AddStokvelModal({ onClose, onAdd }: AddStokvelModalProps) {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Stokvel Type
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Stokvel Type</label>
                 <select
                   value={formData.type}
                   onChange={(e) => setFormData({...formData, type: e.target.value as 'traditional' | 'flexible'})}
@@ -509,9 +497,7 @@ function AddStokvelModal({ onClose, onAdd }: AddStokvelModalProps) {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Status
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                 <select
                   value={formData.status}
                   onChange={(e) => setFormData({...formData, status: e.target.value as 'active' | 'upcoming'})}
@@ -524,15 +510,12 @@ function AddStokvelModal({ onClose, onAdd }: AddStokvelModalProps) {
             </div>
           </div>
 
-          {/* Financial Settings */}
           <div className="space-y-4">
             <h3 className="text-sm font-medium text-gray-700 uppercase tracking-wider">Financial Settings</h3>
             
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Target Amount (R) *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Target Amount (R) *</label>
                 <div className="relative">
                   <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input
@@ -551,9 +534,7 @@ function AddStokvelModal({ onClose, onAdd }: AddStokvelModalProps) {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Max Members *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Max Members *</label>
                 <div className="relative">
                   <UsersIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input
@@ -580,15 +561,12 @@ function AddStokvelModal({ onClose, onAdd }: AddStokvelModalProps) {
             </div>
           </div>
 
-          {/* Cycle Settings */}
           <div className="space-y-4">
             <h3 className="text-sm font-medium text-gray-700 uppercase tracking-wider">Cycle Settings</h3>
             
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Contribution Cycle
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Contribution Cycle</label>
                 <select
                   value={formData.cycle}
                   onChange={(e) => {
@@ -603,9 +581,7 @@ function AddStokvelModal({ onClose, onAdd }: AddStokvelModalProps) {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Meeting Day
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Meeting Day</label>
                 <select
                   value={formData.meetingDay}
                   onChange={(e) => setFormData({...formData, meetingDay: e.target.value})}
@@ -620,7 +596,6 @@ function AddStokvelModal({ onClose, onAdd }: AddStokvelModalProps) {
             </div>
           </div>
 
-          {/* Preview Section */}
           <div className="space-y-2">
             <h3 className="text-sm font-medium text-gray-700 uppercase tracking-wider">Preview</h3>
             <div className={`border rounded-lg p-4 ${
@@ -661,20 +636,12 @@ function AddStokvelModal({ onClose, onAdd }: AddStokvelModalProps) {
             </div>
           </div>
 
-          {/* Action Buttons */}
           <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
+            <button type="button" onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
               Cancel
             </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center space-x-2"
-            >
-              <PlusCircle className="w-4 h-4" />
+            <button type="submit" className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center space-x-2">
+              <PlusCircle className="w-5 h-5" />
               <span>Create Stokvel</span>
             </button>
           </div>
@@ -794,14 +761,11 @@ function EditUserModal({ user, onClose, onSave, stokvels }: EditUserModalProps) 
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* Basic Information */}
           <div className="space-y-4">
             <h3 className="text-sm font-medium text-gray-700 uppercase tracking-wider">Basic Information</h3>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Full Name *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
               <input
                 type="text"
                 value={formData.name}
@@ -815,9 +779,7 @@ function EditUserModal({ user, onClose, onSave, stokvels }: EditUserModalProps) 
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email Address *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email Address *</label>
               <input
                 type="email"
                 value={formData.email}
@@ -831,9 +793,7 @@ function EditUserModal({ user, onClose, onSave, stokvels }: EditUserModalProps) 
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Phone Number *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number *</label>
               <input
                 type="tel"
                 value={formData.phone}
@@ -847,9 +807,7 @@ function EditUserModal({ user, onClose, onSave, stokvels }: EditUserModalProps) 
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Status
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
               <select
                 value={formData.status}
                 onChange={(e) => setFormData({...formData, status: e.target.value as 'active' | 'inactive' | 'pending'})}
@@ -862,7 +820,6 @@ function EditUserModal({ user, onClose, onSave, stokvels }: EditUserModalProps) 
             </div>
           </div>
 
-          {/* Stokvel Assignment */}
           <div className="space-y-4">
             <h3 className="text-sm font-medium text-gray-700 uppercase tracking-wider">Stokvel Membership</h3>
             <p className="text-xs text-gray-500">Select which stokvels this user belongs to</p>
@@ -900,19 +857,11 @@ function EditUserModal({ user, onClose, onSave, stokvels }: EditUserModalProps) 
             </div>
           </div>
 
-          {/* Action Buttons */}
           <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
+            <button type="button" onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
               Cancel
             </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center space-x-2"
-            >
+            <button type="submit" className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center space-x-2">
               <Edit2 className="w-4 h-4" />
               <span>Save Changes</span>
             </button>
@@ -1039,15 +988,12 @@ function EditStokvelModal({ stokvel, onClose, onSave }: EditStokvelModalProps) {
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* Basic Information */}
           <div className="space-y-4">
             <h3 className="text-sm font-medium text-gray-700 uppercase tracking-wider">Stokvel Details</h3>
             
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Stokvel Name *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Stokvel Name *</label>
                 <input
                   type="text"
                   value={formData.name}
@@ -1060,9 +1006,7 @@ function EditStokvelModal({ stokvel, onClose, onSave }: EditStokvelModalProps) {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Icon
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Icon</label>
                 <select
                   value={formData.icon}
                   onChange={(e) => setFormData({...formData, icon: e.target.value})}
@@ -1078,9 +1022,7 @@ function EditStokvelModal({ stokvel, onClose, onSave }: EditStokvelModalProps) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Description
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
               <textarea
                 value={formData.description}
                 onChange={(e) => setFormData({...formData, description: e.target.value})}
@@ -1090,15 +1032,12 @@ function EditStokvelModal({ stokvel, onClose, onSave }: EditStokvelModalProps) {
             </div>
           </div>
 
-          {/* Financial Settings */}
           <div className="space-y-4">
             <h3 className="text-sm font-medium text-gray-700 uppercase tracking-wider">Financial Settings</h3>
             
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Target Amount (R) *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Target Amount (R) *</label>
                 <input
                   type="number"
                   value={formData.targetAmount}
@@ -1113,9 +1052,7 @@ function EditStokvelModal({ stokvel, onClose, onSave }: EditStokvelModalProps) {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Max Members *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Max Members *</label>
                 <input
                   type="number"
                   value={formData.maxMembers}
@@ -1131,15 +1068,12 @@ function EditStokvelModal({ stokvel, onClose, onSave }: EditStokvelModalProps) {
             </div>
           </div>
 
-          {/* Cycle Settings */}
           <div className="space-y-4">
             <h3 className="text-sm font-medium text-gray-700 uppercase tracking-wider">Cycle Settings</h3>
             
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Contribution Cycle
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Contribution Cycle</label>
                 <select
                   value={formData.cycle}
                   onChange={(e) => {
@@ -1154,9 +1088,7 @@ function EditStokvelModal({ stokvel, onClose, onSave }: EditStokvelModalProps) {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Meeting Day
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Meeting Day</label>
                 <select
                   value={formData.meetingDay}
                   onChange={(e) => setFormData({...formData, meetingDay: e.target.value})}
@@ -1172,9 +1104,7 @@ function EditStokvelModal({ stokvel, onClose, onSave }: EditStokvelModalProps) {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Status
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                 <select
                   value={formData.status}
                   onChange={(e) => setFormData({...formData, status: e.target.value as 'active' | 'inactive' | 'upcoming'})}
@@ -1187,9 +1117,7 @@ function EditStokvelModal({ stokvel, onClose, onSave }: EditStokvelModalProps) {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Color Theme
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Color Theme</label>
                 <select
                   value={formData.color}
                   onChange={(e) => setFormData({...formData, color: e.target.value})}
@@ -1203,19 +1131,11 @@ function EditStokvelModal({ stokvel, onClose, onSave }: EditStokvelModalProps) {
             </div>
           </div>
 
-          {/* Action Buttons */}
           <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
+            <button type="button" onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
               Cancel
             </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center space-x-2"
-            >
+            <button type="submit" className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center space-x-2">
               <Edit2 className="w-4 h-4" />
               <span>Save Changes</span>
             </button>
@@ -1260,7 +1180,6 @@ function ApproveUserModal({ user, onClose, onApprove, stokvels }: ApproveUserMod
         </div>
 
         <div className="p-6 space-y-6">
-          {/* User Information */}
           <div className="bg-gray-50 rounded-lg p-4">
             <h3 className="font-medium text-gray-700 mb-3">User Details</h3>
             <div className="space-y-2">
@@ -1271,7 +1190,6 @@ function ApproveUserModal({ user, onClose, onApprove, stokvels }: ApproveUserMod
             </div>
           </div>
 
-          {/* Stokvel Assignment */}
           <div className="space-y-4">
             <h3 className="text-sm font-medium text-gray-700 uppercase tracking-wider">Assign to Stokvels</h3>
             <p className="text-xs text-gray-500">Select which stokvels this user should join</p>
@@ -1316,12 +1234,8 @@ function ApproveUserModal({ user, onClose, onApprove, stokvels }: ApproveUserMod
             )}
           </div>
 
-          {/* Action Buttons */}
           <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
+            <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
               Cancel
             </button>
             <button
@@ -1351,7 +1265,6 @@ function ConfirmContributionModal({ contribution, onClose, onConfirm }: ConfirmC
 
   const handleConfirm = () => {
     setIsProcessing(true);
-    // Simulate processing
     setTimeout(() => {
       onConfirm(contribution.id);
       setIsProcessing(false);
@@ -1396,10 +1309,6 @@ function ConfirmContributionModal({ contribution, onClose, onConfirm }: ConfirmC
               <span className="text-gray-600">Payment Method:</span>
               <span className="font-medium capitalize">{contribution.paymentMethod}</span>
             </div>
-            <div className="flex justify-between items-center py-2">
-              <span className="text-gray-600">Reference:</span>
-              <span className="font-medium">{contribution.reference || 'N/A'}</span>
-            </div>
           </div>
 
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-6">
@@ -1410,11 +1319,7 @@ function ConfirmContributionModal({ contribution, onClose, onConfirm }: ConfirmC
           </div>
 
           <div className="flex space-x-3">
-            <button
-              onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-              disabled={isProcessing}
-            >
+            <button onClick={onClose} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors" disabled={isProcessing}>
               Cancel
             </button>
             <button
@@ -1447,34 +1352,543 @@ interface DeleteConfirmModalProps {
   message: string;
   onConfirm: () => void;
   onCancel: () => void;
+  isSoftDelete?: boolean;
 }
 
-function DeleteConfirmModal({ title, message, onConfirm, onCancel }: DeleteConfirmModalProps) {
+function DeleteConfirmModal({ title, message, onConfirm, onCancel, isSoftDelete = false }: DeleteConfirmModalProps) {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
         <div className="text-center mb-6">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <AlertCircle className="w-8 h-8 text-red-600" />
+          <div className={`w-16 h-16 ${isSoftDelete ? 'bg-orange-100' : 'bg-red-100'} rounded-full flex items-center justify-center mx-auto mb-4`}>
+            {isSoftDelete ? (
+              <Archive className="w-8 h-8 text-orange-600" />
+            ) : (
+              <AlertCircle className="w-8 h-8 text-red-600" />
+            )}
           </div>
           <h3 className="text-xl font-semibold text-gray-800 mb-2">{title}</h3>
           <p className="text-gray-500">{message}</p>
+          {isSoftDelete && (
+            <p className="text-xs text-orange-600 mt-2 flex items-center justify-center">
+              <Archive className="w-3 h-3 mr-1" />
+              User will be archived and can be restored later
+            </p>
+          )}
         </div>
         <div className="flex space-x-3">
-          <button
-            onClick={onCancel}
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-          >
+          <button onClick={onCancel} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
             Cancel
           </button>
-          <button
-            onClick={onConfirm}
-            className="flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition-colors"
+          <button 
+            onClick={onConfirm} 
+            className={`flex-1 ${isSoftDelete ? 'bg-orange-600 hover:bg-orange-700' : 'bg-red-600 hover:bg-red-700'} text-white py-2 rounded-lg transition-colors`}
           >
-            Delete
+            {isSoftDelete ? 'Archive User' : 'Permanently Delete'}
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// Settings Modal Component
+interface SettingsModalProps {
+  onClose: () => void;
+  onSave: (settings: any) => void;
+}
+
+function SettingsModal({ onClose, onSave }: SettingsModalProps) {
+  const [settings, setSettings] = useState(() => {
+    // Load settings from localStorage if they exist
+    const savedSettings = localStorage.getItem('adminSettings');
+    return savedSettings ? JSON.parse(savedSettings) : {
+      siteName: 'HENNESSY SOCIAL CLUB',
+      adminEmail: 'admin@hennessyclub.co.za',
+      currency: 'ZAR',
+      dateFormat: 'DD MMM YYYY',
+      timezone: 'Africa/Johannesburg',
+      notifications: {
+        emailAlerts: true,
+        paymentConfirmations: true,
+        newUserRegistrations: true,
+        monthlyReports: false
+      },
+      paymentSettings: {
+        autoConfirmPayments: false,
+        requireReference: true,
+        defaultPaymentMethod: 'card'
+      },
+      retention: {
+        softDeleteDays: 30,
+        autoPurge: false
+      }
+    };
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    // Save to localStorage
+    localStorage.setItem('adminSettings', JSON.stringify(settings));
+    onSave(settings);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-gray-800">System Settings</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          <div className="space-y-4">
+            <h3 className="text-sm font-medium text-gray-700 uppercase tracking-wider">General Settings</h3>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Site Name</label>
+                <input
+                  type="text"
+                  value={settings.siteName}
+                  onChange={(e) => setSettings({...settings, siteName: e.target.value})}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Admin Email</label>
+                <input
+                  type="email"
+                  value={settings.adminEmail}
+                  onChange={(e) => setSettings({...settings, adminEmail: e.target.value})}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
+                <select
+                  value={settings.currency}
+                  onChange={(e) => setSettings({...settings, currency: e.target.value})}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="ZAR">ZAR (R)</option>
+                  <option value="USD">USD ($)</option>
+                  <option value="EUR">EUR (€)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Date Format</label>
+                <select
+                  value={settings.dateFormat}
+                  onChange={(e) => setSettings({...settings, dateFormat: e.target.value})}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="DD MMM YYYY">21 Jan 2026</option>
+                  <option value="YYYY-MM-DD">2026-01-21</option>
+                  <option value="MM/DD/YYYY">01/21/2026</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Timezone</label>
+                <select
+                  value={settings.timezone}
+                  onChange={(e) => setSettings({...settings, timezone: e.target.value})}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="Africa/Johannesburg">Johannesburg</option>
+                  <option value="Africa/Cairo">Cairo</option>
+                  <option value="Africa/Lagos">Lagos</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <h3 className="text-sm font-medium text-gray-700 uppercase tracking-wider">Notifications</h3>
+            
+            <div className="space-y-2">
+              <label className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <span className="text-sm text-gray-700">Email Alerts</span>
+                <input
+                  type="checkbox"
+                  checked={settings.notifications.emailAlerts}
+                  onChange={(e) => setSettings({
+                    ...settings, 
+                    notifications: {...settings.notifications, emailAlerts: e.target.checked}
+                  })}
+                  className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
+                />
+              </label>
+              <label className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <span className="text-sm text-gray-700">Payment Confirmations</span>
+                <input
+                  type="checkbox"
+                  checked={settings.notifications.paymentConfirmations}
+                  onChange={(e) => setSettings({
+                    ...settings, 
+                    notifications: {...settings.notifications, paymentConfirmations: e.target.checked}
+                  })}
+                  className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
+                />
+              </label>
+              <label className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <span className="text-sm text-gray-700">New User Registrations</span>
+                <input
+                  type="checkbox"
+                  checked={settings.notifications.newUserRegistrations}
+                  onChange={(e) => setSettings({
+                    ...settings, 
+                    notifications: {...settings.notifications, newUserRegistrations: e.target.checked}
+                  })}
+                  className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
+                />
+              </label>
+              <label className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <span className="text-sm text-gray-700">Monthly Reports</span>
+                <input
+                  type="checkbox"
+                  checked={settings.notifications.monthlyReports}
+                  onChange={(e) => setSettings({
+                    ...settings, 
+                    notifications: {...settings.notifications, monthlyReports: e.target.checked}
+                  })}
+                  className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
+                />
+              </label>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <h3 className="text-sm font-medium text-gray-700 uppercase tracking-wider">Payment Settings</h3>
+            
+            <div className="space-y-2">
+              <label className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <span className="text-sm text-gray-700">Auto-confirm payments</span>
+                <input
+                  type="checkbox"
+                  checked={settings.paymentSettings.autoConfirmPayments}
+                  onChange={(e) => setSettings({
+                    ...settings, 
+                    paymentSettings: {...settings.paymentSettings, autoConfirmPayments: e.target.checked}
+                  })}
+                  className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
+                />
+              </label>
+              <label className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <span className="text-sm text-gray-700">Require payment reference</span>
+                <input
+                  type="checkbox"
+                  checked={settings.paymentSettings.requireReference}
+                  onChange={(e) => setSettings({
+                    ...settings, 
+                    paymentSettings: {...settings.paymentSettings, requireReference: e.target.checked}
+                  })}
+                  className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
+                />
+              </label>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Default Payment Method</label>
+                <select
+                  value={settings.paymentSettings.defaultPaymentMethod}
+                  onChange={(e) => setSettings({
+                    ...settings, 
+                    paymentSettings: {...settings.paymentSettings, defaultPaymentMethod: e.target.value}
+                  })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="card">Card Payment</option>
+                  <option value="bank_transfer">Bank Transfer</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <h3 className="text-sm font-medium text-gray-700 uppercase tracking-wider">Data Retention</h3>
+            
+            <div className="space-y-2">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Soft Delete Retention (days)</label>
+                <input
+                  type="number"
+                  value={settings.retention.softDeleteDays}
+                  onChange={(e) => setSettings({
+                    ...settings, 
+                    retention: {...settings.retention, softDeleteDays: parseInt(e.target.value)}
+                  })}
+                  min="1"
+                  max="365"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">Number of days to keep deleted users before permanent deletion</p>
+              </div>
+              <label className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <span className="text-sm text-gray-700">Auto-purge deleted users</span>
+                <input
+                  type="checkbox"
+                  checked={settings.retention.autoPurge}
+                  onChange={(e) => setSettings({
+                    ...settings, 
+                    retention: {...settings.retention, autoPurge: e.target.checked}
+                  })}
+                  className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
+                />
+              </label>
+            </div>
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+            <button type="button" onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+              Cancel
+            </button>
+            <button type="submit" className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors">
+              Save Settings
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// Report Modal Component
+interface ReportModalProps {
+  onClose: () => void;
+  onGenerate: (reportType: string, dateRange: string, format: string) => void;
+}
+
+function ReportModal({ onClose, onGenerate }: ReportModalProps) {
+  const [reportType, setReportType] = useState('users');
+  const [dateRange, setDateRange] = useState('month');
+  const [format, setFormat] = useState('pdf');
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const handleGenerate = () => {
+    setIsGenerating(true);
+    setTimeout(() => {
+      onGenerate(reportType, dateRange, format);
+      setIsGenerating(false);
+      onClose();
+    }, 2000);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-gray-800">Generate Report</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Report Type</label>
+            <select
+              value={reportType}
+              onChange={(e) => setReportType(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+            >
+              <option value="users">User Report</option>
+              <option value="contributions">Contributions Report</option>
+              <option value="stokvels">Stokvel Performance Report</option>
+              <option value="payments">Payment History Report</option>
+              <option value="financial">Financial Summary Report</option>
+              <option value="deleted">Deleted Users Report</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Date Range</label>
+            <select
+              value={dateRange}
+              onChange={(e) => setDateRange(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+            >
+              <option value="today">Today</option>
+              <option value="week">This Week</option>
+              <option value="month">This Month</option>
+              <option value="quarter">This Quarter</option>
+              <option value="year">This Year</option>
+              <option value="custom">Custom Range</option>
+            </select>
+          </div>
+
+          {dateRange === 'custom' && (
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">From</label>
+                <input type="date" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">To</label>
+                <input type="date" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Format</label>
+            <div className="flex space-x-4">
+              <label className="flex items-center space-x-2">
+                <input
+                  type="radio"
+                  value="pdf"
+                  checked={format === 'pdf'}
+                  onChange={(e) => setFormat(e.target.value)}
+                  className="w-4 h-4 text-primary-600"
+                />
+                <span className="text-sm text-gray-700">PDF</span>
+              </label>
+              <label className="flex items-center space-x-2">
+                <input
+                  type="radio"
+                  value="excel"
+                  checked={format === 'excel'}
+                  onChange={(e) => setFormat(e.target.value)}
+                  className="w-4 h-4 text-primary-600"
+                />
+                <span className="text-sm text-gray-700">Excel</span>
+              </label>
+              <label className="flex items-center space-x-2">
+                <input
+                  type="radio"
+                  value="csv"
+                  checked={format === 'csv'}
+                  onChange={(e) => setFormat(e.target.value)}
+                  className="w-4 h-4 text-primary-600"
+                />
+                <span className="text-sm text-gray-700">CSV</span>
+              </label>
+            </div>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <p className="text-xs text-blue-700 flex items-center">
+              <Download className="w-3 h-3 mr-1" />
+              Report will be generated and downloaded in {format.toUpperCase()} format.
+            </p>
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+            <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+              Cancel
+            </button>
+            <button
+              onClick={handleGenerate}
+              disabled={isGenerating}
+              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center space-x-2 disabled:opacity-50"
+            >
+              {isGenerating ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Generating...</span>
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4" />
+                  <span>Generate Report</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Deleted Users Modal Component
+interface DeletedUsersModalProps {
+  onClose: () => void;
+  deletedUsers: DeletedUser[];
+  onRestore: (userId: number) => void;
+  onPermanentDelete: (userId: number) => void;
+}
+
+function DeletedUsersModal({ onClose, deletedUsers, onRestore, onPermanentDelete }: DeletedUsersModalProps) {
+  const [selectedUser, setSelectedUser] = useState<DeletedUser | null>(null);
+  const [showConfirmPermanent, setShowConfirmPermanent] = useState(false);
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-gray-800">Deleted Users Archive</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-6">
+          {deletedUsers.length === 0 ? (
+            <div className="text-center py-12">
+              <Archive className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-800 mb-2">No Deleted Users</h3>
+              <p className="text-gray-500">There are no deleted users in the archive.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {deletedUsers.map(user => (
+                <div key={user.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-medium text-gray-800">{user.name}</h4>
+                      <p className="text-sm text-gray-600">{user.email}</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Deleted: {user.deletedAt} • Reason: {user.reason || 'Not specified'}
+                      </p>
+                    </div>
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => onRestore(user.id)}
+                        className="px-3 py-1 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-1"
+                      >
+                        <RotateCcw className="w-4 h-4" />
+                        <span>Restore</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedUser(user);
+                          setShowConfirmPermanent(true);
+                        }}
+                        className="px-3 py-1 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-1"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        <span>Delete Permanently</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Permanent Delete Confirmation */}
+      {showConfirmPermanent && selectedUser && (
+        <DeleteConfirmModal
+          title="Permanently Delete User"
+          message={`Are you sure you want to permanently delete ${selectedUser.name}? This action cannot be undone.`}
+          onConfirm={() => {
+            onPermanentDelete(selectedUser.id);
+            setShowConfirmPermanent(false);
+            setSelectedUser(null);
+          }}
+          onCancel={() => {
+            setShowConfirmPermanent(false);
+            setSelectedUser(null);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -1492,9 +1906,14 @@ export default function AdminDashboard() {
   const [showDeleteStokvelConfirm, setShowDeleteStokvelConfirm] = useState<number | null>(null);
   const [showApproveUserModal, setShowApproveUserModal] = useState<User | null>(null);
   const [showConfirmContributionModal, setShowConfirmContributionModal] = useState<Contribution | null>(null);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [showDeletedUsersModal, setShowDeletedUsersModal] = useState(false);
   const [showSuccessMessage, setShowSuccessMessage] = useState('');
 
-  // Mock Stokvels Data
+  // Deleted users archive
+  const [deletedUsers, setDeletedUsers] = useState<DeletedUser[]>([]);
+
   const [stokvels, setStokvels] = useState<Stokvel[]>([
     {
       id: 1,
@@ -1552,7 +1971,6 @@ export default function AdminDashboard() {
     }
   ]);
 
-  // Mock Users Data
   const [users, setUsers] = useState<User[]>([
     {
       id: 1,
@@ -1665,7 +2083,6 @@ export default function AdminDashboard() {
     }
   ]);
 
-  // Mock Contributions Data
   const [contributions, setContributions] = useState<Contribution[]>([
     {
       id: 1,
@@ -1755,11 +2172,11 @@ export default function AdminDashboard() {
     }
   ]);
 
-  // Stats
   const stats = {
     totalUsers: users.length,
     activeUsers: users.filter(u => u.status === 'active').length,
     pendingUsers: users.filter(u => u.status === 'pending').length,
+    deletedUsers: deletedUsers.length,
     totalStokvels: stokvels.length,
     activeStokvels: stokvels.filter(s => s.status === 'active').length,
     upcomingStokvels: stokvels.filter(s => s.status === 'upcoming').length,
@@ -1768,7 +2185,6 @@ export default function AdminDashboard() {
     pendingAmount: contributions.filter(c => c.status === 'pending').reduce((sum, c) => sum + c.amount, 0)
   };
 
-  // Filter users
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -1804,9 +2220,69 @@ export default function AdminDashboard() {
 
   const handleDeleteUser = (userId: number) => {
     const user = users.find(u => u.id === userId);
+    if (!user) return;
+
+    // Archive the user
+    const deletedUser: DeletedUser = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      deletedAt: new Date().toLocaleString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+      deletedBy: 'Admin',
+      reason: 'User deleted by admin',
+      originalData: user
+    };
+
+    setDeletedUsers([...deletedUsers, deletedUser]);
+    
+    // Remove from active users
     setUsers(users.filter(u => u.id !== userId));
+    
+    // Mark contributions as deleted
+    setContributions(contributions.map(c => 
+      c.userId === userId 
+        ? { ...c, status: 'deleted', deletedAt: new Date().toLocaleString() }
+        : c
+    ));
+
     setShowDeleteUserConfirm(null);
-    setShowSuccessMessage(`User ${user?.name} deleted successfully!`);
+    setShowSuccessMessage(`User ${user.name} has been archived. They can be restored from the archive.`);
+    setTimeout(() => setShowSuccessMessage(''), 3000);
+  };
+
+  const handleRestoreUser = (userId: number) => {
+    const deletedUser = deletedUsers.find(d => d.id === userId);
+    if (!deletedUser) return;
+
+    // Restore the user
+    setUsers([...users, deletedUser.originalData]);
+    
+    // Remove from deleted archive
+    setDeletedUsers(deletedUsers.filter(d => d.id !== userId));
+    
+    // Restore contributions (remove deleted status)
+    setContributions(contributions.map(c => 
+      c.userId === userId 
+        ? { ...c, status: 'pending', deletedAt: undefined }
+        : c
+    ));
+
+    setShowSuccessMessage(`User ${deletedUser.name} has been restored.`);
+    setTimeout(() => setShowSuccessMessage(''), 3000);
+  };
+
+  const handlePermanentDelete = (userId: number) => {
+    const deletedUser = deletedUsers.find(d => d.id === userId);
+    if (!deletedUser) return;
+
+    // Permanently remove from deleted archive
+    setDeletedUsers(deletedUsers.filter(d => d.id !== userId));
+    
+    // Permanently delete contributions
+    setContributions(contributions.filter(c => c.userId !== userId));
+
+    setShowSuccessMessage(`User ${deletedUser.name} has been permanently deleted.`);
     setTimeout(() => setShowSuccessMessage(''), 3000);
   };
 
@@ -1874,6 +2350,55 @@ export default function AdminDashboard() {
     setTimeout(() => setShowSuccessMessage(''), 3000);
   };
 
+  const handleSaveSettings = (settings: any) => {
+  // Save to localStorage for persistence
+  localStorage.setItem('adminSettings', JSON.stringify(settings));
+  
+  // You can also apply settings to your app state here
+  // For example, update currency format, date format, etc.
+  
+  setShowSuccessMessage('Settings saved successfully!');
+  setTimeout(() => setShowSuccessMessage(''), 3000);
+  
+  // Log for debugging (remove in production)
+  console.log('Settings saved:', settings);
+};
+
+  const handleGenerateReport = (reportType: string, dateRange: string, format: string) => {
+    let reportData = '';
+    
+    switch(reportType) {
+      case 'users':
+        reportData = `User Report (${dateRange})\nTotal Users: ${users.length}\nActive: ${stats.activeUsers}\nPending: ${stats.pendingUsers}\n\n` +
+                    users.map(u => `${u.name},${u.email},${u.status},${u.joinedDate}`).join('\n');
+        break;
+      case 'deleted':
+        reportData = `Deleted Users Report (${dateRange})\nTotal Deleted: ${deletedUsers.length}\n\n` +
+                    deletedUsers.map(d => `${d.name},${d.email},${d.deletedAt},${d.reason || 'No reason'}`).join('\n');
+        break;
+      case 'contributions':
+        reportData = `Contributions Report (${dateRange})\nTotal: R ${stats.totalContributions}\nPending: R ${stats.pendingAmount}\n\n` +
+                    contributions.map(c => `${c.userName},${c.stokvelName},R ${c.amount},${c.date},${c.status}`).join('\n');
+        break;
+      default:
+        reportData = `${reportType} report for ${dateRange}`;
+    }
+
+    const extension = format === 'pdf' ? 'txt' : format; // For demo, we'll use txt instead of actual PDF
+    const filename = `${reportType}-report-${dateRange}.${extension}`;
+    
+    const element = document.createElement('a');
+    const file = new Blob([reportData], {type: 'text/plain'});
+    element.href = URL.createObjectURL(file);
+    element.download = filename;
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+
+    setShowSuccessMessage(`${reportType} report generated successfully!`);
+    setTimeout(() => setShowSuccessMessage(''), 3000);
+  };
+
   const formatCurrency = (amount: number) => {
     return `R ${amount.toLocaleString()}`;
   };
@@ -1890,6 +2415,8 @@ export default function AdminDashboard() {
         return <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full">Upcoming</span>;
       case 'confirmed':
         return <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full">Confirmed</span>;
+      case 'deleted':
+        return <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full">Deleted</span>;
       default:
         return null;
     }
@@ -1897,7 +2424,6 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* Success Message Toast */}
       {showSuccessMessage && (
         <div className="fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg shadow-lg z-50 flex items-center">
           <CheckCircle className="w-5 h-5 mr-2" />
@@ -1905,7 +2431,6 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* Header */}
       <header className="bg-primary-800 text-white shadow-lg sticky top-0 z-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
@@ -1917,16 +2442,26 @@ export default function AdminDashboard() {
               </div>
             </div>
             <div className="flex items-center space-x-4">
-              <span className="text-sm bg-primary-700 px-3 py-1 rounded-full">
-                Admin
-              </span>
-              <button className="p-2 hover:bg-primary-700 rounded-lg transition-colors">
-                <Settings className="w-5 h-5" />
+              <button
+                onClick={() => setShowDeletedUsersModal(true)}
+                className="p-2 hover:bg-primary-700 rounded-lg transition-colors relative"
+                title="View Deleted Users"
+              >
+                <Archive className="w-5 h-5" />
+                {deletedUsers.length > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs flex items-center justify-center rounded-full">
+                    {deletedUsers.length}
+                  </span>
+                )}
               </button>
-              <Link
-                to="/"
+              <span className="text-sm bg-primary-700 px-3 py-1 rounded-full">Admin</span>
+              <button 
+                onClick={() => setShowSettingsModal(true)}
                 className="p-2 hover:bg-primary-700 rounded-lg transition-colors"
               >
+                <Settings className="w-5 h-5" />
+              </button>
+              <Link to="/" className="p-2 hover:bg-primary-700 rounded-lg transition-colors">
                 <LogOut className="w-5 h-5" />
               </Link>
             </div>
@@ -1934,7 +2469,6 @@ export default function AdminDashboard() {
         </div>
       </header>
 
-      {/* Navigation Tabs */}
       <div className="bg-white shadow-sm border-b sticky top-[73px] z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex space-x-1 overflow-x-auto">
@@ -1983,11 +2517,9 @@ export default function AdminDashboard() {
       </div>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* OVERVIEW TAB */}
         {activeTab === 'overview' && (
           <div className="space-y-6">
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-sm text-gray-500">Total Users</p>
@@ -1999,6 +2531,20 @@ export default function AdminDashboard() {
                   <span className="mx-2 text-gray-300">•</span>
                   <span className="text-yellow-600">{stats.pendingUsers} pending</span>
                 </div>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm text-gray-500">Deleted Users</p>
+                  <Archive className="w-5 h-5 text-orange-600" />
+                </div>
+                <p className="text-3xl font-bold text-gray-800">{stats.deletedUsers}</p>
+                <button
+                  onClick={() => setShowDeletedUsersModal(true)}
+                  className="text-xs text-orange-600 hover:text-orange-700 mt-2"
+                >
+                  View Archive →
+                </button>
               </div>
 
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -2035,7 +2581,6 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Pending Approvals Section */}
             {pendingUsers.length > 0 && (
               <div className="bg-yellow-50 rounded-xl shadow-sm border border-yellow-200 p-6">
                 <h3 className="font-semibold text-yellow-800 mb-4 flex items-center">
@@ -2068,7 +2613,6 @@ export default function AdminDashboard() {
               </div>
             )}
 
-            {/* Pending Contributions */}
             {pendingContributions.length > 0 && (
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                 <h3 className="font-semibold text-gray-800 mb-4 flex items-center">
@@ -2101,7 +2645,6 @@ export default function AdminDashboard() {
               </div>
             )}
 
-            {/* Quick Actions */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <button
                 onClick={() => setShowAddUserModal(true)}
@@ -2122,7 +2665,7 @@ export default function AdminDashboard() {
               </button>
               
               <button
-                onClick={() => alert('Generate Report functionality - Coming soon!')}
+                onClick={() => setShowReportModal(true)}
                 className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary-300 transition-colors text-left"
               >
                 <Download className="w-8 h-8 text-primary-600 mb-3" />
@@ -2133,10 +2676,8 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* USERS TAB */}
         {activeTab === 'users' && (
           <div className="space-y-6">
-            {/* Users Header */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <h3 className="text-lg font-semibold text-gray-800">User Management</h3>
@@ -2148,13 +2689,15 @@ export default function AdminDashboard() {
                     <UserPlus className="w-5 h-5" />
                     <span>Add User</span>
                   </button>
-                  <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                  <button 
+                    onClick={() => setShowReportModal(true)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
                     <Download className="w-5 h-5 text-gray-600" />
                   </button>
                 </div>
               </div>
 
-              {/* Search and Filter */}
               <div className="mt-4 flex flex-col md:flex-row gap-4">
                 <div className="flex-1 relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -2179,7 +2722,6 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Users Table */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full">
@@ -2194,7 +2736,7 @@ export default function AdminDashboard() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {filteredUsers.filter(u => u.status !== 'pending').map((user) => (
+                    {filteredUsers.map((user) => (
                       <tr key={user.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4">
                           <div>
@@ -2243,7 +2785,6 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* STOKVELS TAB */}
         {activeTab === 'stokvels' && (
           <div className="space-y-6">
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -2288,7 +2829,6 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                     
-                    {/* Edit/Delete buttons for stokvels */}
                     <div className="flex justify-end space-x-2 mt-3 pt-3 border-t border-gray-200">
                       <button
                         onClick={() => setShowEditStokvelModal(stokvel)}
@@ -2312,7 +2852,6 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* CONTRIBUTIONS TAB */}
         {activeTab === 'contributions' && (
           <div className="space-y-6">
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -2369,7 +2908,6 @@ export default function AdminDashboard() {
         )}
       </main>
 
-      {/* Add User Modal */}
       {showAddUserModal && (
         <AddUserModal
           onClose={() => setShowAddUserModal(false)}
@@ -2378,7 +2916,6 @@ export default function AdminDashboard() {
         />
       )}
 
-      {/* Add Stokvel Modal */}
       {showAddStokvelModal && (
         <AddStokvelModal
           onClose={() => setShowAddStokvelModal(false)}
@@ -2386,7 +2923,6 @@ export default function AdminDashboard() {
         />
       )}
 
-      {/* Edit User Modal */}
       {showEditUserModal && (
         <EditUserModal
           user={showEditUserModal}
@@ -2396,17 +2932,16 @@ export default function AdminDashboard() {
         />
       )}
 
-      {/* Delete User Confirmation */}
       {showDeleteUserConfirm && (
         <DeleteConfirmModal
           title="Delete User"
-          message="Are you sure you want to delete this user? This action cannot be undone."
+          message="Are you sure you want to delete this user? They will be moved to the archive and can be restored later."
           onConfirm={() => handleDeleteUser(showDeleteUserConfirm)}
           onCancel={() => setShowDeleteUserConfirm(null)}
+          isSoftDelete={true}
         />
       )}
 
-      {/* Edit Stokvel Modal */}
       {showEditStokvelModal && (
         <EditStokvelModal
           stokvel={showEditStokvelModal}
@@ -2415,7 +2950,6 @@ export default function AdminDashboard() {
         />
       )}
 
-      {/* Delete Stokvel Confirmation */}
       {showDeleteStokvelConfirm && (
         <DeleteConfirmModal
           title="Delete Stokvel"
@@ -2425,7 +2959,6 @@ export default function AdminDashboard() {
         />
       )}
 
-      {/* Approve User Modal */}
       {showApproveUserModal && (
         <ApproveUserModal
           user={showApproveUserModal}
@@ -2435,12 +2968,34 @@ export default function AdminDashboard() {
         />
       )}
 
-      {/* Confirm Contribution Modal */}
       {showConfirmContributionModal && (
         <ConfirmContributionModal
           contribution={showConfirmContributionModal}
           onClose={() => setShowConfirmContributionModal(null)}
           onConfirm={handleConfirmContribution}
+        />
+      )}
+
+      {showSettingsModal && (
+        <SettingsModal
+          onClose={() => setShowSettingsModal(false)}
+          onSave={handleSaveSettings}
+        />
+      )}
+
+      {showReportModal && (
+        <ReportModal
+          onClose={() => setShowReportModal(false)}
+          onGenerate={handleGenerateReport}
+        />
+      )}
+
+      {showDeletedUsersModal && (
+        <DeletedUsersModal
+          onClose={() => setShowDeletedUsersModal(false)}
+          deletedUsers={deletedUsers}
+          onRestore={handleRestoreUser}
+          onPermanentDelete={handlePermanentDelete}
         />
       )}
     </div>

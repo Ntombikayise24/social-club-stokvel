@@ -131,10 +131,15 @@ function App() {
       {showAdminModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full relative animate-modalIn">
-            <button onClick={closeModal} className="absolute right-4 top-4 text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-2 rounded-full transition-all z-10">
+            {/* Close Button */}
+            <button
+              onClick={closeModal}
+              className="absolute right-4 top-4 text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-2 rounded-full transition-all z-10"
+            >
               <X className="w-5 h-5" />
             </button>
 
+            {/* Decorative Header */}
             <div className="h-32 bg-gradient-to-r from-primary-600 to-primary-400 rounded-t-2xl relative overflow-hidden">
               <div className="absolute inset-0 bg-black/10"></div>
               <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full"></div>
@@ -142,7 +147,9 @@ function App() {
               <Shield className="absolute left-6 bottom-6 w-10 h-10 text-white/90" />
             </div>
 
+            {/* Modal Content */}
             <div className="px-8 pb-8">
+              {/* Header */}
               <div className="text-center -mt-12 mb-6 relative">
                 <div className="w-20 h-20 bg-primary-600 rounded-2xl shadow-lg flex items-center justify-center mx-auto mb-4 transform rotate-3 hover:rotate-0 transition-transform">
                   <Shield className="w-10 h-10 text-white" />
@@ -152,6 +159,7 @@ function App() {
               </div>
 
               <form onSubmit={handleAdminLogin} className="space-y-5">
+                {/* Error Message */}
                 {loginError && (
                   <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start space-x-3 animate-shake">
                     <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
@@ -162,10 +170,15 @@ function App() {
                   </div>
                 )}
 
+                {/* Email Field */}
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">Email Address</label>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Email Address
+                  </label>
                   <div className="relative group">
-                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-primary-500" />
+                    <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-primary-500 transition-colors">
+                      <Mail className="w-5 h-5" />
+                    </div>
                     <input
                       type="email"
                       required
@@ -177,10 +190,15 @@ function App() {
                   </div>
                 </div>
 
+                {/* Password Field */}
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">Password</label>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Password
+                  </label>
                   <div className="relative group">
-                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-primary-500" />
+                    <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-primary-500 transition-colors">
+                      <Lock className="w-5 h-5" />
+                    </div>
                     <input
                       type={showPassword ? "text" : "password"}
                       required
@@ -192,19 +210,21 @@ function App() {
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
                     >
                       {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                     </button>
                   </div>
                 </div>
 
+                {/* Forgot Password Link */}
                 <div className="text-right">
                   <button type="button" className="text-sm text-primary-600 hover:text-primary-700 font-medium">
                     Forgot password?
                   </button>
                 </div>
 
+                {/* Submit Button */}
                 <button
                   type="submit"
                   disabled={isLoading}
@@ -221,6 +241,7 @@ function App() {
                 </button>
               </form>
 
+              {/* Footer */}
               <div className="mt-6 pt-6 border-t border-gray-100">
                 <p className="text-xs text-gray-400 text-center">
                   ⚡ Two-factor authentication enabled • IP logging active
@@ -237,6 +258,7 @@ function App() {
       }`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center">
+            {/* Logo */}
             <Link to="/" className="flex items-center space-x-3 group">
               <div className="w-10 h-10 bg-gradient-to-br from-primary-600 to-primary-500 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all group-hover:scale-110">
                 <Users className="w-6 h-6 text-white" />
@@ -246,12 +268,14 @@ function App() {
               </span>
             </Link>
 
+            {/* Desktop Navigation */}
             <div className="hidden md:flex items-center space-x-8">
               <a href="#features" className="text-gray-600 hover:text-primary-600 transition-colors font-medium">Features</a>
               <a href="#how-it-works" className="text-gray-600 hover:text-primary-600 transition-colors font-medium">How It Works</a>
               <a href="#testimonials" className="text-gray-600 hover:text-primary-600 transition-colors font-medium">Testimonials</a>
               <a href="#contact" className="text-gray-600 hover:text-primary-600 transition-colors font-medium">Contact</a>
               
+              {/* Admin Button */}
               <button
                 onClick={handleAdminClick}
                 className="flex items-center space-x-2 px-4 py-2 bg-primary-50 text-primary-700 rounded-xl hover:bg-primary-100 transition-all border-2 border-primary-200 hover:border-primary-300"
@@ -268,6 +292,7 @@ function App() {
               </Link>
             </div>
 
+            {/* Mobile Menu Button */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="md:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
@@ -277,6 +302,7 @@ function App() {
           </div>
         </div>
 
+        {/* Mobile Menu */}
         {mobileMenuOpen && (
           <div className="md:hidden bg-white border-t mt-3 py-4 px-4">
             <div className="flex flex-col space-y-3">
@@ -306,12 +332,15 @@ function App() {
       <main className="pt-24 md:pt-32">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
+            {/* Left Column */}
             <div className="space-y-8">
+              {/* Badge */}
               <div className="inline-flex items-center space-x-2 bg-primary-50 text-primary-700 px-4 py-2 rounded-full border border-primary-200">
                 <Award className="w-4 h-4" />
                 <span className="text-sm font-medium">Trusted by 100+ members</span>
               </div>
 
+              {/* Heading */}
               <h1 className="text-5xl md:text-6xl font-bold">
                 <span className="text-gray-900">Save Together,</span>
                 <br />
@@ -326,6 +355,7 @@ function App() {
                 — the digital Stokvel management system that brings transparency and trust to group savings.
               </p>
               
+              {/* Stats Grid */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {stats.map((stat, index) => (
                   <div key={index} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
@@ -341,6 +371,7 @@ function App() {
                 ))}
               </div>
 
+              {/* CTA Buttons */}
               <div className="flex flex-col sm:flex-row gap-4">
                 <Link 
                   to="/register" 
@@ -357,6 +388,7 @@ function App() {
                 </Link>
               </div>
 
+              {/* Trust Indicators */}
               <div className="flex items-center space-x-4 text-sm text-gray-500">
                 <div className="flex items-center space-x-1">
                   <CheckCircle className="w-4 h-4 text-green-500" />
@@ -373,6 +405,7 @@ function App() {
               </div>
             </div>
 
+            {/* Right Column - Enhanced Features Grid */}
             <div className="grid grid-cols-2 gap-4">
               {features.map((feature, index) => (
                 <div 
@@ -390,6 +423,7 @@ function App() {
                 </div>
               ))}
 
+              {/* Featured Card */}
               <div className="col-span-2 bg-gradient-to-br from-primary-600 to-primary-500 rounded-2xl p-6 text-white">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center space-x-2">
@@ -426,8 +460,12 @@ function App() {
       <section id="how-it-works" className="py-20 mt-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">How It <span className="text-primary-600">Works</span></h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">Simple, transparent, and effective - join thousands of successful savers</p>
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+              How It <span className="text-primary-600">Works</span>
+            </h2>
+            <p className="text-gray-600 max-w-2xl mx-auto">
+              Simple, transparent, and effective - join thousands of successful savers
+            </p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
@@ -463,8 +501,12 @@ function App() {
       <section id="testimonials" className="py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">What Our <span className="text-primary-600">Members Say</span></h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">Real stories from real people who achieved their financial goals</p>
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+              What Our <span className="text-primary-600">Members Say</span>
+            </h2>
+            <p className="text-gray-600 max-w-2xl mx-auto">
+              Real stories from real people who achieved their financial goals
+            </p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-6">
@@ -494,8 +536,12 @@ function App() {
       {/* CTA Section */}
       <section className="py-20 bg-gradient-to-r from-primary-600 to-primary-500">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">Ready to Start Saving?</h2>
-          <p className="text-white/90 text-lg mb-8 max-w-2xl mx-auto">Join SOCIAL CLUB today and take control of your financial future</p>
+          <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+            Ready to Start Saving?
+          </h2>
+          <p className="text-white/90 text-lg mb-8 max-w-2xl mx-auto">
+            Join SOCIAL CLUB today and take control of your financial future
+          </p>
           <Link
             to="/register"
             className="inline-flex items-center space-x-2 bg-white text-primary-600 px-8 py-4 rounded-xl hover:bg-gray-100 transition-all shadow-xl font-bold text-lg"
@@ -510,6 +556,7 @@ function App() {
       <footer className="bg-gray-900 text-gray-400 py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid md:grid-cols-4 gap-8 mb-8">
+            {/* Company Info */}
             <div>
               <div className="flex items-center space-x-2 mb-4">
                 <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
@@ -517,7 +564,9 @@ function App() {
                 </div>
                 <span className="text-white font-bold">SOCIAL CLUB</span>
               </div>
-              <p className="text-sm">Building wealth together through trusted community savings.</p>
+              <p className="text-sm">
+                Building wealth together through trusted community savings.
+              </p>
               <div className="flex space-x-4 mt-4">
                 <a href="#" className="hover:text-white transition-colors"><Facebook className="w-5 h-5" /></a>
                 <a href="#" className="hover:text-white transition-colors"><Twitter className="w-5 h-5" /></a>
@@ -526,6 +575,7 @@ function App() {
               </div>
             </div>
 
+            {/* Quick Links */}
             <div>
               <h4 className="text-white font-semibold mb-4">Quick Links</h4>
               <ul className="space-y-2">
@@ -536,43 +586,75 @@ function App() {
               </ul>
             </div>
 
+            {/* Contact */}
             <div>
               <h4 className="text-white font-semibold mb-4">Contact</h4>
               <ul className="space-y-2">
-                <li className="flex items-center space-x-2"><Phone className="w-4 h-4" /><span>+27 (0) 82 123 4567</span></li>
-                <li className="flex items-center space-x-2"><Mail className="w-4 h-4" /><span>info@socialclub.co.za</span></li>
-                <li className="flex items-center space-x-2"><MapPin className="w-4 h-4" /><span>Johannesburg, SA</span></li>
+                <li className="flex items-center space-x-2">
+                  <Phone className="w-4 h-4" />
+                  <span>+27 (0) 82 123 4567</span>
+                </li>
+                <li className="flex items-center space-x-2">
+                  <Mail className="w-4 h-4" />
+                  <span>info@socialclub.co.za</span>
+                </li>
+                <li className="flex items-center space-x-2">
+                  <MapPin className="w-4 h-4" />
+                  <span>Johannesburg, SA</span>
+                </li>
               </ul>
             </div>
 
+            {/* Newsletter */}
             <div>
               <h4 className="text-white font-semibold mb-4">Newsletter</h4>
               <p className="text-sm mb-3">Get updates on new features and financial tips</p>
               <div className="flex">
-                <input type="email" placeholder="Your email" className="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-l-lg focus:outline-none focus:border-primary-500 text-white" />
-                <button className="px-4 py-2 bg-primary-600 text-white rounded-r-lg hover:bg-primary-700 transition-colors">Subscribe</button>
+                <input
+                  type="email"
+                  placeholder="Your email"
+                  className="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-l-lg focus:outline-none focus:border-primary-500 text-white"
+                />
+                <button className="px-4 py-2 bg-primary-600 text-white rounded-r-lg hover:bg-primary-700 transition-colors">
+                  Subscribe
+                </button>
               </div>
             </div>
           </div>
 
+          {/* Copyright */}
           <div className="border-t border-gray-800 pt-8 text-sm text-center">
             <p>© 2026 SOCIAL CLUB. All rights reserved. Your trusted Stokvel partner.</p>
           </div>
         </div>
       </footer>
 
+      {/* Animation Styles */}
       <style>{`
         @keyframes modalIn {
-          from { opacity: 0; transform: translateY(-20px) scale(0.95); }
-          to { opacity: 1; transform: translateY(0) scale(1); }
+          from {
+            opacity: 0;
+            transform: translateY(-20px) scale(0.95);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
         }
+        
         @keyframes shake {
           0%, 100% { transform: translateX(0); }
           10%, 30%, 50%, 70%, 90% { transform: translateX(-2px); }
           20%, 40%, 60%, 80% { transform: translateX(2px); }
         }
-        .animate-modalIn { animation: modalIn 0.3s ease-out; }
-        .animate-shake { animation: shake 0.5s ease-in-out; }
+
+        .animate-modalIn {
+          animation: modalIn 0.3s ease-out;
+        }
+
+        .animate-shake {
+          animation: shake 0.5s ease-in-out;
+        }
       `}</style>
     </div>
   );
