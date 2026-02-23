@@ -14,6 +14,7 @@ import notificationRoutes from './routes/notifications.js';
 import settingsRoutes from './routes/settings.js';
 import helpRoutes from './routes/help.js';
 import adminRoutes from './routes/admin.js';
+import paymentRoutes from './routes/payments.js';
 
 dotenv.config();
 
@@ -47,6 +48,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/help', helpRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/payments', paymentRoutes);
 
 // ── Health check ──
 app.get('/api/health', async (_req, res) => {

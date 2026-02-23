@@ -10,6 +10,8 @@ export default function Register() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [apiError, setApiError] = useState('');
   const [stokvels, setStokvels] = useState<{ id: number; name: string; currentMembers: number; targetAmount: number; type: string }[]>([]);
+  const [stokvelsLoading, setStokvelsLoading] = useState(true);
+  const [stokvelsError, setStokvelsError] = useState('');
   
   const [formData, setFormData] = useState({
     fullName: '',
@@ -28,10 +30,23 @@ export default function Register() {
   });
 
   // Load stokvels from API
-  useEffect(() => {
+  const fetchStokvels = () => {
+    setStokvelsLoading(true);
+    setStokvelsError('');
     stokvelApi.list()
-      .then(res => setStokvels(res.data))
-      .catch(() => {});
+      .then(res => {
+        const data = Array.isArray(res.data) ? res.data : res.data?.data ?? [];
+        setStokvels(data);
+      })
+      .catch((err) => {
+        console.error('Failed to load stokvels:', err);
+        setStokvelsError('Failed to load stokvels. Please try again.');
+      })
+      .finally(() => setStokvelsLoading(false));
+  };
+
+  useEffect(() => {
+    fetchStokvels();
   }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -237,22 +252,38 @@ export default function Register() {
           {/* Stokvel Selection - Updated with both options */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Select Stokvel to Join</label>
-            <select
-              name="selectedStokvel"
-              required
-              value={formData.selectedStokvel}
-              onChange={handleChange}
-              className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 ${
-                errors.selectedStokvel ? 'border-red-500' : 'border-gray-300'
-              }`}
-            >
-              <option value="">Choose a stokvel...</option>
-              {stokvels.map(s => (
-                <option key={s.id} value={s.id}>
-                  {s.name} ({s.currentMembers} members · R{s.targetAmount?.toLocaleString()} target)
+            {stokvelsError ? (
+              <div className="flex items-center space-x-2">
+                <p className="text-sm text-red-600 flex-1">{stokvelsError}</p>
+                <button
+                  type="button"
+                  onClick={fetchStokvels}
+                  className="text-sm text-primary-600 hover:text-primary-700 underline whitespace-nowrap"
+                >
+                  Retry
+                </button>
+              </div>
+            ) : (
+              <select
+                name="selectedStokvel"
+                required
+                value={formData.selectedStokvel}
+                onChange={handleChange}
+                disabled={stokvelsLoading}
+                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 ${
+                  errors.selectedStokvel ? 'border-red-500' : 'border-gray-300'
+                } ${stokvelsLoading ? 'bg-gray-100 cursor-wait' : ''}`}
+              >
+                <option value="">
+                  {stokvelsLoading ? 'Loading stokvels...' : 'Choose a stokvel...'}
                 </option>
-              ))}
-            </select>
+                {stokvels.map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} ({s.currentMembers} members · R{s.targetAmount?.toLocaleString()} target)
+                  </option>
+                ))}
+              </select>
+            )}
             {errors.selectedStokvel && (
               <p className="text-red-500 text-xs mt-1">{errors.selectedStokvel}</p>
             )}

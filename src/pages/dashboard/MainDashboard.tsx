@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { 
   Target, 
   Users, 
@@ -20,9 +20,11 @@ import {
   CheckCircle,
   Clock,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  Loader2
 } from 'lucide-react';
 import ProfileSwitcher from './ProfileSwitcher';
+import { userApi, stokvelApi, loanApi, contributionApi, notificationApi, cardApi, paymentApi } from '../../api';
 
 interface Profile {
   id: string;
@@ -60,137 +62,103 @@ interface AvailableStokvel {
 
 export default function MainDashboard() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [showAddContribution, setShowAddContribution] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showDiscoverStokvels, setShowDiscoverStokvels] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [isLoading, setIsLoading] = useState(true);
+  const [userName, setUserName] = useState('');
   
-  // Constants
-  const TARGET_DATE = "06 Dec 2026";
+  // Dynamic data from backend
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [availableStokvels, setAvailableStokvels] = useState<AvailableStokvel[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [loanStats, setLoanStats] = useState({ available: 0, borrowed: 0, remaining: 0, progress: 0 });
+  const [stokvelDetails, setStokvelDetails] = useState<StokvelData | null>(null);
+  const [userCards, setUserCards] = useState<any[]>([]);
   
-  // Mock profiles data with status
-  const mockProfiles: Profile[] = [
-    {
-      id: '1',
-      name: 'Nkulumo Nkuna',
-      stokvelName: 'COLLECTIVE POT',
-      stokvelId: 'collective-pot',
-      role: 'member',
-      targetAmount: 7000,
-      savedAmount: 1070,
-      progress: 13,
-      status: 'active'
-    },
-    {
-      id: '2',
-      name: 'Nkulumo Nkuna',
-      stokvelName: 'SUMMER SAVERS',
-      stokvelId: 'summer-savers',
-      role: 'member',
-      targetAmount: 5000,
-      savedAmount: 850,
-      progress: 17,
-      status: 'active'
-    },
-    {
-      id: '3',
-      name: 'Nkulumo Nkuna',
-      stokvelName: 'EDUCATION FUND',
-      stokvelId: 'education-fund',
-      role: 'member',
-      targetAmount: 10000,
-      savedAmount: 0,
-      progress: 0,
-      status: 'pending'
-    },
-    {
-      id: '4',
-      name: 'Nkulumo Nkuna',
-      stokvelName: 'EMERGENCY FUND',
-      stokvelId: 'emergency-fund',
-      role: 'member',
-      targetAmount: 5000,
-      savedAmount: 0,
-      progress: 0,
-      status: 'rejected'
-    }
-  ];
+  // Fetch data from backend
+  const fetchData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const [userRes, stokvelsRes, notifRes, cardsRes] = await Promise.all([
+        userApi.getMe(),
+        stokvelApi.list(),
+        notificationApi.list({ limit: 10 }).catch(() => ({ data: [] })),
+        cardApi.list().catch(() => ({ data: [] })),
+      ]);
 
-  // Available stokvels in the system
-  const availableStokvels: AvailableStokvel[] = [
-    {
-      id: 'collective-pot',
-      name: 'COLLECTIVE POT',
-      description: 'Community savings for year-end celebrations',
-      memberCount: 18,
-      targetAmount: 7000,
-      cycle: 'Weekly (Sunday)',
-      category: 'Social',
-      status: 'active'
-    },
-    {
-      id: 'summer-savers',
-      name: 'SUMMER SAVERS',
-      description: 'Save for summer holidays and festivals',
-      memberCount: 8,
-      targetAmount: 5000,
-      cycle: 'Monthly',
-      category: 'Holiday',
-      status: 'active'
-    },
-    {
-      id: 'education-fund',
-      name: 'EDUCATION FUND',
-      description: 'Save for school fees and educational expenses',
-      memberCount: 12,
-      targetAmount: 10000,
-      cycle: 'Monthly',
-      category: 'Education',
-      status: 'pending'
-    },
-    {
-      id: 'emergency-fund',
-      name: 'EMERGENCY FUND',
-      description: 'Rainy day savings for unexpected expenses',
-      memberCount: 25,
-      targetAmount: 5000,
-      cycle: 'Weekly (Friday)',
-      category: 'Emergency',
-      status: 'available'
-    },
-    {
-      id: 'investment-club',
-      name: 'INVESTMENT CLUB',
-      description: 'Pool resources for property and stock investments',
-      memberCount: 10,
-      targetAmount: 20000,
-      cycle: 'Quarterly',
-      category: 'Investment',
-      status: 'available'
-    },
-    {
-      id: 'travel-stokvel',
-      name: 'TRAVEL STOKVEL',
-      description: 'Save for group travel and adventures',
-      memberCount: 15,
-      targetAmount: 15000,
-      cycle: 'Monthly',
-      category: 'Travel',
-      status: 'available'
-    },
-    {
-      id: 'business-starters',
-      name: 'BUSINESS STARTERS',
-      description: 'Fund small business ventures together',
-      memberCount: 7,
-      targetAmount: 25000,
-      cycle: 'Bi-weekly',
-      category: 'Business',
-      status: 'available'
+      const user = userRes.data;
+      setUserName(user.name);
+
+      // Map user profiles from backend
+      const userProfiles: Profile[] = (user.profiles || []).map((p: any) => ({
+        id: String(p.id),
+        name: user.name,
+        stokvelName: p.stokvelName,
+        stokvelId: String(p.stokvelId),
+        role: p.role || 'member',
+        targetAmount: p.targetAmount || 0,
+        savedAmount: p.savedAmount || 0,
+        progress: p.progress || 0,
+        status: p.status || 'active',
+      }));
+      setProfiles(userProfiles);
+
+      // Map available stokvels
+      const userStokvelIds = userProfiles.map((p: Profile) => p.stokvelId);
+      const allStokvels: AvailableStokvel[] = (stokvelsRes.data || []).map((s: any) => ({
+        id: String(s.id),
+        name: s.name,
+        description: s.description || '',
+        memberCount: s.currentMembers || 0,
+        targetAmount: s.targetAmount || 0,
+        cycle: s.cycle || 'Monthly',
+        category: s.type || 'General',
+        status: userStokvelIds.includes(String(s.id)) ? 'active' as const : 'available' as const,
+      }));
+      setAvailableStokvels(allStokvels);
+
+      // Notifications
+      const notifData = Array.isArray(notifRes.data) ? notifRes.data : notifRes.data?.data || [];
+      setNotifications(notifData.map((n: any) => ({
+        id: n.id,
+        message: n.title || n.message,
+        time: n.createdAt ? new Date(n.createdAt).toLocaleDateString() : '',
+        read: n.isRead || false,
+      })));
+
+      // Cards
+      setUserCards(Array.isArray(cardsRes.data) ? cardsRes.data : []);
+
+      // Fetch loan stats
+      try {
+        const loanRes = await loanApi.getStats();
+        const ls = loanRes.data;
+        const maxBorrowable = userProfiles.reduce((sum: number, p: Profile) => sum + Math.floor(p.savedAmount * 0.5), 0);
+        const borrowed = ls.activeAmount || 0;
+        setLoanStats({
+          available: maxBorrowable,
+          borrowed,
+          remaining: Math.max(0, maxBorrowable - borrowed),
+          progress: maxBorrowable > 0 ? Math.min(100, Math.floor((borrowed / maxBorrowable) * 100)) : 0,
+        });
+      } catch { /* no loans yet */ }
+
+    } catch (err: any) {
+      console.error('Dashboard fetch error:', err);
+      if (err.response?.status === 401) {
+        navigate('/login');
+      }
+    } finally {
+      setIsLoading(false);
     }
-  ];
+  }, [navigate]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   // Filter stokvels based on search and category
   const filteredStokvels = availableStokvels.filter(stokvel => {
@@ -201,30 +169,64 @@ export default function MainDashboard() {
   });
 
   // Categories for filter
-  const categories = ['all', 'Social', 'Holiday', 'Education', 'Emergency', 'Investment', 'Travel', 'Business'];
+  const categories = ['all', ...new Set(availableStokvels.map(s => s.category))];
 
   // Get initial profile from URL params or localStorage
-  const getInitialProfile = (): Profile => {
+  const getInitialProfile = (): Profile | null => {
+    if (profiles.length === 0) return null;
     const profileIdFromUrl = searchParams.get('profile');
-    
     if (profileIdFromUrl) {
-      const foundProfile = mockProfiles.find(p => p.id === profileIdFromUrl);
-      if (foundProfile) return foundProfile;
+      const found = profiles.find(p => p.id === profileIdFromUrl);
+      if (found) return found;
     }
-    
-    // Try to get from localStorage
     const savedProfileId = localStorage.getItem('activeProfileId');
     if (savedProfileId) {
-      const foundProfile = mockProfiles.find(p => p.id === savedProfileId);
-      if (foundProfile) return foundProfile;
+      const found = profiles.find(p => p.id === savedProfileId);
+      if (found) return found;
     }
-    
-    // Default to first profile
-    return mockProfiles[0];
+    return profiles[0];
   };
 
   // Active Profile State
-  const [activeProfile, setActiveProfile] = useState<Profile>(getInitialProfile);
+  const [activeProfile, setActiveProfile] = useState<Profile | null>(null);
+
+  // Update active profile when profiles load
+  useEffect(() => {
+    if (profiles.length > 0 && !activeProfile) {
+      setActiveProfile(getInitialProfile());
+    }
+  }, [profiles]);
+
+  // Fetch stokvel details when active profile changes
+  useEffect(() => {
+    if (!activeProfile?.stokvelId) return;
+    stokvelApi.getDetails(Number(activeProfile.stokvelId))
+      .then(res => {
+        const s = res.data;
+        setStokvelDetails({
+          name: s.name,
+          total: s.totalPool || 0,
+          target: (s.currentMembers || 0) * (activeProfile.targetAmount || 0),
+          progress: 0,
+          memberCount: s.currentMembers || 0,
+          cycle: s.cycle ? `${s.cycle}${s.meetingDay ? ' (' + s.meetingDay + ')' : ''}` : 'Monthly',
+          nextPayout: s.nextPayout ? new Date(s.nextPayout).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' }) : 'TBD',
+          individualTarget: activeProfile.targetAmount,
+        });
+      })
+      .catch(() => {
+        setStokvelDetails({
+          name: activeProfile.stokvelName,
+          total: 0,
+          target: 0,
+          progress: 0,
+          memberCount: 0,
+          cycle: 'Monthly',
+          nextPayout: 'TBD',
+          individualTarget: activeProfile.targetAmount,
+        });
+      });
+  }, [activeProfile]);
 
   // Update URL and localStorage when profile changes
   const handleProfileSwitch = (profile: Profile) => {
@@ -236,125 +238,113 @@ export default function MainDashboard() {
   // Contribution form state
   const [contributionData, setContributionData] = useState({
     amount: '',
-    paymentMethod: 'card_4242'
+    paymentMethod: 'card'
   });
 
   // Calculate remaining amount for this profile
-  const remainingAmount = activeProfile.targetAmount - activeProfile.savedAmount;
-  const progressPercentage = (activeProfile.savedAmount / activeProfile.targetAmount) * 100;
+  const remainingAmount = activeProfile ? activeProfile.targetAmount - activeProfile.savedAmount : 0;
+  const progressPercentage = activeProfile ? (activeProfile.targetAmount > 0 ? (activeProfile.savedAmount / activeProfile.targetAmount) * 100 : 0) : 0;
 
-  // Calculate loan data based on actual savings
-  const maxBorrowable = Math.floor(activeProfile.savedAmount * 0.5);
-  const borrowedSoFar = Math.floor(activeProfile.savedAmount * 0.3);
-  const remainingBorrowable = maxBorrowable - borrowedSoFar;
+  // Use loan stats from backend
+  const loanData = loanStats;
 
-  const loanData = {
-    available: maxBorrowable,
-    borrowed: borrowedSoFar,
-    remaining: Math.max(0, remainingBorrowable),
-    progress: Math.min(100, Math.floor((borrowedSoFar / maxBorrowable) * 100)) || 0
+  // Stokvel data from details fetch
+  const currentStokvel = stokvelDetails || {
+    name: activeProfile?.stokvelName || '',
+    total: 0,
+    target: 0,
+    progress: 0,
+    memberCount: 0,
+    cycle: 'Monthly',
+    nextPayout: 'TBD',
+    individualTarget: activeProfile?.targetAmount || 0,
   };
+  // Calculate stokvel progress
+  if (currentStokvel.target > 0) {
+    currentStokvel.progress = Math.round((currentStokvel.total / currentStokvel.target) * 100);
+  }
 
-  // Stokvel data based on active profile
-  const getStokvelData = (profile: Profile): StokvelData => {
-    switch(profile.stokvelId) {
-      case 'collective-pot':
-        return {
-          name: 'COLLECTIVE POT',
-          total: 9800,
-          target: 126000,
-          progress: 8,
-          memberCount: 18,
-          cycle: "Weekly (Sunday)",
-          nextPayout: TARGET_DATE,
-          individualTarget: profile.targetAmount
-        };
-      case 'summer-savers':
-        return {
-          name: 'SUMMER SAVERS',
-          total: 4250,
-          target: 40000,
-          progress: 11,
-          memberCount: 8,
-          cycle: "Monthly",
-          nextPayout: "31 Dec 2026",
-          individualTarget: profile.targetAmount
-        };
-      default:
-        return {
-          name: profile.stokvelName,
-          total: 0,
-          target: 0,
-          progress: 0,
-          memberCount: 0,
-          cycle: "Weekly",
-          nextPayout: TARGET_DATE,
-          individualTarget: profile.targetAmount
-        };
+  // Handle join request
+  const handleJoinRequest = async (stokvelId: string) => {
+    try {
+      await stokvelApi.joinRequest(Number(stokvelId));
+      alert('Join request sent! Awaiting admin approval.');
+      fetchData();
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to send join request');
     }
   };
 
-  const currentStokvel = getStokvelData(activeProfile);
-
-  // Handle join request
-  const handleJoinRequest = (stokvelId: string) => {
-    alert(`Join request sent to ${stokvelId} admin for approval! (Demo)`);
-    // In a real app, this would make an API call
-  };
-
-  // Regular notifications
-  const notifications = [
-    { id: 1, message: `Contribution of R200 confirmed for ${activeProfile.stokvelName}`, time: '2 hours ago', read: false },
-    { id: 2, message: 'Loan repayment due in 3 days', time: '1 day ago', read: false },
-    { id: 3, message: 'Welcome to HENNESSY SOCIAL CLUB!', time: '2 days ago', read: true },
-    { id: 4, message: 'Weekly meeting this Sunday at 10am', time: '3 days ago', read: true },
-    { id: 5, message: 'Your request to join EDUCATION FUND is pending approval', time: '3 days ago', read: false },
-  ];
-
   // Get rejected profiles to show in notifications only
-  const rejectedProfiles = mockProfiles.filter(p => p.status === 'rejected');
+  const rejectedProfiles = profiles.filter(p => p.status === 'rejected');
   
-  // Combine notifications with rejected profiles for display in notifications dropdown only
-  const allNotifications = [
-    ...notifications,
-    ...rejectedProfiles.map(profile => ({
-      id: `rejected-${profile.id}`,
-      message: `Your request to join ${profile.stokvelName} was not approved`,
-      time: '2 days ago',
-      read: false,
-      type: 'rejected',
-      profile
-    }))
-  ];
+  const unreadCount = notifications.filter(n => !n.read).length + rejectedProfiles.length;
 
-  const unreadCount = allNotifications.filter(n => !n.read).length;
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
-  const handleAddContribution = () => {
+  const handleAddContribution = async () => {
+    if (!activeProfile) return;
     // Check if amount is valid
     if (!contributionData.amount || parseInt(contributionData.amount) < 100 || parseInt(contributionData.amount) > remainingAmount) {
       return;
     }
 
-    // Simulate payment processing
-    setShowAddContribution(false);
-    
-    // Show a success message based on selected card
-    const cardSelected = contributionData.paymentMethod;
-    let cardMessage = '';
-    
-    if (cardSelected === 'card_4242') {
-      cardMessage = 'Visa •••• 4242';
-    } else if (cardSelected === 'card_8888') {
-      cardMessage = 'Mastercard •••• 8888';
-    } else {
-      cardMessage = 'Card';
+    setIsProcessingPayment(true);
+
+    try {
+      // Initialize Paystack payment via backend
+      const res = await paymentApi.initialize({
+        amount: parseInt(contributionData.amount),
+        profileId: Number(activeProfile.id),
+      });
+
+      const { authorizationUrl, reference } = res.data.data;
+
+      // Open Paystack payment page
+      const paymentWindow = window.open(authorizationUrl, '_blank');
+
+      // Poll for payment completion
+      const checkPayment = setInterval(async () => {
+        try {
+          const verifyRes = await paymentApi.verify(reference);
+          if (verifyRes.data.data?.status === 'success') {
+            clearInterval(checkPayment);
+            setShowAddContribution(false);
+            setIsProcessingPayment(false);
+            setContributionData({ amount: '', paymentMethod: 'card' });
+            alert(`✅ Payment of R ${contributionData.amount} confirmed! Your contribution has been recorded.`);
+            fetchData();
+          }
+        } catch {
+          // Still pending, keep polling
+        }
+      }, 5000);
+
+      // Stop polling after 5 minutes
+      setTimeout(() => {
+        clearInterval(checkPayment);
+        setIsProcessingPayment(false);
+      }, 300000);
+
+    } catch (err: any) {
+      setIsProcessingPayment(false);
+      alert(err.response?.data?.error || 'Failed to initialize payment. Please try again.');
     }
-    
-    alert(`✅ Payment Successful!\n\nR ${contributionData.amount} paid to ${activeProfile.stokvelName}\nCard: ${cardMessage}\n\nReference: TRX-${Math.floor(Math.random() * 10000)}`);
-    
-    // Reset form
-    setContributionData({ amount: '', paymentMethod: 'card_4242' });
   };
+
+  if (isLoading || !activeProfile) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-primary-600 mx-auto mb-3" />
+          <p className="text-gray-500">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Next payout date display
+  const TARGET_DATE = currentStokvel.nextPayout || 'TBD';
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -368,7 +358,7 @@ export default function MainDashboard() {
                 <Users className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-primary-800">HENNESSY SOCIAL CLUB</h1>
+                <h1 className="text-xl font-bold text-primary-800">{currentStokvel.name || 'STOKVEL CLUB'}</h1>
                 <p className="text-xs text-gray-500">Member Dashboard</p>
               </div>
             </div>
@@ -458,7 +448,7 @@ export default function MainDashboard() {
 
               {/* Profile Switcher */}
               <ProfileSwitcher 
-                profiles={mockProfiles}
+                profiles={profiles}
                 activeProfile={activeProfile}
                 onSwitch={handleProfileSwitch}
                 onAddProfile={() => setShowDiscoverStokvels(true)}
@@ -509,7 +499,13 @@ export default function MainDashboard() {
                     <Link 
                       to="/" 
                       className="flex items-center space-x-2 px-4 py-3 hover:bg-gray-50 text-red-600 transition-colors"
-                      onClick={() => setShowUserMenu(false)}
+                      onClick={() => {
+                        setShowUserMenu(false);
+                        localStorage.removeItem('token');
+                        localStorage.removeItem('currentUser');
+                        sessionStorage.removeItem('token');
+                        sessionStorage.removeItem('user');
+                      }}
                     >
                       <LogOut className="w-4 h-4" />
                       <span className="text-sm">Logout</span>
@@ -955,34 +951,24 @@ export default function MainDashboard() {
                 </div>
               </div>
 
-              {/* Payment Method - Card Selection */}
+              {/* Payment Method - Paystack */}
               <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Select Card
-                </label>
-                <select 
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  value={contributionData.paymentMethod}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    if (value === 'new') {
-                      setShowAddContribution(false);
-                      window.location.href = '/cards';
-                    } else {
-                      setContributionData({...contributionData, paymentMethod: value});
-                    }
-                  }}
-                >
-                  <option value="card_4242">💳 Visa •••• 4242 (Default)</option>
-                  <option value="card_8888">💳 Mastercard •••• 8888</option>
-                  <option value="new">➕ Add New Card</option>
-                </select>
-                
-                <div className="flex justify-between items-center mt-2">
-                  <Link to="/cards" className="text-xs text-primary-600 hover:text-primary-700">
-                    Manage Cards →
-                  </Link>
-                  <span className="text-xs text-gray-400">🔒 Secured by SSL</span>
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                      <CreditCard className="w-5 h-5 text-green-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">Pay securely with Paystack</p>
+                      <p className="text-xs text-gray-500">Card, Bank Transfer, or USSD</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center mt-3 space-x-2">
+                    <span className="text-xs bg-white border border-gray-200 px-2 py-1 rounded">Visa</span>
+                    <span className="text-xs bg-white border border-gray-200 px-2 py-1 rounded">Mastercard</span>
+                    <span className="text-xs bg-white border border-gray-200 px-2 py-1 rounded">Bank Transfer</span>
+                    <span className="text-xs text-gray-400 ml-auto">🔒 256-bit SSL</span>
+                  </div>
                 </div>
               </div>
 
@@ -1007,19 +993,35 @@ export default function MainDashboard() {
               {/* Action Buttons */}
               <div className="flex space-x-3">
                 <button 
-                  onClick={() => setShowAddContribution(false)}
+                  onClick={() => { setShowAddContribution(false); setIsProcessingPayment(false); }}
                   className="flex-1 border border-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                  disabled={isProcessingPayment}
                 >
                   Cancel
                 </button>
                 <button 
-                  className="flex-1 bg-gradient-to-r from-primary-600 to-primary-700 text-white py-3 rounded-lg hover:from-primary-700 hover:to-primary-800 transition-all font-medium shadow-sm hover:shadow disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={!contributionData.amount || parseInt(contributionData.amount) < 100 || parseInt(contributionData.amount) > remainingAmount}
+                  className="flex-1 bg-gradient-to-r from-green-600 to-green-700 text-white py-3 rounded-lg hover:from-green-700 hover:to-green-800 transition-all font-medium shadow-sm hover:shadow disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                  disabled={!contributionData.amount || parseInt(contributionData.amount) < 100 || parseInt(contributionData.amount) > remainingAmount || isProcessingPayment}
                   onClick={handleAddContribution}
                 >
-                  Add Contribution
+                  {isProcessingPayment ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard className="w-4 h-4 mr-2" />
+                      Pay with Paystack
+                    </>
+                  )}
                 </button>
               </div>
+              {isProcessingPayment && (
+                <p className="text-xs text-center text-gray-500 mt-3">
+                  Complete payment in the Paystack window. This page will update automatically.
+                </p>
+              )}
             </div>
           </div>
         )}

@@ -246,3 +246,15 @@ export const adminApi = {
   rejectJoinRequest: (id: number) =>
     api.post(`/admin/join-requests/${id}/reject`),
 };
+
+// ══════════════════════════════════════════
+//  PAYMENTS (Paystack)
+// ══════════════════════════════════════════
+
+export const paymentApi = {
+  initialize: (data: { amount: number; profileId: number }) =>
+    api.post('/payments/initialize', data),
+
+  verify: (reference: string) =>
+    api.get(`/payments/verify/${reference}`),
+};

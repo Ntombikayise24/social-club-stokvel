@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
+import { adminApi } from '../../api';
 import { 
   Users,
   DollarSign,
@@ -1910,280 +1911,144 @@ export default function AdminDashboard() {
   const [showReportModal, setShowReportModal] = useState(false);
   const [showDeletedUsersModal, setShowDeletedUsersModal] = useState(false);
   const [showSuccessMessage, setShowSuccessMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Deleted users archive
+  // Data from backend
   const [deletedUsers, setDeletedUsers] = useState<DeletedUser[]>([]);
+  const [stokvels, setStokvels] = useState<Stokvel[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [contributions, setContributions] = useState<Contribution[]>([]);
+  const [apiStats, setApiStats] = useState<any>(null);
 
-  const [stokvels, setStokvels] = useState<Stokvel[]>([
-    {
-      id: 1,
-      name: 'COLLECTIVE POT',
-      type: 'traditional',
-      description: 'Traditional Stokvel saving for festive season celebrations',
-      targetAmount: 7000,
-      maxMembers: 18,
-      currentMembers: 15,
-      interestRate: 30,
-      cycle: 'weekly',
-      meetingDay: 'Sunday',
-      nextPayout: '06 Dec 2026',
-      status: 'active',
-      icon: '🌱',
-      color: 'primary',
-      createdAt: '01 Jan 2026',
-      createdBy: 'Admin'
-    },
-    {
-      id: 2,
-      name: 'SUMMER SAVERS',
-      type: 'flexible',
-      description: 'Save for summer holidays and beach trips',
-      targetAmount: 5000,
-      maxMembers: 15,
-      currentMembers: 8,
-      interestRate: 30,
-      cycle: 'monthly',
-      meetingDay: 'Friday',
-      nextPayout: '31 Dec 2026',
-      status: 'active',
-      icon: '💰',
-      color: 'secondary',
-      createdAt: '05 Feb 2026',
-      createdBy: 'Admin'
-    },
-    {
-      id: 3,
-      name: 'WINTER WARMTH',
-      type: 'traditional',
-      description: 'Upcoming Stokvel - Save for winter essentials',
-      targetAmount: 3000,
-      maxMembers: 12,
-      currentMembers: 0,
-      interestRate: 30,
-      cycle: 'weekly',
-      meetingDay: 'Monday',
-      nextPayout: '01 Jun 2027',
-      status: 'upcoming',
-      icon: '❄️',
-      color: 'blue',
-      createdAt: '10 Feb 2026',
-      createdBy: 'Admin'
+  // ── Load all data from backend ──
+  const fetchData = useCallback(async () => {
+    try {
+      const [statsRes, usersRes, stokvelsRes, contributionsRes, deletedRes] = await Promise.all([
+        adminApi.getStats(),
+        adminApi.listUsers({ limit: 100 }),
+        adminApi.listStokvels(),
+        adminApi.listContributions({ limit: 100 }),
+        adminApi.listDeletedUsers(),
+      ]);
+
+      setApiStats(statsRes.data);
+
+      setUsers(
+        (usersRes.data.data || []).map((u: any) => ({
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          phone: u.phone,
+          status: u.status,
+          joinedDate: new Date(u.joinedDate).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }),
+          lastActive: u.lastActive
+            ? new Date(u.lastActive).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })
+            : 'Never',
+          profiles: (u.stokvels || []).map((s: any) => ({
+            id: `p-${u.id}-${s.stokvelId}`,
+            stokvelId: s.stokvelId,
+            stokvelName: s.stokvelName,
+            role: s.role || 'member',
+            targetAmount: 0,
+            savedAmount: 0,
+            joinedDate: '',
+          })),
+        }))
+      );
+
+      setStokvels(
+        (stokvelsRes.data || []).map((s: any) => ({
+          id: s.id,
+          name: s.name,
+          type: s.type,
+          description: s.description || '',
+          targetAmount: s.targetAmount,
+          maxMembers: s.maxMembers,
+          currentMembers: s.currentMembers,
+          interestRate: s.interestRate,
+          cycle: s.cycle,
+          meetingDay: s.meetingDay,
+          nextPayout: s.nextPayout
+            ? new Date(s.nextPayout).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })
+            : '',
+          status: s.status,
+          icon: s.icon || '💰',
+          color: s.color || 'primary',
+          createdAt: new Date(s.createdAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }),
+          createdBy: s.createdBy || 'Admin',
+        }))
+      );
+
+      setContributions(
+        (contributionsRes.data.data || []).map((c: any) => ({
+          id: c.id,
+          userId: c.userId,
+          userName: c.userName,
+          userInitials: c.userInitials || c.userName.split(' ').map((n: string) => n[0]).join('').toUpperCase(),
+          stokvelId: c.stokvelId || 0,
+          stokvelName: c.stokvelName,
+          amount: c.amount,
+          date: new Date(c.date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }),
+          status: c.status,
+          confirmedBy: c.confirmedBy,
+          confirmedAt: c.confirmedAt
+            ? new Date(c.confirmedAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+            : undefined,
+          paymentMethod: c.paymentMethod,
+          reference: c.reference,
+        }))
+      );
+
+      setDeletedUsers(
+        (deletedRes.data || []).map((d: any) => ({
+          id: d.id,
+          name: d.name,
+          email: d.email,
+          phone: d.phone,
+          deletedAt: d.deletedAt
+            ? new Date(d.deletedAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })
+            : '',
+          deletedBy: d.deletedBy || 'Admin',
+          reason: d.reason,
+          originalData: d,
+        }))
+      );
+    } catch (err) {
+      console.error('Failed to load admin data:', err);
+    } finally {
+      setIsLoading(false);
     }
-  ]);
+  }, []);
 
-  const [users, setUsers] = useState<User[]>([
-    {
-      id: 1,
-      name: 'Nkulumo Nkuna',
-      email: 'nkulumo.nkuna@email.com',
-      phone: '082 123 4567',
-      status: 'active',
-      joinedDate: '21 Jan 2026',
-      lastActive: 'Today',
-      profiles: [
-        {
-          id: 'p1',
-          stokvelId: 1,
-          stokvelName: 'COLLECTIVE POT',
-          role: 'member',
-          targetAmount: 7000,
-          savedAmount: 1070,
-          joinedDate: '21 Jan 2026'
-        },
-        {
-          id: 'p2',
-          stokvelId: 2,
-          stokvelName: 'SUMMER SAVERS',
-          role: 'member',
-          targetAmount: 5000,
-          savedAmount: 850,
-          joinedDate: '05 Feb 2026'
-        }
-      ]
-    },
-    {
-      id: 2,
-      name: 'Thabo Mbeki',
-      email: 'thabo.mbeki@email.com',
-      phone: '083 456 7890',
-      status: 'active',
-      joinedDate: '15 Jan 2026',
-      lastActive: 'Yesterday',
-      profiles: [
-        {
-          id: 'p3',
-          stokvelId: 1,
-          stokvelName: 'COLLECTIVE POT',
-          role: 'member',
-          targetAmount: 7000,
-          savedAmount: 2000,
-          joinedDate: '15 Jan 2026'
-        }
-      ]
-    },
-    {
-      id: 3,
-      name: 'Sarah Jones',
-      email: 'sarah.jones@email.com',
-      phone: '084 567 8901',
-      status: 'active',
-      joinedDate: '10 Jan 2026',
-      lastActive: '2 days ago',
-      profiles: [
-        {
-          id: 'p4',
-          stokvelId: 1,
-          stokvelName: 'COLLECTIVE POT',
-          role: 'member',
-          targetAmount: 7000,
-          savedAmount: 850,
-          joinedDate: '10 Jan 2026'
-        }
-      ]
-    },
-    {
-      id: 4,
-      name: 'John Doe',
-      email: 'john.doe@email.com',
-      phone: '085 678 9012',
-      status: 'inactive',
-      joinedDate: '05 Jan 2026',
-      lastActive: '2 weeks ago',
-      profiles: [
-        {
-          id: 'p5',
-          stokvelId: 1,
-          stokvelName: 'COLLECTIVE POT',
-          role: 'member',
-          targetAmount: 7000,
-          savedAmount: 2000,
-          joinedDate: '05 Jan 2026'
-        }
-      ]
-    },
-    {
-      id: 5,
-      name: 'Mary Johnson',
-      email: 'mary.johnson@email.com',
-      phone: '086 789 0123',
-      status: 'pending',
-      joinedDate: '18 Feb 2026',
-      lastActive: 'Never',
-      profiles: []
-    },
-    {
-      id: 6,
-      name: 'Peter Williams',
-      email: 'peter.williams@email.com',
-      phone: '087 890 1234',
-      status: 'pending',
-      joinedDate: '19 Feb 2026',
-      lastActive: 'Never',
-      profiles: []
-    }
-  ]);
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
-  const [contributions, setContributions] = useState<Contribution[]>([
-    {
-      id: 1,
-      userId: 1,
-      userName: 'Nkulumo Nkuna',
-      userInitials: 'NN',
-      stokvelId: 1,
-      stokvelName: 'COLLECTIVE POT',
-      amount: 200,
-      date: '04 Feb 2026',
-      status: 'confirmed',
-      confirmedBy: 'Admin',
-      confirmedAt: '04 Feb 2026 14:30',
-      paymentMethod: 'card',
-      reference: 'TRX-001'
-    },
-    {
-      id: 2,
-      userId: 2,
-      userName: 'Thabo Mbeki',
-      userInitials: 'TM',
-      stokvelId: 1,
-      stokvelName: 'COLLECTIVE POT',
-      amount: 350,
-      date: '22 Jan 2026',
-      status: 'confirmed',
-      confirmedBy: 'Admin',
-      confirmedAt: '22 Jan 2026 09:15',
-      paymentMethod: 'bank',
-      reference: 'TRX-002'
-    },
-    {
-      id: 3,
-      userId: 3,
-      userName: 'Sarah Jones',
-      userInitials: 'SJ',
-      stokvelId: 1,
-      stokvelName: 'COLLECTIVE POT',
-      amount: 250,
-      date: '22 Jan 2026',
-      status: 'confirmed',
-      confirmedBy: 'Admin',
-      confirmedAt: '22 Jan 2026 10:45',
-      paymentMethod: 'cash',
-      reference: 'TRX-003'
-    },
-    {
-      id: 4,
-      userId: 1,
-      userName: 'Nkulumo Nkuna',
-      userInitials: 'NN',
-      stokvelId: 2,
-      stokvelName: 'SUMMER SAVERS',
-      amount: 500,
-      date: '10 Feb 2026',
-      status: 'confirmed',
-      confirmedBy: 'Admin',
-      confirmedAt: '10 Feb 2026 11:20',
-      paymentMethod: 'card',
-      reference: 'TRX-004'
-    },
-    {
-      id: 5,
-      userId: 5,
-      userName: 'Mary Johnson',
-      userInitials: 'MJ',
-      stokvelId: 2,
-      stokvelName: 'SUMMER SAVERS',
-      amount: 1200,
-      date: '05 Feb 2026',
-      status: 'pending',
-      paymentMethod: 'cash',
-      reference: 'TRX-005'
-    },
-    {
-      id: 6,
-      userId: 6,
-      userName: 'Peter Williams',
-      userInitials: 'PW',
-      stokvelId: 2,
-      stokvelName: 'SUMMER SAVERS',
-      amount: 500,
-      date: '06 Feb 2026',
-      status: 'pending',
-      paymentMethod: 'card',
-      reference: 'TRX-006'
-    }
-  ]);
-
-  const stats = {
-    totalUsers: users.length,
-    activeUsers: users.filter(u => u.status === 'active').length,
-    pendingUsers: users.filter(u => u.status === 'pending').length,
-    deletedUsers: deletedUsers.length,
-    totalStokvels: stokvels.length,
-    activeStokvels: stokvels.filter(s => s.status === 'active').length,
-    upcomingStokvels: stokvels.filter(s => s.status === 'upcoming').length,
-    totalContributions: contributions.reduce((sum, c) => sum + c.amount, 0),
-    pendingContributions: contributions.filter(c => c.status === 'pending').length,
-    pendingAmount: contributions.filter(c => c.status === 'pending').reduce((sum, c) => sum + c.amount, 0)
-  };
+  const stats = apiStats
+    ? {
+        totalUsers: apiStats.totalMembers + (apiStats.pendingApprovals || 0),
+        activeUsers: apiStats.totalMembers,
+        pendingUsers: apiStats.pendingApprovals,
+        deletedUsers: apiStats.deletedUsers || 0,
+        totalStokvels: apiStats.totalStokvels,
+        activeStokvels: apiStats.totalStokvels,
+        upcomingStokvels: 0,
+        totalContributions: apiStats.totalContributions,
+        pendingContributions: apiStats.pendingContributionCount,
+        pendingAmount: apiStats.pendingContributionAmount,
+      }
+    : {
+        totalUsers: users.length,
+        activeUsers: users.filter(u => u.status === 'active').length,
+        pendingUsers: users.filter(u => u.status === 'pending').length,
+        deletedUsers: deletedUsers.length,
+        totalStokvels: stokvels.length,
+        activeStokvels: stokvels.filter(s => s.status === 'active').length,
+        upcomingStokvels: stokvels.filter(s => s.status === 'upcoming').length,
+        totalContributions: contributions.reduce((sum, c) => sum + c.amount, 0),
+        pendingContributions: contributions.filter(c => c.status === 'pending').length,
+        pendingAmount: contributions.filter(c => c.status === 'pending').reduce((sum, c) => sum + c.amount, 0),
+      };
 
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -2197,206 +2062,227 @@ export default function AdminDashboard() {
   const pendingUsers = users.filter(u => u.status === 'pending');
   const pendingContributions = contributions.filter(c => c.status === 'pending');
 
-  const handleAddUser = (newUser: any) => {
-    setUsers([...users, newUser]);
-    setShowAddUserModal(false);
-    setShowSuccessMessage(`User ${newUser.name} created successfully!`);
+  const showSuccess = (msg: string) => {
+    setShowSuccessMessage(msg);
     setTimeout(() => setShowSuccessMessage(''), 3000);
   };
 
-  const handleAddStokvel = (newStokvel: any) => {
-    setStokvels([...stokvels, newStokvel]);
-    setShowAddStokvelModal(false);
-    setShowSuccessMessage(`Stokvel ${newStokvel.name} created successfully!`);
-    setTimeout(() => setShowSuccessMessage(''), 3000);
+  const handleAddUser = async (newUser: any) => {
+    try {
+      await adminApi.createUser({
+        fullName: newUser.name,
+        email: newUser.email,
+        phone: newUser.phone,
+        status: newUser.status,
+        stokvelIds: newUser.profiles?.map((p: any) => p.stokvelId) || [],
+      });
+      setShowAddUserModal(false);
+      showSuccess(`User ${newUser.name} created successfully!`);
+      fetchData();
+    } catch (err: any) {
+      const msg = err.response?.data?.error || 'Failed to create user';
+      showSuccess(msg);
+    }
   };
 
-  const handleEditUser = (updatedUser: User) => {
-    setUsers(users.map(u => u.id === updatedUser.id ? updatedUser : u));
-    setShowEditUserModal(null);
-    setShowSuccessMessage(`User ${updatedUser.name} updated successfully!`);
-    setTimeout(() => setShowSuccessMessage(''), 3000);
+  const handleAddStokvel = async (newStokvel: any) => {
+    try {
+      await adminApi.createStokvel({
+        name: newStokvel.name,
+        type: newStokvel.type,
+        description: newStokvel.description,
+        targetAmount: newStokvel.targetAmount,
+        maxMembers: newStokvel.maxMembers,
+        interestRate: newStokvel.interestRate || 30,
+        cycle: newStokvel.cycle,
+        meetingDay: newStokvel.meetingDay,
+        icon: newStokvel.icon,
+        color: newStokvel.color,
+      });
+      setShowAddStokvelModal(false);
+      showSuccess(`Stokvel ${newStokvel.name} created successfully!`);
+      fetchData();
+    } catch (err: any) {
+      const msg = err.response?.data?.error || 'Failed to create stokvel';
+      showSuccess(msg);
+    }
   };
 
-  const handleDeleteUser = (userId: number) => {
+  const handleEditUser = async (updatedUser: User) => {
+    try {
+      await adminApi.updateUser(updatedUser.id, {
+        fullName: updatedUser.name,
+        email: updatedUser.email,
+        phone: updatedUser.phone,
+        status: updatedUser.status,
+        stokvelIds: updatedUser.profiles.map(p => p.stokvelId),
+      });
+      setShowEditUserModal(null);
+      showSuccess(`User ${updatedUser.name} updated successfully!`);
+      fetchData();
+    } catch (err: any) {
+      const msg = err.response?.data?.error || 'Failed to update user';
+      showSuccess(msg);
+    }
+  };
+
+  const handleDeleteUser = async (userId: number) => {
     const user = users.find(u => u.id === userId);
     if (!user) return;
-
-    // Archive the user
-    const deletedUser: DeletedUser = {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      phone: user.phone,
-      deletedAt: new Date().toLocaleString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
-      deletedBy: 'Admin',
-      reason: 'User deleted by admin',
-      originalData: user
-    };
-
-    setDeletedUsers([...deletedUsers, deletedUser]);
-    
-    // Remove from active users
-    setUsers(users.filter(u => u.id !== userId));
-    
-    // Mark contributions as deleted
-    setContributions(contributions.map(c => 
-      c.userId === userId 
-        ? { ...c, status: 'deleted', deletedAt: new Date().toLocaleString() }
-        : c
-    ));
-
-    setShowDeleteUserConfirm(null);
-    setShowSuccessMessage(`User ${user.name} has been archived. They can be restored from the archive.`);
-    setTimeout(() => setShowSuccessMessage(''), 3000);
-  };
-
-  const handleRestoreUser = (userId: number) => {
-    const deletedUser = deletedUsers.find(d => d.id === userId);
-    if (!deletedUser) return;
-
-    // Restore the user
-    setUsers([...users, deletedUser.originalData]);
-    
-    // Remove from deleted archive
-    setDeletedUsers(deletedUsers.filter(d => d.id !== userId));
-    
-    // Restore contributions (remove deleted status)
-    setContributions(contributions.map(c => 
-      c.userId === userId 
-        ? { ...c, status: 'pending', deletedAt: undefined }
-        : c
-    ));
-
-    setShowSuccessMessage(`User ${deletedUser.name} has been restored.`);
-    setTimeout(() => setShowSuccessMessage(''), 3000);
-  };
-
-  const handlePermanentDelete = (userId: number) => {
-    const deletedUser = deletedUsers.find(d => d.id === userId);
-    if (!deletedUser) return;
-
-    // Permanently remove from deleted archive
-    setDeletedUsers(deletedUsers.filter(d => d.id !== userId));
-    
-    // Permanently delete contributions
-    setContributions(contributions.filter(c => c.userId !== userId));
-
-    setShowSuccessMessage(`User ${deletedUser.name} has been permanently deleted.`);
-    setTimeout(() => setShowSuccessMessage(''), 3000);
-  };
-
-  const handleEditStokvel = (updatedStokvel: Stokvel) => {
-    setStokvels(stokvels.map(s => s.id === updatedStokvel.id ? updatedStokvel : s));
-    setShowEditStokvelModal(null);
-    setShowSuccessMessage(`Stokvel ${updatedStokvel.name} updated successfully!`);
-    setTimeout(() => setShowSuccessMessage(''), 3000);
-  };
-
-  const handleDeleteStokvel = (stokvelId: number) => {
-    const stokvel = stokvels.find(s => s.id === stokvelId);
-    setStokvels(stokvels.filter(s => s.id !== stokvelId));
-    setShowDeleteStokvelConfirm(null);
-    setShowSuccessMessage(`Stokvel ${stokvel?.name} deleted successfully!`);
-    setTimeout(() => setShowSuccessMessage(''), 3000);
-  };
-
-  const handleApproveUser = (userId: number, selectedStokvels: number[]) => {
-    setUsers(users.map(u => 
-      u.id === userId 
-        ? { 
-            ...u, 
-            status: 'active', 
-            lastActive: 'Just now',
-            profiles: selectedStokvels.map(stokvelId => {
-              const stokvel = stokvels.find(s => s.id === stokvelId);
-              return {
-                id: `p${Date.now()}-${stokvelId}`,
-                stokvelId,
-                stokvelName: stokvel?.name || '',
-                role: 'member',
-                targetAmount: stokvel?.targetAmount || 0,
-                savedAmount: 0,
-                joinedDate: u.joinedDate
-              };
-            })
-          }
-        : u
-    ));
-    setShowApproveUserModal(null);
-    setShowSuccessMessage(`User approved successfully!`);
-    setTimeout(() => setShowSuccessMessage(''), 3000);
-  };
-
-  const handleConfirmContribution = (contributionId: number) => {
-    setContributions(contributions.map(c =>
-      c.id === contributionId
-        ? {
-            ...c,
-            status: 'confirmed',
-            confirmedBy: 'Admin',
-            confirmedAt: new Date().toLocaleString('en-ZA', {
-              day: 'numeric',
-              month: 'short',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit'
-            })
-          }
-        : c
-    ));
-    setShowConfirmContributionModal(null);
-    setShowSuccessMessage(`Payment confirmed successfully!`);
-    setTimeout(() => setShowSuccessMessage(''), 3000);
-  };
-
-  const handleSaveSettings = (settings: any) => {
-  // Save to localStorage for persistence
-  localStorage.setItem('adminSettings', JSON.stringify(settings));
-  
-  // You can also apply settings to your app state here
-  // For example, update currency format, date format, etc.
-  
-  setShowSuccessMessage('Settings saved successfully!');
-  setTimeout(() => setShowSuccessMessage(''), 3000);
-  
-  // Log for debugging (remove in production)
-  console.log('Settings saved:', settings);
-};
-
-  const handleGenerateReport = (reportType: string, dateRange: string, format: string) => {
-    let reportData = '';
-    
-    switch(reportType) {
-      case 'users':
-        reportData = `User Report (${dateRange})\nTotal Users: ${users.length}\nActive: ${stats.activeUsers}\nPending: ${stats.pendingUsers}\n\n` +
-                    users.map(u => `${u.name},${u.email},${u.status},${u.joinedDate}`).join('\n');
-        break;
-      case 'deleted':
-        reportData = `Deleted Users Report (${dateRange})\nTotal Deleted: ${deletedUsers.length}\n\n` +
-                    deletedUsers.map(d => `${d.name},${d.email},${d.deletedAt},${d.reason || 'No reason'}`).join('\n');
-        break;
-      case 'contributions':
-        reportData = `Contributions Report (${dateRange})\nTotal: R ${stats.totalContributions}\nPending: R ${stats.pendingAmount}\n\n` +
-                    contributions.map(c => `${c.userName},${c.stokvelName},R ${c.amount},${c.date},${c.status}`).join('\n');
-        break;
-      default:
-        reportData = `${reportType} report for ${dateRange}`;
+    try {
+      await adminApi.deleteUser(userId, 'User deleted by admin');
+      setShowDeleteUserConfirm(null);
+      showSuccess(`User ${user.name} has been archived. They can be restored from the archive.`);
+      fetchData();
+    } catch (err: any) {
+      const msg = err.response?.data?.error || 'Failed to delete user';
+      showSuccess(msg);
     }
+  };
 
-    const extension = format === 'pdf' ? 'txt' : format; // For demo, we'll use txt instead of actual PDF
-    const filename = `${reportType}-report-${dateRange}.${extension}`;
-    
-    const element = document.createElement('a');
-    const file = new Blob([reportData], {type: 'text/plain'});
-    element.href = URL.createObjectURL(file);
-    element.download = filename;
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
+  const handleRestoreUser = async (userId: number) => {
+    const deletedUser = deletedUsers.find(d => d.id === userId);
+    if (!deletedUser) return;
+    try {
+      await adminApi.restoreUser(userId);
+      showSuccess(`User ${deletedUser.name} has been restored.`);
+      fetchData();
+    } catch (err: any) {
+      const msg = err.response?.data?.error || 'Failed to restore user';
+      showSuccess(msg);
+    }
+  };
 
-    setShowSuccessMessage(`${reportType} report generated successfully!`);
-    setTimeout(() => setShowSuccessMessage(''), 3000);
+  const handlePermanentDelete = async (userId: number) => {
+    const deletedUser = deletedUsers.find(d => d.id === userId);
+    if (!deletedUser) return;
+    try {
+      await adminApi.permanentDeleteUser(userId);
+      showSuccess(`User ${deletedUser.name} has been permanently deleted.`);
+      fetchData();
+    } catch (err: any) {
+      const msg = err.response?.data?.error || 'Failed to permanently delete user';
+      showSuccess(msg);
+    }
+  };
+
+  const handleEditStokvel = async (updatedStokvel: Stokvel) => {
+    try {
+      await adminApi.updateStokvel(updatedStokvel.id, {
+        name: updatedStokvel.name,
+        type: updatedStokvel.type,
+        description: updatedStokvel.description,
+        targetAmount: updatedStokvel.targetAmount,
+        maxMembers: updatedStokvel.maxMembers,
+        cycle: updatedStokvel.cycle,
+        meetingDay: updatedStokvel.meetingDay,
+        status: updatedStokvel.status,
+        icon: updatedStokvel.icon,
+        color: updatedStokvel.color,
+      });
+      setShowEditStokvelModal(null);
+      showSuccess(`Stokvel ${updatedStokvel.name} updated successfully!`);
+      fetchData();
+    } catch (err: any) {
+      const msg = err.response?.data?.error || 'Failed to update stokvel';
+      showSuccess(msg);
+    }
+  };
+
+  const handleDeleteStokvel = async (stokvelId: number) => {
+    const stokvel = stokvels.find(s => s.id === stokvelId);
+    try {
+      await adminApi.deleteStokvel(stokvelId);
+      setShowDeleteStokvelConfirm(null);
+      showSuccess(`Stokvel ${stokvel?.name} deleted successfully!`);
+      fetchData();
+    } catch (err: any) {
+      const msg = err.response?.data?.error || 'Failed to delete stokvel';
+      showSuccess(msg);
+    }
+  };
+
+  const handleApproveUser = async (userId: number, selectedStokvels: number[]) => {
+    try {
+      await adminApi.approveUser(userId, selectedStokvels);
+      setShowApproveUserModal(null);
+      showSuccess(`User approved successfully!`);
+      fetchData();
+    } catch (err: any) {
+      const msg = err.response?.data?.error || 'Failed to approve user';
+      showSuccess(msg);
+    }
+  };
+
+  const handleConfirmContribution = async (contributionId: number) => {
+    try {
+      await adminApi.confirmContribution(contributionId);
+      setShowConfirmContributionModal(null);
+      showSuccess(`Payment confirmed successfully!`);
+      fetchData();
+    } catch (err: any) {
+      const msg = err.response?.data?.error || 'Failed to confirm payment';
+      showSuccess(msg);
+    }
+  };
+
+  const handleSaveSettings = async (settings: any) => {
+    try {
+      await adminApi.updateSiteSettings(settings);
+      showSuccess('Settings saved successfully!');
+    } catch {
+      // Fallback to localStorage
+      localStorage.setItem('adminSettings', JSON.stringify(settings));
+      showSuccess('Settings saved locally!');
+    }
+  };
+
+  const handleGenerateReport = async (reportType: string, dateRange: string, format: string) => {
+    try {
+      const dateRanges: Record<string, { start: string; end: string }> = {
+        today: { start: new Date().toISOString().split('T')[0], end: new Date().toISOString().split('T')[0] },
+        week: { start: new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0], end: new Date().toISOString().split('T')[0] },
+        month: { start: new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0], end: new Date().toISOString().split('T')[0] },
+        quarter: { start: new Date(Date.now() - 90 * 86400000).toISOString().split('T')[0], end: new Date().toISOString().split('T')[0] },
+        year: { start: new Date(Date.now() - 365 * 86400000).toISOString().split('T')[0], end: new Date().toISOString().split('T')[0] },
+      };
+
+      const apiReportType = reportType === 'users' ? 'members' : reportType;
+      const res = await adminApi.generateReport({
+        reportType: apiReportType,
+        dateRange: dateRanges[dateRange],
+        format,
+      });
+
+      const reportData = JSON.stringify(res.data, null, 2);
+      const extension = format === 'pdf' ? 'txt' : format;
+      const filename = `${reportType}-report-${dateRange}.${extension}`;
+
+      const element = document.createElement('a');
+      const file = new Blob([reportData], { type: 'text/plain' });
+      element.href = URL.createObjectURL(file);
+      element.download = filename;
+      document.body.appendChild(element);
+      element.click();
+      document.body.removeChild(element);
+
+      showSuccess(`${reportType} report generated successfully!`);
+    } catch {
+      // Fallback to local data
+      let reportData = `${reportType} report for ${dateRange}`;
+      const extension = format === 'pdf' ? 'txt' : format;
+      const filename = `${reportType}-report-${dateRange}.${extension}`;
+
+      const element = document.createElement('a');
+      const file = new Blob([reportData], { type: 'text/plain' });
+      element.href = URL.createObjectURL(file);
+      element.download = filename;
+      document.body.appendChild(element);
+      element.click();
+      document.body.removeChild(element);
+
+      showSuccess(`${reportType} report generated (local data).`);
+    }
   };
 
   const formatCurrency = (amount: number) => {
@@ -2517,7 +2403,14 @@ export default function AdminDashboard() {
       </div>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {activeTab === 'overview' && (
+        {isLoading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="text-center">
+              <div className="w-12 h-12 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin mx-auto mb-4" />
+              <p className="text-gray-500">Loading admin data...</p>
+            </div>
+          </div>
+        ) : activeTab === 'overview' && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">

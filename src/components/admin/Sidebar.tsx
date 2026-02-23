@@ -6,6 +6,7 @@ import {
   ChevronRight, Star, Facebook, Twitter, Instagram, Linkedin,
   Menu, Phone, MapPin, DollarSign, Bell
 } from 'lucide-react';
+import { authApi } from '../../api';
 
 function App() {
   const navigate = useNavigate();
@@ -18,9 +19,7 @@ function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
-  // Admin credentials
-  const ADMIN_EMAIL = 'admin@admin.com';
-  const ADMIN_PASSWORD = 'admin@123';
+  // Admin credentials handled by backend API
 
   // Handle scroll effect for navbar
   useEffect(() => {
@@ -39,20 +38,33 @@ function App() {
     setShowPassword(false);
   };
 
-  const handleAdminLogin = (e: React.FormEvent) => {
+  const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setLoginError('');
 
-    setTimeout(() => {
-      if (adminEmail === ADMIN_EMAIL && adminPassword === ADMIN_PASSWORD) {
-        setShowAdminModal(false);
-        navigate('/admin');
-      } else {
-        setLoginError('Invalid email or password');
+    try {
+      const res = await authApi.login({ email: adminEmail, password: adminPassword });
+      const { token, user } = res.data;
+
+      if (user.role !== 'admin') {
+        setLoginError('This account does not have admin access');
+        return;
       }
+
+      localStorage.setItem('token', token);
+      localStorage.setItem('currentUser', JSON.stringify(user));
+      sessionStorage.setItem('token', token);
+      sessionStorage.setItem('user', JSON.stringify(user));
+
+      setShowAdminModal(false);
+      navigate('/admin');
+    } catch (err: any) {
+      const message = err.response?.data?.error || 'Invalid email or password';
+      setLoginError(message);
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   const closeModal = () => {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   BarChart,
   Bar,
@@ -24,42 +24,10 @@ import {
   ArrowUpRight,
   ArrowDownRight
 } from 'lucide-react';
+import { adminApi } from '../../api';
 
-// Mock data for charts
-const contributionData = [
-  { month: 'Jan', amount: 4500, contributions: 12 },
-  { month: 'Feb', amount: 6200, contributions: 18 },
-  { month: 'Mar', amount: 7800, contributions: 24 },
-  { month: 'Apr', amount: 5600, contributions: 16 },
-  { month: 'May', amount: 8900, contributions: 28 },
-  { month: 'Jun', amount: 10300, contributions: 32 },
-  { month: 'Jul', amount: 9500, contributions: 30 },
-  { month: 'Aug', amount: 11200, contributions: 35 },
-  { month: 'Sep', amount: 12800, contributions: 40 },
-];
-
-const stokvelPerformance = [
-  { name: 'COLLECTIVE POT', contributions: 24500, members: 15, target: 7000 },
-  { name: 'SUMMER SAVERS', contributions: 18200, members: 8, target: 5000 },
-  { name: 'WINTER WARMTH', contributions: 8900, members: 5, target: 3000 },
-  { name: 'FESTIVE FUND', contributions: 15600, members: 12, target: 6000 },
-  { name: 'EDUCATION EGG', contributions: 20300, members: 10, target: 8000 },
-];
-
-const paymentMethods = [
-  { name: 'Card', value: 65 },
-  { name: 'Bank Transfer', value: 35 },
-];
-
+// Default empty data for charts
 const COLORS = ['#10b981', '#6366f1', '#f59e0b', '#ef4444', '#8b5cf6'];
-
-const recentActivities = [
-  { id: 1, type: 'payment', user: 'Nkulumo Nkuna', amount: 500, time: '5 min ago', status: 'success' },
-  { id: 2, type: 'user', user: 'Mary Johnson', action: 'registered', time: '15 min ago', status: 'pending' },
-  { id: 3, type: 'payment', user: 'Thabo Mbeki', amount: 350, time: '1 hour ago', status: 'success' },
-  { id: 4, type: 'stokvel', user: 'Admin', action: 'created WINTER WARMTH', time: '2 hours ago', status: 'info' },
-  { id: 5, type: 'payment', user: 'Sarah Jones', amount: 250, time: '3 hours ago', status: 'success' },
-];
 
 interface StatCardProps {
   title: string;
@@ -96,13 +64,102 @@ function StatCard({ title, value, change, icon: Icon, color, subtitle }: StatCar
 export default function AnalyticsOverview() {
   const [timeRange, setTimeRange] = useState('6m');
   const [selectedChart, setSelectedChart] = useState('contributions');
+  const [isLoading, setIsLoading] = useState(true);
+  const [contributionData, setContributionData] = useState<any[]>([]);
+  const [stokvelPerformance, setStokvelPerformance] = useState<any[]>([]);
+  const [recentActivities, setRecentActivities] = useState<any[]>([]);
+  const [stats, setStats] = useState({
+    totalUsers: { value: 0 as string | number, change: 0, subtitle: '' },
+    totalContributions: { value: 'R 0', change: 0, subtitle: '' },
+    activeStokvels: { value: 0 as string | number, change: 0, subtitle: '' },
+    pendingPayments: { value: 'R 0', change: 0, subtitle: '' },
+  });
 
-  const stats = {
-    totalUsers: { value: 156, change: 12, subtitle: '+18 this month' },
-    totalContributions: { value: 'R 458.2k', change: 8, subtitle: 'R 32.4k this month' },
-    activeStokvels: { value: 12, change: -2, subtitle: '2 stokvels ending soon' },
-    pendingPayments: { value: 'R 23.5k', change: 15, subtitle: '8 payments pending' }
-  };
+  const paymentMethods = [
+    { name: 'Card', value: 65 },
+    { name: 'Bank Transfer', value: 35 },
+  ];
+
+  useEffect(() => {
+    const loadData = async () => {
+      setIsLoading(true);
+      try {
+        const [statsRes, stokvelsRes, contributionsRes] = await Promise.all([
+          adminApi.getStats(),
+          adminApi.listStokvels(),
+          adminApi.listContributions({ limit: 20 }),
+        ]);
+
+        const s = statsRes.data;
+
+        // Build stats cards
+        setStats({
+          totalUsers: {
+            value: s.totalMembers + (s.pendingApprovals || 0),
+            change: 12,
+            subtitle: `${s.pendingApprovals || 0} pending approval`,
+          },
+          totalContributions: {
+            value: `R ${(s.totalContributions / 1000).toFixed(1)}k`,
+            change: 8,
+            subtitle: `${s.pendingContributionCount || 0} pending`,
+          },
+          activeStokvels: {
+            value: s.totalStokvels,
+            change: 0,
+            subtitle: `${s.totalStokvels} active`,
+          },
+          pendingPayments: {
+            value: `R ${((s.pendingContributionAmount || 0) / 1000).toFixed(1)}k`,
+            change: s.pendingContributionCount > 0 ? 15 : 0,
+            subtitle: `${s.pendingContributionCount || 0} payments pending`,
+          },
+        });
+
+        // Monthly contributions chart
+        const monthlyData = (s.monthlyContributions || []).map((m: any) => {
+          const [, month] = m.month.split('-');
+          const monthNames = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          return {
+            month: monthNames[parseInt(month)] || m.month,
+            amount: m.total,
+            contributions: m.count,
+          };
+        });
+        setContributionData(monthlyData.length > 0 ? monthlyData : [{ month: 'No data', amount: 0, contributions: 0 }]);
+
+        // Stokvel performance
+        const stokvelData = (stokvelsRes.data || []).map((sv: any) => ({
+          name: sv.name,
+          contributions: sv.totalPool || 0,
+          members: sv.currentMembers,
+          target: sv.targetAmount,
+        }));
+        setStokvelPerformance(stokvelData);
+
+        // Recent activities from contributions
+        const contribs = contributionsRes.data?.data || [];
+        setRecentActivities(
+          contribs.slice(0, 5).map((c: any, i: number) => ({
+            id: c.id || i,
+            type: 'payment',
+            user: c.userName,
+            amount: c.amount,
+            time: c.date
+              ? new Date(c.date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })
+              : '',
+            status: c.status === 'confirmed' ? 'success' : 'pending',
+          }))
+        );
+      } catch (err) {
+        console.error('Failed to load analytics:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadData();
+  }, [timeRange]);
 
   // Safely format percentage for pie chart labels
   const renderPieLabel = (entry: any) => {
@@ -388,29 +445,19 @@ export default function AnalyticsOverview() {
 
       {/* Upcoming Payouts */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <h3 className="font-semibold text-gray-800 mb-4">Upcoming Payouts</h3>
+        <h3 className="font-semibold text-gray-800 mb-4">Stokvel Targets</h3>
         <div className="space-y-3">
-          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-            <div>
-              <p className="font-medium text-gray-800">COLLECTIVE POT</p>
-              <p className="text-sm text-gray-500">Payout date: 06 Dec 2026</p>
+          {stokvelPerformance.length > 0 ? stokvelPerformance.map((sv, i) => (
+            <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              <div>
+                <p className="font-medium text-gray-800">{sv.name}</p>
+                <p className="text-sm text-gray-500">{sv.members} members</p>
+              </div>
+              <span className="text-lg font-bold text-primary-600">R {sv.target?.toLocaleString()}</span>
             </div>
-            <span className="text-lg font-bold text-primary-600">R 7,000</span>
-          </div>
-          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-            <div>
-              <p className="font-medium text-gray-800">SUMMER SAVERS</p>
-              <p className="text-sm text-gray-500">Payout date: 31 Dec 2026</p>
-            </div>
-            <span className="text-lg font-bold text-primary-600">R 5,000</span>
-          </div>
-          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-            <div>
-              <p className="font-medium text-gray-800">WINTER WARMTH</p>
-              <p className="text-sm text-gray-500">Payout date: 01 Jun 2027</p>
-            </div>
-            <span className="text-lg font-bold text-primary-600">R 3,000</span>
-          </div>
+          )) : (
+            <p className="text-sm text-gray-500 text-center py-4">No stokvel data available</p>
+          )}
         </div>
       </div>
     </div>

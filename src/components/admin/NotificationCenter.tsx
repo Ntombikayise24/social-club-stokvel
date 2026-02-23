@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Bell, CheckCircle, AlertCircle, Info, AlertTriangle } from 'lucide-react';
+import { notificationApi } from '../../api';
 
 interface Notification {
   id: string;
@@ -12,59 +13,58 @@ interface Notification {
 
 export default function NotificationCenter() {
   const [isOpen, setIsOpen] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>([
-    {
-      id: '1',
-      type: 'info',
-      title: 'New User Registration',
-      message: 'Mary Johnson has registered and is pending approval',
-      time: '5 min ago',
-      read: false
-    },
-    {
-      id: '2',
-      type: 'success',
-      title: 'Payment Confirmed',
-      message: 'R 1,200 contribution from Peter Williams confirmed',
-      time: '1 hour ago',
-      read: false
-    },
-    {
-      id: '3',
-      type: 'warning',
-      title: 'Stokvel Target Alert',
-      message: 'COLLECTIVE POT is 85% towards target',
-      time: '2 hours ago',
-      read: true
-    },
-    {
-      id: '4',
-      type: 'success',
-      title: 'New Stokvel Created',
-      message: 'WINTER WARMTH stokvel has been created successfully',
-      time: '3 hours ago',
-      read: true
-    },
-    {
-      id: '5',
-      type: 'error',
-      title: 'Payment Failed',
-      message: 'Payment from John Doe failed. Please check payment details.',
-      time: '5 hours ago',
-      read: true
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+
+  const fetchNotifications = async () => {
+    try {
+      const res = await notificationApi.list({ limit: 10 });
+      const data = Array.isArray(res.data) ? res.data : res.data?.data || [];
+      setNotifications(
+        data.map((n: any) => ({
+          id: String(n.id),
+          type: n.type || 'info',
+          title: n.title,
+          message: n.message,
+          time: n.createdAt
+            ? new Date(n.createdAt).toLocaleDateString('en-ZA', {
+                day: 'numeric',
+                month: 'short',
+                hour: '2-digit',
+                minute: '2-digit',
+              })
+            : '',
+          read: !!n.read,
+        }))
+      );
+    } catch {
+      // Silently fail - notifications are non-critical
     }
-  ]);
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+  }, []);
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
-  const markAsRead = (id: string) => {
+  const markAsRead = async (id: string) => {
     setNotifications(notifications.map(n => 
       n.id === id ? { ...n, read: true } : n
     ));
+    try {
+      await notificationApi.markRead(parseInt(id));
+    } catch {
+      // Already updated optimistically
+    }
   };
 
-  const markAllAsRead = () => {
+  const markAllAsRead = async () => {
     setNotifications(notifications.map(n => ({ ...n, read: true })));
+    try {
+      await notificationApi.markAllRead();
+    } catch {
+      // Already updated optimistically
+    }
   };
 
   const getIcon = (type: string) => {
