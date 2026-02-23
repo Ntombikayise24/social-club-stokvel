@@ -1,12 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { User, Mail, Lock, Phone, ArrowLeft, Users, Eye, EyeOff } from 'lucide-react';
+import { authApi, stokvelApi } from '../../api';
 
 export default function Register() {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [apiError, setApiError] = useState('');
+  const [stokvels, setStokvels] = useState<{ id: number; name: string; currentMembers: number; targetAmount: number; type: string }[]>([]);
   
   const [formData, setFormData] = useState({
     fullName: '',
@@ -23,6 +26,13 @@ export default function Register() {
     confirmPassword: '',
     selectedStokvel: ''
   });
+
+  // Load stokvels from API
+  useEffect(() => {
+    stokvelApi.list()
+      .then(res => setStokvels(res.data))
+      .catch(() => {});
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -58,8 +68,9 @@ export default function Register() {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setApiError('');
     
     // Validate passwords match
     if (formData.password !== formData.confirmPassword) {
@@ -81,12 +92,21 @@ export default function Register() {
 
     setIsLoading(true);
     
-    // Simulate registration
-    setTimeout(() => {
-      setIsLoading(false);
-      // Redirect to success page instead of dashboard
+    try {
+      await authApi.register({
+        fullName: formData.fullName,
+        email: formData.email,
+        phone: formData.phone,
+        password: formData.password,
+        selectedStokvel: parseInt(formData.selectedStokvel),
+      });
       navigate('/registration-success');
-    }, 1500);
+    } catch (err: any) {
+      const message = err.response?.data?.error || 'Registration failed. Please try again.';
+      setApiError(message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -101,6 +121,13 @@ export default function Register() {
 
         <h2 className="text-2xl font-bold text-center text-gray-800 mb-2">Join HENNESSY SOCIAL CLUB</h2>
         <p className="text-center text-gray-500 mb-8">Create your account to start saving</p>
+
+        {apiError && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 flex items-start space-x-3">
+            <Lock className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-red-700">{apiError}</p>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Full Name */}
@@ -220,8 +247,11 @@ export default function Register() {
               }`}
             >
               <option value="">Choose a stokvel...</option>
-              <option value="collective">🌱 COLLECTIVE POT (18 members · R7,000 target)</option>
-              <option value="summer">💰 SUMMER SAVERS (Flexible · Up to R15,000 target)</option>
+              {stokvels.map(s => (
+                <option key={s.id} value={s.id}>
+                  {s.name} ({s.currentMembers} members · R{s.targetAmount?.toLocaleString()} target)
+                </option>
+              ))}
             </select>
             {errors.selectedStokvel && (
               <p className="text-red-500 text-xs mt-1">{errors.selectedStokvel}</p>

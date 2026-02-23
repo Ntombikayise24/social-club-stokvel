@@ -1,17 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Mail, ArrowLeft, Users, AlertCircle, Lock } from 'lucide-react';
-
-// Mock user database - make it mutable so we can update passwords
-let mockUsers = [
-  { email: 'nkulumo.nkuna@email.com', password: 'password123' },
-  { email: 'thabo.mbeki@email.com', password: 'password123' },
-  { email: 'sarah.jones@email.com', password: 'password123' },
-  { email: 'john.doe@email.com', password: 'password123' },
-  { email: 'mary.johnson@email.com', password: 'password123' },
-  { email: 'peter.williams@email.com', password: 'password123' },
-  { email: 'demo@hennessy.co.za', password: 'demo123' },
-];
+import { authApi } from '../../api';
 
 export default function ForgotPassword() {
   const navigate = useNavigate();
@@ -24,50 +14,44 @@ export default function ForgotPassword() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
 
-  const handleEmailSubmit = (e: React.FormEvent) => {
+  const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
 
-    // Simulate API call
-    setTimeout(() => {
-      const userExists = mockUsers.some(u => u.email.toLowerCase() === email.toLowerCase());
-      
-      if (!userExists) {
-        setError('No account found with this email address');
-        setIsLoading(false);
-        return;
-      }
-
-      // Generate a random 6-digit code
-      const code = Math.floor(100000 + Math.random() * 900000).toString();
-      setResetCode(code);
-      console.log('Reset code (in real app would be emailed):', code); // For demo purposes
-      
+    try {
+      await authApi.forgotPassword(email);
       setStep('code');
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to send reset code. Please try again.');
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
-  const handleCodeSubmit = (e: React.FormEvent) => {
+  const handleCodeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
 
-    // Simulate API call
-    setTimeout(() => {
-      // In a real app, this would verify the code
-      setStep('newPassword');
+    try {
+      const res = await authApi.verifyCode({ email, code: resetCode });
+      if (res.data.valid) {
+        setStep('newPassword');
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Invalid or expired code.');
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
-  const handlePasswordSubmit = (e: React.FormEvent) => {
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setPasswordError('');
 
-    if (newPassword.length < 6) {
-      setPasswordError('Password must be at least 6 characters');
+    if (newPassword.length < 8) {
+      setPasswordError('Password must be at least 8 characters');
       return;
     }
 
@@ -78,33 +62,27 @@ export default function ForgotPassword() {
 
     setIsLoading(true);
 
-    // Simulate API call
-    setTimeout(() => {
-      // ACTUALLY UPDATE THE PASSWORD in mock database
-      mockUsers = mockUsers.map(user => 
-        user.email.toLowerCase() === email.toLowerCase() 
-          ? { ...user, password: newPassword } 
-          : user
-      );
-      
-      console.log('Password updated for:', email);
-      console.log('New mock users:', mockUsers);
-      
-      setIsLoading(false);
-      // Redirect to login with success message
+    try {
+      await authApi.resetPassword({ email, code: resetCode, newPassword });
       navigate('/login?reset=success');
-    }, 1500);
+    } catch (err: any) {
+      setPasswordError(err.response?.data?.error || 'Failed to reset password.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const resendCode = () => {
+  const resendCode = async () => {
     setIsLoading(true);
-    setTimeout(() => {
-      const code = Math.floor(100000 + Math.random() * 900000).toString();
-      setResetCode(code);
-      console.log('New reset code:', code);
+    try {
+      await authApi.forgotPassword(email);
+      setResetCode('');
+      alert('New code sent! Check your email (or server console in dev mode).');
+    } catch {
+      // silently fail
+    } finally {
       setIsLoading(false);
-      alert('New code sent! (Check console)');
-    }, 1000);
+    }
   };
 
   return (
@@ -170,7 +148,7 @@ export default function ForgotPassword() {
 
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
               <p className="text-xs text-yellow-700">
-                For demo purposes, check the console for the code: <strong>{resetCode}</strong>
+                Check the backend server console for the reset code (in dev mode).
               </p>
             </div>
 

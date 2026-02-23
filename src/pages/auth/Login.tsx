@@ -2,18 +2,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, LogIn, Users, AlertCircle, ArrowLeft } from 'lucide-react';
-
-// Mock user database
-const mockUsers = [
-  { email: 'nkulumo.nkuna@email.com', password: 'password123', name: 'Nkulumo Nkuna', role: 'member' },
-  { email: 'thabo.mbeki@email.com', password: 'password123', name: 'Thabo Mbeki', role: 'member' },
-  { email: 'sarah.jones@email.com', password: 'password123', name: 'Sarah Jones', role: 'member' },
-  { email: 'john.doe@email.com', password: 'password123', name: 'John Doe', role: 'member' },
-  { email: 'mary.johnson@email.com', password: 'password123', name: 'Mary Johnson', role: 'member' },
-  { email: 'peter.williams@email.com', password: 'password123', name: 'Peter Williams', role: 'member' },
-  { email: 'admin@admin.com', password: 'admin@123', name: 'Admin User', role: 'admin' },
-  { email: 'demo@hennessy.co.za', password: 'demo123', name: 'Demo User', role: 'member' },
-];
+import { authApi } from '../../api';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -24,36 +13,34 @@ export default function Login() {
   const [error, setError] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
 
-    setTimeout(() => {
-      const user = mockUsers.find(
-        u => u.email.toLowerCase() === email.toLowerCase() && u.password === password
-      );
-      
-      if (user) {
-        console.log('Login successful:', user);
-        
-        if (rememberMe) {
-          localStorage.setItem('user', JSON.stringify({ email: user.email, name: user.name, role: user.role }));
-        } else {
-          sessionStorage.setItem('user', JSON.stringify({ email: user.email, name: user.name, role: user.role }));
-        }
-        
-        if (user.role === 'admin') {
-          navigate('/admin');
-        } else {
-          navigate('/dashboard');
-        }
+    try {
+      const res = await authApi.login({ email, password, rememberMe });
+      const { token, user } = res.data;
+
+      // Store token and user info
+      const storage = rememberMe ? localStorage : sessionStorage;
+      storage.setItem('token', token);
+      storage.setItem('user', JSON.stringify(user));
+      // Also keep in localStorage for the API client interceptor
+      localStorage.setItem('token', token);
+      localStorage.setItem('currentUser', JSON.stringify(user));
+
+      if (user.role === 'admin') {
+        navigate('/admin');
       } else {
-        setError('Invalid email or password');
+        navigate('/dashboard');
       }
-      
+    } catch (err: any) {
+      const message = err.response?.data?.error || 'Login failed. Please try again.';
+      setError(message);
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   return (
@@ -183,13 +170,13 @@ export default function Login() {
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div className="bg-gray-50 p-2 rounded">
               <p className="font-medium text-gray-700">Admin</p>
-              <p className="text-gray-500">admin@admin.com</p>
-              <p className="text-gray-500">admin@123</p>
+              <p className="text-gray-500">admin@stokvel.co.za</p>
+              <p className="text-gray-500">Admin@123</p>
             </div>
             <div className="bg-gray-50 p-2 rounded">
               <p className="font-medium text-gray-700">Member</p>
-              <p className="text-gray-500">demo@hennessy.co.za</p>
-              <p className="text-gray-500">demo123</p>
+              <p className="text-gray-500">thabo@example.com</p>
+              <p className="text-gray-500">Member@123</p>
             </div>
           </div>
         </div>
