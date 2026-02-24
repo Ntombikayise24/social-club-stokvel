@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   User, 
@@ -15,6 +15,7 @@ import {
   Target,
   LogOut
 } from 'lucide-react';
+import { userApi } from '../../api';
 
 interface Profile {
   id: string;
@@ -39,42 +40,55 @@ interface UserData {
 
 export default function MemberProfile() {
   const [isEditing, setIsEditing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   
-  // Mock user data with the two profiles we've been using
   const [userData, setUserData] = useState<UserData>({
-    fullName: "Nkulumo Nkuna",
-    email: "nkulumo.nkuna@email.com",
-    phone: "082 123 4567",
-    mainMemberSince: "21 January 2026",
-    profiles: [
-      {
-        id: '1',
-        stokvelName: 'COLLECTIVE POT',
-        stokvelId: 'collective-pot',
-        role: 'member',
-        targetAmount: 7000,
-        savedAmount: 1070,
-        progress: 13,
-        joinedDate: '21 Jan 2026',
-        icon: '🌱',
-        color: 'primary'
-      },
-      {
-        id: '2',
-        stokvelName: 'SUMMER SAVERS',
-        stokvelId: 'summer-savers',
-        role: 'member',
-        targetAmount: 5000,
-        savedAmount: 850,
-        progress: 17,
-        joinedDate: '05 Feb 2026',
-        icon: '💰',
-        color: 'secondary'
-      }
-    ]
+    fullName: '',
+    email: '',
+    phone: '',
+    mainMemberSince: '',
+    profiles: []
   });
 
   const [editedUserData, setEditedUserData] = useState({ ...userData });
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        setLoading(true);
+        const res = await userApi.getMe();
+        const user = res.data;
+        const colors = ['primary', 'secondary', 'blue', 'green', 'purple'];
+        const icons = ['🌱', '💰', '🎯', '🏦', '💎'];
+        const mapped: UserData = {
+          fullName: user.name || '',
+          email: user.email || '',
+          phone: user.phone || '',
+          mainMemberSince: user.joinedDate ? new Date(user.joinedDate).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' }) : '',
+          profiles: (user.profiles || []).map((p: any, i: number) => ({
+            id: String(p.id),
+            stokvelName: p.stokvelName || '',
+            stokvelId: String(p.stokvelId),
+            role: p.role || 'member',
+            targetAmount: p.targetAmount || 0,
+            savedAmount: p.savedAmount || 0,
+            progress: p.progress || 0,
+            joinedDate: p.joinedDate ? new Date(p.joinedDate).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' }) : '',
+            icon: icons[i % icons.length],
+            color: colors[i % colors.length]
+          }))
+        };
+        setUserData(mapped);
+        setEditedUserData(mapped);
+      } catch (err) {
+        console.error('Failed to load profile', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchProfile();
+  }, []);
 
   const stats = {
     totalSaved: userData.profiles.reduce((sum, p) => sum + p.savedAmount, 0),
@@ -82,9 +96,21 @@ export default function MemberProfile() {
     activeGroups: userData.profiles.length
   };
 
-  const handleSave = () => {
-    setUserData(editedUserData);
-    setIsEditing(false);
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+      await userApi.updateProfile({
+        fullName: editedUserData.fullName,
+        email: editedUserData.email,
+        phone: editedUserData.phone
+      });
+      setUserData(editedUserData);
+      setIsEditing(false);
+    } catch (err) {
+      console.error('Failed to save profile', err);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleCancel = () => {
@@ -116,6 +142,11 @@ export default function MemberProfile() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : (<>
         {/* Profile Header with Single Edit Button */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
           <div className="flex items-center justify-between mb-6">
@@ -372,6 +403,7 @@ export default function MemberProfile() {
             <span>Logout</span>
           </Link>
         </div>
+        </>)}
       </main>
     </div>
   );

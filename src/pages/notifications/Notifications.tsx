@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   ArrowLeft,
@@ -11,6 +11,7 @@ import {
   CheckCheck,
   X
 } from 'lucide-react';
+import { notificationApi } from '../../api';
 
 // Remove "export default" from here - just "interface"
 interface Notification {
@@ -26,70 +27,55 @@ interface Notification {
 }
 
 export default function Notifications() {
-  const [notifications, setNotifications] = useState<Notification[]>([
-    {
-      id: 1,
-      type: 'contribution',
-      title: 'Contribution Confirmed',
-      message: 'Your contribution of R200 to COLLECTIVE POT has been confirmed.',
-      time: '2 hours ago',
-      read: false,
-      actionable: true,
-      actionLink: '/contributions?profile=1',
-      actionText: 'View History'
-    },
-    {
-      id: 2,
-      type: 'loan',
-      title: 'Loan Repayment Due',
-      message: 'Your loan repayment of R299 is due in 3 days.',
-      time: '1 day ago',
-      read: false,
-      actionable: true,
-      actionLink: '/loans?profile=1',
-      actionText: 'View Loan'
-    },
-    {
-      id: 3,
-      type: 'approval',
-      title: 'Welcome to HENNESSY SOCIAL CLUB!',
-      message: 'Your account has been approved. Start your savings journey today!',
-      time: '2 days ago',
-      read: true,
-      actionable: true,
-      actionLink: '/dashboard',
-      actionText: 'Go to Dashboard'
-    },
-    {
-      id: 4,
-      type: 'payment',
-      title: 'Payment Received',
-      message: 'R350 contribution from Thabo Mbeki has been confirmed.',
-      time: '3 days ago',
-      read: true,
-      actionable: false
-    },
-    {
-      id: 5,
-      type: 'reminder',
-      title: 'Weekly Meeting Reminder',
-      message: 'COLLECTIVE POT meeting this Sunday at 10:00 AM.',
-      time: '4 days ago',
-      read: true,
-      actionable: false
-    }
-  ]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        setLoading(true);
+        const res = await notificationApi.list();
+        const data = res.data?.data || res.data || [];
+        setNotifications(data.map((n: any) => ({
+          id: n.id,
+          type: n.type || 'reminder',
+          title: n.title || '',
+          message: n.message || '',
+          time: n.time || '',
+          read: !!n.read,
+          actionable: !!n.actionable,
+          actionLink: n.actionLink,
+          actionText: n.actionText
+        })));
+      } catch (err) {
+        console.error('Failed to load notifications', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchNotifications();
+  }, []);
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
-  const markAsRead = (id: number) => {
-    setNotifications(notifications.map(n => 
-      n.id === id ? { ...n, read: true } : n
-    ));
+  const markAsRead = async (id: number) => {
+    try {
+      await notificationApi.markRead(id);
+      setNotifications(notifications.map(n => 
+        n.id === id ? { ...n, read: true } : n
+      ));
+    } catch (err) {
+      console.error('Failed to mark as read', err);
+    }
   };
 
-  const markAllAsRead = () => {
-    setNotifications(notifications.map(n => ({ ...n, read: true })));
+  const markAllAsRead = async () => {
+    try {
+      await notificationApi.markAllRead();
+      setNotifications(notifications.map(n => ({ ...n, read: true })));
+    } catch (err) {
+      console.error('Failed to mark all as read', err);
+    }
   };
 
   const getTypeIcon = (type: string) => {
@@ -148,6 +134,11 @@ export default function Notifications() {
       </header>
 
       <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : (<>
         {/* Header with actions */}
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -248,6 +239,7 @@ export default function Notifications() {
             Back to Dashboard
           </Link>
         </div>
+        </>)}
       </main>
     </div>
   );

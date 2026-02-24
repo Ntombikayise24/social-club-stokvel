@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   ArrowLeft, 
@@ -9,6 +9,7 @@ import {
   Lock,
   AlertCircle
 } from 'lucide-react';
+import { cardApi } from '../../api';
 
 interface Card {
   id: string;
@@ -21,49 +22,79 @@ interface Card {
 }
 
 export default function Cards() {
-  const [cards, setCards] = useState<Card[]>([
-    {
-      id: '1',
-      cardType: 'visa',
-      last4: '4242',
-      expiryMonth: '12',
-      expiryYear: '25',
-      cardholderName: 'Nkulumo Nkuna',
-      isDefault: true
-    },
-    {
-      id: '2',
-      cardType: 'mastercard',
-      last4: '8888',
-      expiryMonth: '08',
-      expiryYear: '26',
-      cardholderName: 'Nkulumo Nkuna',
-      isDefault: false
-    }
-  ]);
+  const [cards, setCards] = useState<Card[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const [showAddCard, setShowAddCard] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [showSuccessMessage, setShowSuccessMessage] = useState('');
 
-  const handleSetDefault = (id: string) => {
-    setCards(cards.map(card => ({
-      ...card,
-      isDefault: card.id === id
-    })));
-    setShowSuccessMessage('Default card updated successfully');
-    setTimeout(() => setShowSuccessMessage(''), 3000);
+  useEffect(() => {
+    const fetchCards = async () => {
+      try {
+        setLoading(true);
+        const res = await cardApi.list();
+        setCards((res.data || []).map((c: any) => ({
+          id: String(c.id),
+          cardType: c.cardType || 'visa',
+          last4: c.last4 || '****',
+          expiryMonth: c.expiryMonth || '',
+          expiryYear: c.expiryYear || '',
+          cardholderName: c.cardholderName || '',
+          isDefault: !!c.isDefault
+        })));
+      } catch (err) {
+        console.error('Failed to load cards', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchCards();
+  }, []);
+
+  const handleSetDefault = async (id: string) => {
+    try {
+      await cardApi.setDefault(Number(id));
+      setCards(cards.map(card => ({
+        ...card,
+        isDefault: card.id === id
+      })));
+      setShowSuccessMessage('Default card updated successfully');
+      setTimeout(() => setShowSuccessMessage(''), 3000);
+    } catch (err) {
+      console.error('Failed to set default card', err);
+    }
   };
 
-  const handleDeleteCard = (id: string) => {
-    setCards(cards.filter(card => card.id !== id));
-    setShowDeleteConfirm(null);
-    setShowSuccessMessage('Card removed successfully');
-    setTimeout(() => setShowSuccessMessage(''), 3000);
+  const handleDeleteCard = async (id: string) => {
+    try {
+      await cardApi.remove(Number(id));
+      setCards(cards.filter(card => card.id !== id));
+      setShowDeleteConfirm(null);
+      setShowSuccessMessage('Card removed successfully');
+      setTimeout(() => setShowSuccessMessage(''), 3000);
+    } catch (err) {
+      console.error('Failed to delete card', err);
+    }
   };
 
-  const handleAddCard = (newCard: Card) => {
-    setCards([...cards, newCard]);
+  const handleAddCard = async (newCard: Card) => {
+    // Card was already added via API in the modal - just refresh list
+    try {
+      const res = await cardApi.list();
+      setCards((res.data || []).map((c: any) => ({
+        id: String(c.id),
+        cardType: c.cardType || 'visa',
+        last4: c.last4 || '****',
+        expiryMonth: c.expiryMonth || '',
+        expiryYear: c.expiryYear || '',
+        cardholderName: c.cardholderName || '',
+        isDefault: !!c.isDefault
+      })));
+    } catch {
+      // Fallback: add locally
+      setCards([...cards, newCard]);
+    }
     setShowAddCard(false);
     setShowSuccessMessage('Card added successfully');
     setTimeout(() => setShowSuccessMessage(''), 3000);
@@ -120,6 +151,11 @@ export default function Cards() {
       </header>
 
       <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : (<>
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -252,6 +288,7 @@ export default function Cards() {
             </div>
           </div>
         </div>
+        </>)}
       </main>
 
       {/* Add Card Modal */}
@@ -350,21 +387,35 @@ function AddCardModal({ onClose, onAdd }: { onClose: () => void; onAdd: (card: C
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!validateForm()) return;
 
     setIsProcessing(true);
 
-    // Simulate API call
-    setTimeout(() => {
+    try {
       const cleanNumber = formData.cardNumber.replace(/\s/g, '');
-      const cardType = detectCardType(cleanNumber);
+      const res = await cardApi.add({
+        cardNumber: cleanNumber,
+        cardholderName: formData.cardholderName,
+        expiryMonth: parseInt(formData.expiryMonth),
+        expiryYear: parseInt(formData.expiryYear),
+        cvv: formData.cvv
+      });
 
-      const newCard: Card = {
+      const card = res.data?.card;
+      const newCard: Card = card ? {
+        id: String(card.id),
+        cardType: card.cardType || detectCardType(cleanNumber),
+        last4: card.last4 || cleanNumber.slice(-4),
+        expiryMonth: card.expiryMonth || formData.expiryMonth,
+        expiryYear: card.expiryYear || formData.expiryYear,
+        cardholderName: card.cardholderName || formData.cardholderName,
+        isDefault: !!card.isDefault
+      } : {
         id: Date.now().toString(),
-        cardType,
+        cardType: detectCardType(cleanNumber),
         last4: cleanNumber.slice(-4),
         expiryMonth: formData.expiryMonth,
         expiryYear: formData.expiryYear,
@@ -373,8 +424,11 @@ function AddCardModal({ onClose, onAdd }: { onClose: () => void; onAdd: (card: C
       };
 
       onAdd(newCard);
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to add card');
+    } finally {
       setIsProcessing(false);
-    }, 1500);
+    }
   };
 
   const formatCardNumber = (value: string) => {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { 
   ArrowLeft,
@@ -7,6 +7,7 @@ import {
   Target,
   Wallet
 } from 'lucide-react';
+import { stokvelApi, userApi } from '../../api';
 
 interface Member {
   id: string;
@@ -57,267 +58,94 @@ export default function GroupDetails() {
   const [searchParams] = useSearchParams();
   const profileId = searchParams.get('profile') || '1';
   const [showAllMembers, setShowAllMembers] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  // Mock data for COLLECTIVE POT (profile 1)
-  const collectivePotData: GroupData = {
-    id: 'collective-pot',
-    name: 'COLLECTIVE POT',
+  const [groupData, setGroupData] = useState<GroupData>({
+    id: '',
+    name: '',
     icon: '🌱',
     color: 'primary',
-    description: 'Traditional Stokvel saving for festive season celebrations',
-    targetAmount: 126000,
-    totalSaved: 9800,
-    memberCount: 18,
-    maxMembers: 18,
-    progress: 8,
-    cycle: 'Weekly (Sunday)',
-    nextPayout: '06 Dec 2026',
+    description: '',
+    targetAmount: 0,
+    totalSaved: 0,
+    memberCount: 0,
+    maxMembers: 0,
+    progress: 0,
+    cycle: '',
+    nextPayout: '',
     interestRate: 30,
-    createdAt: '01 Jan 2026',
-    members: [
-      {
-        id: '1',
-        name: 'Nkulumo Nkuna',
-        initials: 'NN',
-        joinedDate: '21 Jan 2026',
-        totalContributed: 1070,
-        targetAmount: 7000,
-        progress: 15,
-        status: 'active',
-        lastActive: 'Today'
-      },
-      {
-        id: '2',
-        name: 'Thabo Mbeki',
-        initials: 'TM',
-        joinedDate: '15 Jan 2026',
-        totalContributed: 2000,
-        targetAmount: 7000,
-        progress: 29,
-        status: 'active',
-        lastActive: 'Yesterday'
-      },
-      {
-        id: '3',
-        name: 'Sarah Jones',
-        initials: 'SJ',
-        joinedDate: '10 Jan 2026',
-        totalContributed: 850,
-        targetAmount: 7000,
-        progress: 12,
-        status: 'active',
-        lastActive: '2 days ago'
-      },
-      {
-        id: '4',
-        name: 'John Doe',
-        initials: 'JD',
-        joinedDate: '05 Jan 2026',
-        totalContributed: 2000,
-        targetAmount: 7000,
-        progress: 29,
-        status: 'active',
-        lastActive: '3 days ago'
-      },
-      {
-        id: '5',
-        name: 'Mary Johnson',
-        initials: 'MJ',
-        joinedDate: '01 Jan 2026',
-        totalContributed: 1200,
-        targetAmount: 7000,
-        progress: 17,
-        status: 'active',
-        lastActive: '5 days ago'
-      },
-      {
-        id: '6',
-        name: 'Peter Williams',
-        initials: 'PW',
-        joinedDate: '28 Dec 2025',
-        totalContributed: 500,
-        targetAmount: 7000,
-        progress: 7,
-        status: 'active',
-        lastActive: '1 week ago'
-      },
-      {
-        id: '7',
-        name: 'Linda Zulu',
-        initials: 'LZ',
-        joinedDate: '20 Dec 2025',
-        totalContributed: 800,
-        targetAmount: 7000,
-        progress: 11,
-        status: 'active',
-        lastActive: '3 days ago'
-      },
-      {
-        id: '8',
-        name: 'James Brown',
-        initials: 'JB',
-        joinedDate: '15 Dec 2025',
-        totalContributed: 450,
-        targetAmount: 7000,
-        progress: 6,
-        status: 'active',
-        lastActive: '1 week ago'
-      },
-      {
-        id: '9',
-        name: 'Patricia Smith',
-        initials: 'PS',
-        joinedDate: '10 Dec 2025',
-        totalContributed: 600,
-        targetAmount: 7000,
-        progress: 9,
-        status: 'active',
-        lastActive: '4 days ago'
-      }
-    ],
-    activeLoans: [
-      {
-        id: 'l1',
-        memberName: 'Nkulumo Nkuna',
-        memberInitials: 'NN',
-        amount: 500,
-        interest: 150,
-        totalRepayable: 650,
-        status: 'active',
-        borrowedDate: '10 Feb 2026',
-        dueDate: '12 Mar 2026',
-        daysRemaining: 12
-      },
-      {
-        id: 'l2',
-        memberName: 'Thabo Mbeki',
-        memberInitials: 'TM',
-        amount: 800,
-        interest: 240,
-        totalRepayable: 1040,
-        status: 'active',
-        borrowedDate: '05 Feb 2026',
-        dueDate: '07 Mar 2026',
-        daysRemaining: 7
-      },
-      {
-        id: 'l3',
-        memberName: 'Sarah Jones',
-        memberInitials: 'SJ',
-        amount: 230,
-        interest: 69,
-        totalRepayable: 299,
-        status: 'overdue',
-        borrowedDate: '26 Jan 2026',
-        dueDate: '23 Mar 2026',
-        daysRemaining: -5
-      }
-    ]
-  };
+    createdAt: '',
+    members: [],
+    activeLoans: []
+  });
 
-  // Mock data for SUMMER SAVERS (profile 2)
-  const summerSaversData: GroupData = {
-    id: 'summer-savers',
-    name: 'SUMMER SAVERS',
-    icon: '💰',
-    color: 'secondary',
-    description: 'Save for summer holidays and beach trips',
-    targetAmount: 40000,
-    totalSaved: 4250,
-    memberCount: 8,
-    maxMembers: 15,
-    progress: 11,
-    cycle: 'Monthly',
-    nextPayout: '31 Dec 2026',
-    interestRate: 30,
-    createdAt: '05 Feb 2026',
-    members: [
-      {
-        id: '1',
-        name: 'Nkulumo Nkuna',
-        initials: 'NN',
-        joinedDate: '05 Feb 2026',
-        totalContributed: 850,
-        targetAmount: 5000,
-        progress: 17,
-        status: 'active',
-        lastActive: 'Today'
-      },
-      {
-        id: '2',
-        name: 'Jane Smith',
-        initials: 'JS',
-        joinedDate: '06 Feb 2026',
-        totalContributed: 350,
-        targetAmount: 5000,
-        progress: 7,
-        status: 'pending',
-        lastActive: 'Never'
-      },
-      {
-        id: '3',
-        name: 'Bob Johnson',
-        initials: 'BJ',
-        joinedDate: '07 Feb 2026',
-        totalContributed: 600,
-        targetAmount: 5000,
-        progress: 12,
-        status: 'active',
-        lastActive: '2 days ago'
-      },
-      {
-        id: '4',
-        name: 'Alice Wonder',
-        initials: 'AW',
-        joinedDate: '08 Feb 2026',
-        totalContributed: 450,
-        targetAmount: 5000,
-        progress: 9,
-        status: 'active',
-        lastActive: '1 day ago'
-      },
-      {
-        id: '5',
-        name: 'Charlie Brown',
-        initials: 'CB',
-        joinedDate: '09 Feb 2026',
-        totalContributed: 2000,
-        targetAmount: 5000,
-        progress: 40,
-        status: 'active',
-        lastActive: 'Today'
-      }
-    ],
-    activeLoans: [
-      {
-        id: 'l4',
-        memberName: 'Nkulumo Nkuna',
-        memberInitials: 'NN',
-        amount: 800,
-        interest: 240,
-        totalRepayable: 1040,
-        status: 'active',
-        borrowedDate: '05 Feb 2026',
-        dueDate: '07 Mar 2026',
-        daysRemaining: 7
-      },
-      {
-        id: 'l5',
-        memberName: 'Charlie Brown',
-        memberInitials: 'CB',
-        amount: 1200,
-        interest: 360,
-        totalRepayable: 1560,
-        status: 'active',
-        borrowedDate: '01 Feb 2026',
-        dueDate: '03 Mar 2026',
-        daysRemaining: 3
-      }
-    ]
-  };
+  useEffect(() => {
+    const fetchGroupData = async () => {
+      try {
+        setLoading(true);
+        // Get the stokvelId from user's profile
+        const profilesRes = await userApi.getProfiles();
+        const profile = (profilesRes.data || []).find((p: any) => String(p.id) === profileId);
+        const stokvelId = profile?.stokvelId;
+        
+        if (!stokvelId) {
+          setLoading(false);
+          return;
+        }
 
-  // Select data based on profile
-  const groupData = profileId === '1' ? collectivePotData : summerSaversData;
+        const res = await stokvelApi.getDetails(stokvelId);
+        const d = res.data;
+        const colors = ['primary', 'secondary', 'blue', 'green', 'purple'];
+        const icons = ['🌱', '💰', '🎯', '🏦', '💎'];
+        const idx = (profilesRes.data || []).findIndex((p: any) => String(p.id) === profileId);
+        
+        setGroupData({
+          id: String(d.id),
+          name: d.name || '',
+          icon: d.icon || icons[idx % icons.length] || '🌱',
+          color: d.color || colors[idx % colors.length] || 'primary',
+          description: d.description || '',
+          targetAmount: d.targetAmount || 0,
+          totalSaved: d.totalPool || 0,
+          memberCount: d.currentMembers || 0,
+          maxMembers: d.maxMembers || 0,
+          progress: d.targetAmount > 0 ? Math.round(((d.totalPool || 0) / d.targetAmount) * 100) : 0,
+          cycle: d.cycle || '',
+          nextPayout: d.nextPayout ? new Date(d.nextPayout).toLocaleDateString('en-ZA', {day:'2-digit', month:'short', year:'numeric'}) : '',
+          interestRate: d.interestRate || 30,
+          createdAt: d.createdAt ? new Date(d.createdAt).toLocaleDateString('en-ZA', {day:'2-digit', month:'short', year:'numeric'}) : '',
+          members: (d.members || []).map((m: any) => ({
+            id: String(m.id),
+            name: m.name || '',
+            initials: m.initials || (m.name || 'M').split(' ').map((n: string) => n[0]).join(''),
+            joinedDate: m.joinedDate ? new Date(m.joinedDate).toLocaleDateString('en-ZA', {day:'2-digit', month:'short', year:'numeric'}) : '',
+            totalContributed: m.savedAmount || 0,
+            targetAmount: d.targetAmount || 0,
+            progress: d.targetAmount > 0 ? Math.round(((m.savedAmount || 0) / d.targetAmount) * 100) : 0,
+            status: 'active' as const,
+            lastActive: m.lastActive || ''
+          })),
+          activeLoans: (d.activeLoans || []).map((l: any) => ({
+            id: String(l.id),
+            memberName: l.borrower || '',
+            memberInitials: (l.borrower || 'M').split(' ').map((n: string) => n[0]).join(''),
+            amount: l.amount || 0,
+            interest: (l.totalRepayable || 0) - (l.amount || 0),
+            totalRepayable: l.totalRepayable || 0,
+            status: l.status || 'active',
+            borrowedDate: l.borrowedDate ? new Date(l.borrowedDate).toLocaleDateString('en-ZA', {day:'2-digit', month:'short', year:'numeric'}) : '',
+            dueDate: l.dueDate ? new Date(l.dueDate).toLocaleDateString('en-ZA', {day:'2-digit', month:'short', year:'numeric'}) : '',
+            daysRemaining: l.daysRemaining
+          }))
+        });
+      } catch (err) {
+        console.error('Failed to load group data', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchGroupData();
+  }, [profileId]);
 
   const displayedMembers = showAllMembers 
     ? groupData.members 
@@ -378,6 +206,11 @@ export default function GroupDetails() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : (<>
         {/* Group Header */}
         <div className={`bg-gradient-to-r from-${groupData.color}-50 to-white rounded-xl shadow-sm border border-${groupData.color}-200 p-6 mb-6`}>
           <div className="flex items-start justify-between">
@@ -562,6 +395,7 @@ export default function GroupDetails() {
             Back to Dashboard
           </Link>
         </div>
+        </>)}
       </main>
     </div>
   );

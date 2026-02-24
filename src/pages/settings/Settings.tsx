@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft,
@@ -18,18 +18,20 @@ import {
   Eye,
   EyeOff
 } from 'lucide-react';
+import { userApi, settingsApi, cardApi } from '../../api';
 
 export default function Settings() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('profile');
   const [showSuccessMessage, setShowSuccessMessage] = useState('');
   const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [loading, setLoading] = useState(true);
   
   // Profile Settings
   const [profile, setProfile] = useState({
-    name: 'Nkulumo Nkuna',
-    email: 'nkulumo.nkuna@email.com',
-    phone: '082 123 4567',
+    name: '',
+    email: '',
+    phone: '',
     language: 'en'
   });
 
@@ -58,24 +60,85 @@ export default function Settings() {
   });
   const [passwordError, setPasswordError] = useState('');
 
-  // Cards data (mock)
-  const cards = [
-    { id: '1', type: 'visa', last4: '4242', expiry: '12/25', isDefault: true },
-    { id: '2', type: 'mastercard', last4: '8888', expiry: '08/26', isDefault: false }
-  ];
+  // Cards data
+  const [cards, setCards] = useState<any[]>([]);
 
-  const handleSaveProfile = () => {
-    setIsEditing(false);
-    setShowSuccessMessage('Profile updated successfully');
-    setTimeout(() => setShowSuccessMessage(''), 3000);
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const [userRes, settingsRes, cardsRes] = await Promise.all([
+          userApi.getMe(),
+          settingsApi.get().catch(() => ({ data: {} })),
+          cardApi.list().catch(() => ({ data: [] }))
+        ]);
+
+        const user = userRes.data;
+        setProfile({
+          name: user.name || '',
+          email: user.email || '',
+          phone: user.phone || '',
+          language: 'en'
+        });
+
+        const s = settingsRes.data || {};
+        setNotifications({
+          emailAlerts: s.emailNotifications ?? true,
+          smsAlerts: s.smsNotifications ?? false,
+          loanReminders: s.loanAlerts ?? true,
+          contributionReminders: s.contributionReminders ?? true,
+          groupAnnouncements: s.pushNotifications ?? true,
+          marketingEmails: false
+        });
+
+        setCards((cardsRes.data || []).map((c: any) => ({
+          id: String(c.id),
+          type: c.cardType || 'visa',
+          last4: c.last4 || '****',
+          expiry: `${c.expiryMonth || '??'}/${c.expiryYear || '??'}`,
+          isDefault: !!c.isDefault
+        })));
+      } catch (err) {
+        console.error('Failed to load settings', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  const handleSaveProfile = async () => {
+    try {
+      await userApi.updateProfile({
+        fullName: profile.name,
+        email: profile.email,
+        phone: profile.phone
+      });
+      setIsEditing(false);
+      setShowSuccessMessage('Profile updated successfully');
+      setTimeout(() => setShowSuccessMessage(''), 3000);
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to update profile');
+    }
   };
 
-  const handleSaveNotifications = () => {
-    setShowSuccessMessage('Notification preferences saved');
-    setTimeout(() => setShowSuccessMessage(''), 3000);
+  const handleSaveNotifications = async () => {
+    try {
+      await settingsApi.update({
+        emailNotifications: notifications.emailAlerts,
+        smsNotifications: notifications.smsAlerts,
+        loanAlerts: notifications.loanReminders,
+        contributionReminders: notifications.contributionReminders,
+        pushNotifications: notifications.groupAnnouncements
+      });
+      setShowSuccessMessage('Notification preferences saved');
+      setTimeout(() => setShowSuccessMessage(''), 3000);
+    } catch (err) {
+      console.error('Failed to save notification settings', err);
+    }
   };
 
-  const handleChangePassword = (e: React.FormEvent) => {
+  const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setPasswordError('');
 
@@ -89,13 +152,18 @@ export default function Settings() {
       return;
     }
 
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      await userApi.changePassword({
+        currentPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword
+      });
       setShowPasswordForm(false);
       setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
       setShowSuccessMessage('Password changed successfully');
       setTimeout(() => setShowSuccessMessage(''), 3000);
-    }, 1000);
+    } catch (err: any) {
+      setPasswordError(err.response?.data?.error || 'Failed to change password');
+    }
   };
 
   const handleLogout = () => {
@@ -139,6 +207,11 @@ export default function Settings() {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : (<>
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-semibold text-gray-800">Settings</h2>
         </div>
@@ -595,6 +668,7 @@ export default function Settings() {
             <span>Sign Out</span>
           </button>
         </div>
+        </>)}
       </main>
 
       {/* Animation Styles */}

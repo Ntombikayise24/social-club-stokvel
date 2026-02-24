@@ -1,0 +1,158 @@
+import nodemailer from 'nodemailer';
+import dotenv from 'dotenv';
+dotenv.config();
+
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+// Create reusable transporter
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST || 'smtp.gmail.com',
+  port: parseInt(process.env.SMTP_PORT || '587'),
+  secure: false,
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+});
+
+/**
+ * Send an approval email to a user after admin approves their account.
+ */
+export async function sendApprovalEmail(email, fullName, stokvelNames = []) {
+  const loginUrl = `${FRONTEND_URL}/login`;
+
+  const stokvelList = stokvelNames.length > 0
+    ? `<p style="margin:0 0 8px"><strong>You've been assigned to:</strong></p>
+       <ul style="margin:0 0 16px;padding-left:20px;color:#374151;">
+         ${stokvelNames.map(n => `<li>${n}</li>`).join('')}
+       </ul>`
+    : '';
+
+  const html = `
+  <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
+    <!-- Header -->
+    <div style="background:linear-gradient(135deg,#16a34a,#15803d);padding:32px 24px;text-align:center;">
+      <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;">Account Approved! ✅</h1>
+    </div>
+
+    <!-- Body -->
+    <div style="padding:32px 24px;">
+      <p style="margin:0 0 16px;color:#374151;font-size:16px;">
+        Hi <strong>${fullName}</strong>,
+      </p>
+      <p style="margin:0 0 16px;color:#374151;font-size:16px;">
+        Great news! Your account has been reviewed and <strong style="color:#16a34a;">approved</strong> by our admin team. You can now log in and start contributing to your stokvel.
+      </p>
+
+      ${stokvelList}
+
+      <!-- CTA Button -->
+      <div style="text-align:center;margin:32px 0;">
+        <a href="${loginUrl}" style="display:inline-block;background:#16a34a;color:#ffffff;text-decoration:none;padding:14px 40px;border-radius:8px;font-size:16px;font-weight:600;letter-spacing:0.5px;">
+          Log In Now
+        </a>
+      </div>
+
+      <p style="margin:0 0 8px;color:#6b7280;font-size:14px;">
+        Or copy and paste this link into your browser:
+      </p>
+      <p style="margin:0 0 24px;word-break:break-all;">
+        <a href="${loginUrl}" style="color:#16a34a;font-size:14px;">${loginUrl}</a>
+      </p>
+
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;" />
+
+      <p style="margin:0;color:#9ca3af;font-size:13px;text-align:center;">
+        If you did not register for this account, please ignore this email.
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <div style="background:#f9fafb;padding:16px 24px;text-align:center;">
+      <p style="margin:0;color:#9ca3af;font-size:12px;">
+        &copy; ${new Date().getFullYear()} Stokvel Management System. All rights reserved.
+      </p>
+    </div>
+  </div>`;
+
+  const mailOptions = {
+    from: `"Stokvel Management" <${process.env.SMTP_USER || 'noreply@stokvel.co.za'}>`,
+    to: email,
+    subject: '🎉 Your Account Has Been Approved!',
+    html,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`📧 Approval email sent to ${email}`);
+  } catch (err) {
+    // Log but don't throw — email failure shouldn't block the approval flow
+    console.error(`⚠️  Failed to send approval email to ${email}:`, err.message);
+  }
+}
+
+/**
+ * Send an email when a join request is approved.
+ */
+export async function sendJoinRequestApprovedEmail(email, fullName, stokvelName) {
+  const loginUrl = `${FRONTEND_URL}/login`;
+
+  const html = `
+  <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
+    <!-- Header -->
+    <div style="background:linear-gradient(135deg,#2563eb,#1d4ed8);padding:32px 24px;text-align:center;">
+      <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;">Welcome to ${stokvelName}! 🎉</h1>
+    </div>
+
+    <!-- Body -->
+    <div style="padding:32px 24px;">
+      <p style="margin:0 0 16px;color:#374151;font-size:16px;">
+        Hi <strong>${fullName}</strong>,
+      </p>
+      <p style="margin:0 0 16px;color:#374151;font-size:16px;">
+        Your request to join <strong style="color:#2563eb;">${stokvelName}</strong> has been approved! You're now a member and can start contributing.
+      </p>
+
+      <!-- CTA Button -->
+      <div style="text-align:center;margin:32px 0;">
+        <a href="${loginUrl}" style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;padding:14px 40px;border-radius:8px;font-size:16px;font-weight:600;letter-spacing:0.5px;">
+          Log In & Start Contributing
+        </a>
+      </div>
+
+      <p style="margin:0 0 8px;color:#6b7280;font-size:14px;">
+        Or copy and paste this link into your browser:
+      </p>
+      <p style="margin:0 0 24px;word-break:break-all;">
+        <a href="${loginUrl}" style="color:#2563eb;font-size:14px;">${loginUrl}</a>
+      </p>
+
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;" />
+
+      <p style="margin:0;color:#9ca3af;font-size:13px;text-align:center;">
+        If you did not request to join this stokvel, please ignore this email.
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <div style="background:#f9fafb;padding:16px 24px;text-align:center;">
+      <p style="margin:0;color:#9ca3af;font-size:12px;">
+        &copy; ${new Date().getFullYear()} Stokvel Management System. All rights reserved.
+      </p>
+    </div>
+  </div>`;
+
+  const mailOptions = {
+    from: `"Stokvel Management" <${process.env.SMTP_USER || 'noreply@stokvel.co.za'}>`,
+    to: email,
+    subject: `🎉 You've been added to ${stokvelName}!`,
+    html,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`📧 Join-approved email sent to ${email}`);
+  } catch (err) {
+    console.error(`⚠️  Failed to send join-approved email to ${email}:`, err.message);
+  }
+}

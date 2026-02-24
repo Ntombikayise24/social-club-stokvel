@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { 
   ArrowLeft, 
@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   CreditCard
 } from 'lucide-react';
+import { userApi, loanApi, cardApi } from '../../api';
 
 export default function LoanRequest() {
   const navigate = useNavigate();
@@ -20,46 +21,75 @@ export default function LoanRequest() {
   
   const [loanAmount, setLoanAmount] = useState('');
   const [purpose, setPurpose] = useState('');
-  const [selectedCard, setSelectedCard] = useState('card_4242');
+  const [selectedCard, setSelectedCard] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  // Mock profile data
-  const profiles = {
-    '1': {
-      id: '1',
-      name: 'Nkulumo Nkuna',
-      stokvelName: 'COLLECTIVE POT',
-      stokvelId: 'collective-pot',
-      icon: '🌱',
-      savedAmount: 1070,
-      totalContributions: 3000,
-      memberSince: '21 Jan 2026',
-      color: 'primary',
-      targetAmount: 7000
-    },
-    '2': {
-      id: '2',
-      name: 'Nkulumo Nkuna',
-      stokvelName: 'SUMMER SAVERS',
-      stokvelId: 'summer-savers',
-      icon: '💰',
-      savedAmount: 850,
-      totalContributions: 1500,
-      memberSince: '05 Feb 2026',
-      color: 'secondary',
-      targetAmount: 5000
-    }
-  };
+  const [currentProfile, setCurrentProfile] = useState<any>({
+    id: profileId,
+    name: '',
+    stokvelName: '',
+    icon: '🌱',
+    savedAmount: 0,
+    totalContributions: 0,
+    memberSince: '',
+    color: 'primary',
+    targetAmount: 0
+  });
 
-  // Mock cards data
-  const cards = [
-    { id: 'card_4242', type: 'visa', last4: '4242', label: 'Visa •••• 4242', isDefault: true },
-    { id: 'card_8888', type: 'mastercard', last4: '8888', label: 'Mastercard •••• 8888', isDefault: false },
-  ];
+  const [cards, setCards] = useState<any[]>([]);
+  const [loanStats, setLoanStats] = useState<any>({ activeAmount: 0 });
 
-  const currentProfile = profiles[profileId as keyof typeof profiles] || profiles['1'];
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const [profilesRes, cardsRes, statsRes] = await Promise.all([
+          userApi.getProfiles(),
+          cardApi.list(),
+          loanApi.getStats()
+        ]);
+
+        const colors = ['primary', 'secondary', 'blue', 'green', 'purple'];
+        const icons = ['🌱', '💰', '🎯', '🏦', '💎'];
+        const profiles = (profilesRes.data || []).map((p: any, i: number) => ({
+          id: String(p.id),
+          name: p.stokvelName || '',
+          stokvelName: p.stokvelName || '',
+          stokvelId: p.stokvelId,
+          icon: icons[i % icons.length],
+          savedAmount: p.savedAmount || 0,
+          totalContributions: p.savedAmount || 0,
+          memberSince: p.joinedDate ? new Date(p.joinedDate).toLocaleDateString('en-ZA', {day:'2-digit', month:'short', year:'numeric'}) : '',
+          color: colors[i % colors.length],
+          targetAmount: p.targetAmount || 0
+        }));
+
+        const profile = profiles.find((p: any) => p.id === profileId) || profiles[0];
+        if (profile) setCurrentProfile(profile);
+
+        const cardsList = (cardsRes.data || []).map((c: any) => ({
+          id: String(c.id),
+          type: c.cardType || 'visa',
+          last4: c.last4 || '****',
+          label: `${c.cardType === 'visa' ? 'Visa' : c.cardType === 'mastercard' ? 'Mastercard' : c.cardType} •••• ${c.last4}`,
+          isDefault: c.isDefault
+        }));
+        setCards(cardsList);
+        const defaultCard = cardsList.find((c: any) => c.isDefault) || cardsList[0];
+        if (defaultCard) setSelectedCard(defaultCard.id);
+
+        setLoanStats(statsRes.data || {});
+      } catch (err) {
+        console.error('Failed to load data', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [profileId]);
   
   // Calculate loan amounts
   const maxLoanAmount = Math.floor(currentProfile.savedAmount * 0.5);
@@ -87,18 +117,23 @@ export default function LoanRequest() {
     setShowConfirmation(true);
   };
 
-  const confirmLoanRequest = () => {
+  const confirmLoanRequest = async () => {
     setIsSubmitting(true);
     
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      await loanApi.request({
+        amount: requestedAmount,
+        profileId: Number(profileId),
+        purpose: purpose || undefined,
+        cardId: selectedCard ? Number(selectedCard) : undefined
+      });
+
       setShowConfirmation(false);
       
-      // Get card details for success message
-      const card = cards.find(c => c.id === selectedCard);
-      const cardMessage = card ? `${card.type === 'visa' ? 'Visa' : 'Mastercard'} •••• ${card.last4}` : 'Card';
+      const card = cards.find((c: any) => c.id === selectedCard);
+      const cardMessage = card ? card.label : 'Card';
       
-      alert(`✅ Loan Successful!\n\nR ${requestedAmount} loan from ${currentProfile.stokvelName}\nWill be sent to: ${cardMessage}\nInterest: R ${interestAmount}\nTotal to repay: R ${totalRepayable}\nDue: ${formattedDueDate}\n\nReference: LOAN-${Math.floor(Math.random() * 10000)}`);
+      alert(`Loan Successful!\n\nR ${requestedAmount} loan from ${currentProfile.stokvelName}\nWill be sent to: ${cardMessage}\nInterest: R ${interestAmount}\nTotal to repay: R ${totalRepayable}\nDue: ${formattedDueDate}`);
       
       navigate(`/loans?profile=${profileId}`, { 
         state: { 
@@ -106,7 +141,11 @@ export default function LoanRequest() {
           message: `Loan of R ${requestedAmount} from ${currentProfile.stokvelName} successfully processed!` 
         } 
       });
-    }, 2000);
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to process loan request');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const formatCurrency = (amount: number) => {
@@ -133,6 +172,11 @@ export default function LoanRequest() {
       </header>
 
       <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : (<>
         {/* Page Title */}
         <div className="mb-6">
           <h2 className="text-2xl font-semibold text-gray-800">Instant Loan Request</h2>
@@ -399,6 +443,7 @@ export default function LoanRequest() {
             </li>
           </ul>
         </div>
+        </>)}
       </main>
 
       {/* Confirmation Modal */}

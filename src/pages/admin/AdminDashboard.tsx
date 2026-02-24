@@ -26,7 +26,9 @@ import {
   Tag,
   Users as UsersIcon,
   Archive,
-  RotateCcw
+  RotateCcw,
+  UserCheck,
+  XCircle
 } from 'lucide-react';
 
 // Types
@@ -1157,6 +1159,27 @@ interface ApproveUserModalProps {
 
 function ApproveUserModal({ user, onClose, onApprove, stokvels }: ApproveUserModalProps) {
   const [selectedStokvels, setSelectedStokvels] = useState<number[]>([]);
+  const [requestedStokvelIds, setRequestedStokvelIds] = useState<number[]>([]);
+  const [loadingRequests, setLoadingRequests] = useState(true);
+
+  // Fetch which stokvels this user requested to join
+  useEffect(() => {
+    const fetchUserRequests = async () => {
+      try {
+        const res = await adminApi.getUserJoinRequests(user.id);
+        const pending = (res.data || []).filter((r: any) => r.status === 'pending');
+        const ids = pending.map((r: any) => r.stokvelId);
+        setRequestedStokvelIds(ids);
+        // Pre-select the requested stokvels
+        setSelectedStokvels(ids);
+      } catch (err) {
+        console.error('Failed to fetch user join requests:', err);
+      } finally {
+        setLoadingRequests(false);
+      }
+    };
+    fetchUserRequests();
+  }, [user.id]);
 
   const toggleStokvel = (stokvelId: number) => {
     setSelectedStokvels(prev =>
@@ -1191,43 +1214,94 @@ function ApproveUserModal({ user, onClose, onApprove, stokvels }: ApproveUserMod
             </div>
           </div>
 
+          {/* Show which stokvel the user requested */}
+          {!loadingRequests && requestedStokvelIds.length > 0 && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h3 className="font-medium text-blue-800 mb-2 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4" />
+                Stokvel Requested During Registration
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {requestedStokvelIds.map(id => {
+                  const s = stokvels.find(sv => sv.id === id);
+                  return s ? (
+                    <span key={id} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                      <span>{s.icon}</span> {s.name}
+                    </span>
+                  ) : null;
+                })}
+              </div>
+              <p className="text-xs text-blue-600 mt-2">This stokvel has been pre-selected below. You can change the selection if needed.</p>
+            </div>
+          )}
+
           <div className="space-y-4">
             <h3 className="text-sm font-medium text-gray-700 uppercase tracking-wider">Assign to Stokvels</h3>
             <p className="text-xs text-gray-500">Select which stokvels this user should join</p>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {stokvels.filter(s => s.status === 'active').map(stokvel => (
-                <label
-                  key={stokvel.id}
-                  className={`flex items-center p-4 border rounded-lg cursor-pointer transition-colors ${
-                    selectedStokvels.includes(stokvel.id)
-                      ? `border-${stokvel.color}-500 bg-${stokvel.color}-50`
-                      : 'border-gray-200 hover:bg-gray-50'
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedStokvels.includes(stokvel.id)}
-                    onChange={() => toggleStokvel(stokvel.id)}
-                    className="hidden"
-                  />
-                  <div className="flex items-center space-x-3 flex-1">
-                    <span className="text-2xl">{stokvel.icon}</span>
-                    <div className="flex-1">
-                      <p className="font-medium text-gray-800">{stokvel.name}</p>
-                      <p className="text-xs text-gray-500">
-                        Target: R {stokvel.targetAmount.toLocaleString()} • {stokvel.currentMembers}/{stokvel.maxMembers} members
-                      </p>
-                    </div>
-                    {selectedStokvels.includes(stokvel.id) && (
-                      <CheckCircle className={`w-5 h-5 text-${stokvel.color}-600`} />
-                    )}
-                  </div>
-                </label>
-              ))}
-            </div>
+            {loadingRequests ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="w-6 h-6 border-2 border-primary-200 border-t-primary-600 rounded-full animate-spin" />
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {stokvels.filter(s => s.status === 'active').map(stokvel => {
+                  const isFull = stokvel.currentMembers >= stokvel.maxMembers;
+                  const isRequested = requestedStokvelIds.includes(stokvel.id);
+                  const isSelected = selectedStokvels.includes(stokvel.id);
+
+                  return (
+                    <label
+                      key={stokvel.id}
+                      className={`relative flex items-center p-4 border-2 rounded-lg transition-all ${
+                        isFull && !isSelected
+                          ? 'border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed'
+                          : isSelected
+                            ? 'border-green-500 bg-green-50 cursor-pointer shadow-sm'
+                            : 'border-gray-200 hover:bg-gray-50 cursor-pointer'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => !isFull || isSelected ? toggleStokvel(stokvel.id) : null}
+                        disabled={isFull && !isSelected}
+                        className="hidden"
+                      />
+                      <div className="flex items-center space-x-3 flex-1">
+                        <span className="text-2xl">{stokvel.icon}</span>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-gray-800">{stokvel.name}</p>
+                            {isRequested && (
+                              <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold uppercase rounded-full">
+                                Requested
+                              </span>
+                            )}
+                            {isFull && (
+                              <span className="px-2 py-0.5 bg-red-100 text-red-700 text-[10px] font-bold uppercase rounded-full">
+                                Full
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-500">
+                            Target: R {stokvel.targetAmount.toLocaleString()} • 
+                            <span className={isFull ? ' text-red-600 font-semibold' : ''}>
+                              {' '}{stokvel.currentMembers}/{stokvel.maxMembers} members
+                            </span>
+                          </p>
+                        </div>
+                        {isSelected && (
+                          <CheckCircle className="w-5 h-5 text-green-600" />
+                        )}
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
             
-            {selectedStokvels.length === 0 && (
+            {selectedStokvels.length === 0 && !loadingRequests && (
               <p className="text-xs text-yellow-600 flex items-center">
                 <AlertCircle className="w-3 h-3 mr-1" />
                 User will have no stokvel access until assigned
@@ -1919,16 +1993,18 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState<User[]>([]);
   const [contributions, setContributions] = useState<Contribution[]>([]);
   const [apiStats, setApiStats] = useState<any>(null);
+  const [joinRequests, setJoinRequests] = useState<any[]>([]);
 
   // ── Load all data from backend ──
   const fetchData = useCallback(async () => {
     try {
-      const [statsRes, usersRes, stokvelsRes, contributionsRes, deletedRes] = await Promise.all([
+      const [statsRes, usersRes, stokvelsRes, contributionsRes, deletedRes, joinReqRes] = await Promise.all([
         adminApi.getStats(),
         adminApi.listUsers({ limit: 100 }),
         adminApi.listStokvels(),
         adminApi.listContributions({ limit: 100 }),
         adminApi.listDeletedUsers(),
+        adminApi.listJoinRequests(),
       ]);
 
       setApiStats(statsRes.data);
@@ -2013,6 +2089,8 @@ export default function AdminDashboard() {
           originalData: d,
         }))
       );
+
+      setJoinRequests(joinReqRes.data || []);
     } catch (err) {
       console.error('Failed to load admin data:', err);
     } finally {
@@ -2162,6 +2240,28 @@ export default function AdminDashboard() {
       fetchData();
     } catch (err: any) {
       const msg = err.response?.data?.error || 'Failed to permanently delete user';
+      showSuccess(msg);
+    }
+  };
+
+  const handleApproveJoinRequest = async (requestId: number) => {
+    try {
+      await adminApi.approveJoinRequest(requestId);
+      showSuccess('Join request approved! The user has been added to the stokvel.');
+      fetchData();
+    } catch (err: any) {
+      const msg = err.response?.data?.error || 'Failed to approve join request';
+      showSuccess(msg);
+    }
+  };
+
+  const handleRejectJoinRequest = async (requestId: number) => {
+    try {
+      await adminApi.rejectJoinRequest(requestId);
+      showSuccess('Join request has been rejected.');
+      fetchData();
+    } catch (err: any) {
+      const msg = err.response?.data?.error || 'Failed to reject join request';
       showSuccess(msg);
     }
   };
@@ -2397,6 +2497,21 @@ export default function AdminDashboard() {
               }`}
             >
               Contributions
+            </button>
+            <button
+              onClick={() => setActiveTab('join-requests')}
+              className={`px-4 py-3 font-medium text-sm transition-colors border-b-2 relative ${
+                activeTab === 'join-requests'
+                  ? 'border-primary-600 text-primary-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Join Requests
+              {joinRequests.length > 0 && (
+                <span className="ml-2 bg-red-500 text-white text-xs rounded-full px-2 py-0.5">
+                  {joinRequests.length}
+                </span>
+              )}
             </button>
           </div>
         </div>
@@ -2797,6 +2912,88 @@ export default function AdminDashboard() {
                 </table>
               </div>
             </div>
+          </div>
+        )}
+
+        {activeTab === 'join-requests' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-gray-800">Pending Join Requests</h2>
+                <p className="text-sm text-gray-500 mt-1">Users who requested to join a stokvel during registration or from their dashboard</p>
+              </div>
+              <button onClick={fetchData} className="flex items-center gap-2 px-4 py-2 bg-primary-50 text-primary-700 rounded-lg hover:bg-primary-100 transition-colors">
+                <RefreshCw className="w-4 h-4" />
+                Refresh
+              </button>
+            </div>
+
+            {joinRequests.length === 0 ? (
+              <div className="bg-white rounded-xl shadow-sm border p-12 text-center">
+                <UserCheck className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-600">No pending requests</h3>
+                <p className="text-sm text-gray-400 mt-1">All join requests have been processed</p>
+              </div>
+            ) : (
+              <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stokvel Requested</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {joinRequests.map((req: any) => (
+                        <tr key={req.id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center font-semibold text-sm">
+                                {req.userName?.split(' ').map((n: string) => n[0]).join('').toUpperCase() || '?'}
+                              </div>
+                              <div>
+                                <p className="font-medium text-gray-800">{req.userName}</p>
+                                <p className="text-sm text-gray-500">{req.userEmail}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-sm font-medium">
+                              <Target className="w-3.5 h-3.5" />
+                              {req.stokvelName}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-500">
+                            {req.createdAt ? new Date(req.createdAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A'}
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => handleApproveJoinRequest(req.id)}
+                                className="flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                              >
+                                <UserCheck className="w-4 h-4" />
+                                Approve
+                              </button>
+                              <button
+                                onClick={() => handleRejectJoinRequest(req.id)}
+                                className="flex items-center gap-1.5 px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors text-sm font-medium"
+                              >
+                                <XCircle className="w-4 h-4" />
+                                Reject
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </main>

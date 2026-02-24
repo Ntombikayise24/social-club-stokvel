@@ -4,6 +4,7 @@ import { body } from 'express-validator';
 import { validate } from '../middleware/validate.js';
 import { authenticate, requireAdmin } from '../middleware/auth.js';
 import pool from '../database/connection.js';
+import { sendApprovalEmail, sendJoinRequestApprovedEmail } from '../utils/email.js';
 
 const router = Router();
 router.use(authenticate);
@@ -322,13 +323,32 @@ router.put(
   }
 );
 
+// ── Get join requests for a specific user ──
+router.get('/users/:id/join-requests', async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const [requests] = await pool.query(
+      `SELECT jr.id, jr.stokvel_id AS stokvelId, s.name AS stokvelName, jr.status, jr.created_at AS createdAt
+       FROM join_requests jr
+       JOIN stokvels s ON s.id = jr.stokvel_id
+       WHERE jr.user_id = ?
+       ORDER BY jr.created_at DESC`,
+      [userId]
+    );
+    res.json(requests);
+  } catch (err) {
+    console.error('Get user join requests error:', err);
+    res.status(500).json({ error: 'Failed to fetch user join requests' });
+  }
+});
+
 // ── Approve user ──
 router.post('/users/:id/approve', async (req, res) => {
   try {
     const userId = req.params.id;
     const { stokvelIds = [] } = req.body;
 
-    const [users] = await pool.query("SELECT id, full_name FROM users WHERE id = ? AND status = 'pending'", [userId]);
+    const [users] = await pool.query("SELECT id, full_name, email FROM users WHERE id = ? AND status = 'pending'", [userId]);
     if (users.length === 0) {
       return res.status(404).json({ error: 'Pending user not found' });
     }
@@ -361,6 +381,14 @@ router.post('/users/:id/approve', async (req, res) => {
       'INSERT INTO notifications (user_id, type, title, message) VALUES (?, ?, ?, ?)',
       [userId, 'success', 'Account Approved!', 'Your account has been approved. You can now log in and start contributing.']
     );
+
+    // Send approval email with login link
+    const stokvelNames = [];
+    for (const sid of stokvelIds) {
+      const [sv] = await pool.query('SELECT name FROM stokvels WHERE id = ?', [sid]);
+      if (sv.length > 0) stokvelNames.push(sv[0].name);
+    }
+    sendApprovalEmail(users[0].email, users[0].full_name, stokvelNames);
 
     res.json({ message: `${users[0].full_name} has been approved` });
   } catch (err) {
@@ -896,6 +924,12 @@ router.post('/join-requests/:id/approve', async (req, res) => {
       'INSERT INTO notifications (user_id, type, title, message) VALUES (?, ?, ?, ?)',
       [request.user_id, 'success', 'Join Request Approved', `You have been added to ${stokvelInfo[0].name}. Start contributing!`]
     );
+
+    // Send email to user
+    const [userInfo] = await pool.query('SELECT email, full_name FROM users WHERE id = ?', [request.user_id]);
+    if (userInfo.length > 0) {
+      sendJoinRequestApprovedEmail(userInfo[0].email, userInfo[0].full_name, stokvelInfo[0].name);
+    }
 
     res.json({ message: 'Join request approved' });
   } catch (err) {

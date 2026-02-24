@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { 
   ArrowLeft,
@@ -16,6 +16,7 @@ import {
   Download,
   Users,
 } from 'lucide-react';
+import { loanApi, cardApi, userApi } from '../../api';
 
 interface Loan {
   id: number;
@@ -49,107 +50,72 @@ export default function LoanHistory() {
   const [expandedLoan, setExpandedLoan] = useState<number | null>(null);
   const [filter, setFilter] = useState('all');
   const [showRepayModal, setShowRepayModal] = useState<Loan | null>(null);
-  const [selectedCard, setSelectedCard] = useState('card_4242');
+  const [selectedCard, setSelectedCard] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [repaymentSuccess, setRepaymentSuccess] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  // Mock profiles
-  const profiles = [
-    { id: '1', name: 'Nkulumo Nkuna', stokvelName: 'COLLECTIVE POT' },
-    { id: '2', name: 'Nkulumo Nkuna', stokvelName: 'SUMMER SAVERS' }
-  ];
+  const [profiles, setProfiles] = useState<any[]>([]);
+  const [cards, setCards] = useState<Card[]>([]);
+  const [loans, setLoans] = useState<Loan[]>([]);
 
-  // Mock cards data
-  const cards: Card[] = [
-    { id: 'card_4242', type: 'visa', last4: '4242', label: 'Visa •••• 4242', isDefault: true },
-    { id: 'card_8888', type: 'mastercard', last4: '8888', label: 'Mastercard •••• 8888', isDefault: false },
-  ];
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const [profilesRes, cardsRes, loansRes] = await Promise.all([
+          userApi.getProfiles(),
+          cardApi.list(),
+          loanApi.list({ profileId: Number(profileId) })
+        ]);
 
-  const activeProfile = profiles.find(p => p.id === profileId) || profiles[0];
+        setProfiles((profilesRes.data || []).map((p: any) => ({
+          id: String(p.id),
+          name: p.stokvelName || '',
+          stokvelName: p.stokvelName || ''
+        })));
 
-  // Mock data with profile-specific loans
-  const [loans, setLoans] = useState<Loan[]>([
-    // Profile 1 (COLLECTIVE POT) loans
-    {
-      id: 1,
-      profileId: '1',
-      profileName: 'Nkulumo Nkuna',
-      stokvelName: 'COLLECTIVE POT',
-      amount: 230,
-      interest: 69,
-      interestRate: 30,
-      totalRepayable: 299,
-      status: 'overdue',
-      borrowedDate: '26 Jan 2026',
-      dueDate: '23 Mar 2026',
-      purpose: 'Emergency expenses',
-      daysRemaining: -5
-    },
-    {
-      id: 2,
-      profileId: '1',
-      profileName: 'Nkulumo Nkuna',
-      stokvelName: 'COLLECTIVE POT',
-      amount: 175,
-      interest: 105,
-      interestRate: 60,
-      totalRepayable: 280,
-      status: 'repaid',
-      borrowedDate: '26 Jan 2026',
-      dueDate: '23 Feb 2026',
-      repaidDate: '20 Feb 2026',
-      purpose: 'School fees'
-    },
-    {
-      id: 3,
-      profileId: '1',
-      profileName: 'Nkulumo Nkuna',
-      stokvelName: 'COLLECTIVE POT',
-      amount: 500,
-      interest: 150,
-      interestRate: 30,
-      totalRepayable: 650,
-      status: 'active',
-      borrowedDate: '10 Feb 2026',
-      dueDate: '12 Mar 2026',
-      purpose: 'Business supplies',
-      daysRemaining: 12
-    },
-    // Profile 2 (SUMMER SAVERS) loans
-    {
-      id: 4,
-      profileId: '2',
-      profileName: 'Nkulumo Nkuna',
-      stokvelName: 'SUMMER SAVERS',
-      amount: 800,
-      interest: 240,
-      interestRate: 30,
-      totalRepayable: 1040,
-      status: 'active',
-      borrowedDate: '05 Feb 2026',
-      dueDate: '07 Mar 2026',
-      purpose: 'Car repair',
-      daysRemaining: 7
-    },
-    {
-      id: 5,
-      profileId: '2',
-      profileName: 'Nkulumo Nkuna',
-      stokvelName: 'SUMMER SAVERS',
-      amount: 1200,
-      interest: 360,
-      interestRate: 30,
-      totalRepayable: 1560,
-      status: 'active',
-      borrowedDate: '01 Feb 2026',
-      dueDate: '03 Mar 2026',
-      purpose: 'Rent assistance',
-      daysRemaining: 3
-    }
-  ]);
+        const cardsList = (cardsRes.data || []).map((c: any) => ({
+          id: String(c.id),
+          type: c.cardType || 'visa',
+          last4: c.last4 || '****',
+          label: `${c.cardType === 'visa' ? 'Visa' : c.cardType === 'mastercard' ? 'Mastercard' : c.cardType} •••• ${c.last4}`,
+          isDefault: c.isDefault
+        }));
+        setCards(cardsList);
+        const defaultCard = cardsList.find((c: any) => c.isDefault) || cardsList[0];
+        if (defaultCard) setSelectedCard(defaultCard.id);
 
-  // Filter loans by active profile
-  const profileLoans = loans.filter(loan => loan.profileId === profileId);
+        const loansData = loansRes.data?.data || loansRes.data || [];
+        setLoans(loansData.map((l: any) => ({
+          id: l.id,
+          profileId: String(l.profileId || profileId),
+          profileName: l.stokvelName || '',
+          stokvelName: l.stokvelName || '',
+          amount: l.amount || 0,
+          interest: l.interest || 0,
+          interestRate: l.interestRate || 30,
+          totalRepayable: l.totalRepayable || 0,
+          status: l.status || 'active',
+          borrowedDate: l.borrowedDate ? new Date(l.borrowedDate).toLocaleDateString('en-ZA', {day:'numeric', month:'short', year:'numeric'}) : '',
+          dueDate: l.dueDate ? new Date(l.dueDate).toLocaleDateString('en-ZA', {day:'numeric', month:'short', year:'numeric'}) : '',
+          repaidDate: l.repaidDate ? new Date(l.repaidDate).toLocaleDateString('en-ZA', {day:'numeric', month:'short', year:'numeric'}) : undefined,
+          purpose: l.purpose,
+          daysRemaining: l.daysRemaining
+        })));
+      } catch (err) {
+        console.error('Failed to load loan data', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [profileId]);
+
+  const activeProfile = profiles.find(p => p.id === profileId) || profiles[0] || { id: profileId, name: '', stokvelName: 'Stokvel' };
+
+  // All loans are already filtered by API
+  const profileLoans = loans;
 
   const stats = {
     totalInterestPaid: profileLoans
@@ -212,31 +178,26 @@ export default function LoanHistory() {
 
   const handleRepay = (loan: Loan) => {
     setShowRepayModal(loan);
-    setSelectedCard('card_4242'); // Reset to default card
+    const defaultCard = cards.find(c => c.isDefault) || cards[0];
+    if (defaultCard) setSelectedCard(defaultCard.id);
     setRepaymentSuccess(false);
   };
 
-  const confirmRepayment = () => {
+  const confirmRepayment = async () => {
     if (!showRepayModal) return;
     
     setIsProcessing(true);
     
-    // Simulate payment processing
-    setTimeout(() => {
-      // Get card details for success message
-      const card = cards.find(c => c.id === selectedCard);
-      const cardMessage = card ? `${card.type === 'visa' ? 'Visa' : 'Mastercard'} •••• ${card.last4}` : 'Card';
+    try {
+      await loanApi.repay(showRepayModal.id, selectedCard ? Number(selectedCard) : undefined);
       
-      // Show success message
-      alert(`✅ Repayment Successful!\n\nR ${showRepayModal.totalRepayable} paid for loan #${showRepayModal.id}\nPaid from: ${cardMessage}\nReference: PAY-${Math.floor(Math.random() * 10000)}`);
-      
-      // Update loan status
+      // Update loan status locally
       setLoans(prevLoans => 
         prevLoans.map(loan => 
           loan.id === showRepayModal.id 
             ? { 
                 ...loan, 
-                status: 'repaid', 
+                status: 'repaid' as const, 
                 repaidDate: new Date().toLocaleDateString('en-ZA', { 
                   day: 'numeric', 
                   month: 'short', 
@@ -248,14 +209,16 @@ export default function LoanHistory() {
       );
       
       setRepaymentSuccess(true);
-      setIsProcessing(false);
       
-      // Close modal after success
       setTimeout(() => {
         setShowRepayModal(null);
         setRepaymentSuccess(false);
       }, 1500);
-    }, 2000);
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to process repayment');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const filteredLoans = profileLoans.filter(loan => {
@@ -301,6 +264,11 @@ export default function LoanHistory() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : (<>
         {/* Page Title */}
         <div className="mb-6">
           <h2 className="text-2xl font-semibold text-gray-800">Loan History</h2>
@@ -572,6 +540,7 @@ export default function LoanHistory() {
             Request New Loan
           </Link>
         </div>
+        </>)}
       </main>
 
       {/* Repayment Confirmation Modal */}

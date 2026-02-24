@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { 
   ArrowLeft,
@@ -9,6 +9,7 @@ import {
   AlertCircle,
   Users,
 } from 'lucide-react';
+import { contributionApi, userApi } from '../../api';
 
 interface Contribution {
   id: number;
@@ -31,138 +32,66 @@ export default function ContributionHistory() {
   const [searchParams] = useSearchParams();
   const profileId = searchParams.get('profile') || '1';
   
-  const [filter, setFilter] = useState('all'); // all, confirmed, pending
-  const [selectedMember, setSelectedMember] = useState('all'); // filter by member
+  const [filter, setFilter] = useState('all');
+  const [selectedMember, setSelectedMember] = useState('all');
+  const [loading, setLoading] = useState(true);
+  const [contributions, setContributions] = useState<Contribution[]>([]);
 
-  // Mock profiles
-  const profiles: Profile[] = [
-    { id: '1', name: 'Nkulumo Nkuna', stokvelName: 'COLLECTIVE POT' },
-    { id: '2', name: 'Nkulumo Nkuna', stokvelName: 'SUMMER SAVERS' }
-  ];
+  const [profiles, setProfiles] = useState<Profile[]>([]);
 
-  const activeProfile = profiles.find(p => p.id === profileId) || profiles[0];
+  useEffect(() => {
+    const fetchProfiles = async () => {
+      try {
+        const res = await userApi.getProfiles();
+        setProfiles((res.data || []).map((p: any) => ({
+          id: String(p.id),
+          name: p.stokvelName || '',
+          stokvelName: p.stokvelName || ''
+        })));
+      } catch (err) {
+        console.error('Failed to load profiles', err);
+      }
+    };
+    fetchProfiles();
+  }, []);
 
-  // Mock data - ALL members' contributions for the selected stokvel
-  const [contributions] = useState<Contribution[]>([
-    // COLLECTIVE POT contributions (profileId: 1)
-    {
-      id: 1,
-      memberName: 'Nkulumo Nkuna',
-      memberInitials: 'NN',
-      amount: 200,
-      status: 'confirmed',
-      date: '04 Feb 2026',
-      confirmedBy: 'Admin',
-      confirmedAt: '04 Feb 2026 14:30'
-    },
-    {
-      id: 2,
-      memberName: 'Thabo Mbeki',
-      memberInitials: 'TM',
-      amount: 350,
-      status: 'confirmed',
-      date: '22 Jan 2026',
-      confirmedBy: 'Admin',
-      confirmedAt: '22 Jan 2026 09:15'
-    },
-    {
-      id: 3,
-      memberName: 'Sarah Jones',
-      memberInitials: 'SJ',
-      amount: 250,
-      status: 'confirmed',
-      date: '22 Jan 2026',
-      confirmedBy: 'Admin',
-      confirmedAt: '22 Jan 2026 10:45'
-    },
-    {
-      id: 4,
-      memberName: 'John Doe',
-      memberInitials: 'JD',
-      amount: 2000,
-      status: 'confirmed',
-      date: '12 Jan 2025',
-      confirmedBy: 'Admin',
-      confirmedAt: '12 Jan 2025 16:20'
-    },
-    {
-      id: 5,
-      memberName: 'Mary Johnson',
-      memberInitials: 'MJ',
-      amount: 1200,
-      status: 'pending',
-      date: '05 Jan 2025',
-      confirmedBy: undefined,
-      confirmedAt: undefined
-    },
-    {
-      id: 6,
-      memberName: 'Peter Williams',
-      memberInitials: 'PW',
-      amount: 500,
-      status: 'confirmed',
-      date: '03 Feb 2026',
-      confirmedBy: 'Admin',
-      confirmedAt: '03 Feb 2026 11:20'
-    },
-    {
-      id: 7,
-      memberName: 'Linda Zulu',
-      memberInitials: 'LZ',
-      amount: 800,
-      status: 'confirmed',
-      date: '28 Jan 2026',
-      confirmedBy: 'Admin',
-      confirmedAt: '28 Jan 2026 15:45'
-    },
-    // SUMMER SAVERS contributions (profileId: 2)
-    {
-      id: 8,
-      memberName: 'Nkulumo Nkuna',
-      memberInitials: 'NN',
-      amount: 500,
-      status: 'confirmed',
-      date: '10 Feb 2026',
-      confirmedBy: 'Admin',
-      confirmedAt: '10 Feb 2026 11:20'
-    },
-    {
-      id: 9,
-      memberName: 'Jane Smith',
-      memberInitials: 'JS',
-      amount: 350,
-      status: 'pending',
-      date: '15 Feb 2026',
-      confirmedBy: undefined,
-      confirmedAt: undefined
-    },
-    {
-      id: 10,
-      memberName: 'Bob Johnson',
-      memberInitials: 'BJ',
-      amount: 600,
-      status: 'confirmed',
-      date: '12 Feb 2026',
-      confirmedBy: 'Admin',
-      confirmedAt: '12 Feb 2026 09:30'
-    }
-  ]);
+  useEffect(() => {
+    const fetchContributions = async () => {
+      try {
+        setLoading(true);
+        // Get stokvelId from profiles
+        const profilesRes = await userApi.getProfiles();
+        const profile = (profilesRes.data || []).find((p: any) => String(p.id) === profileId);
+        const stokvelId = profile?.stokvelId;
 
-  // Filter contributions by active profile (stokvel)
-  const profileContributions = contributions.filter(c => {
-    // This is mock logic - in real app, contributions would have stokvelId
-    // For now, we'll use a simple rule:
-    // IDs 1-7 are COLLECTIVE POT, IDs 8-10 are SUMMER SAVERS
-    if (profileId === '1') return c.id <= 7;
-    if (profileId === '2') return c.id >= 8;
-    return false;
-  });
+        const res = await contributionApi.list({ stokvelId, profileId: Number(profileId) });
+        const data = res.data?.data || res.data || [];
+        setContributions(data.map((c: any) => ({
+          id: c.id,
+          memberName: c.memberName || 'Member',
+          memberInitials: c.memberInitials || (c.memberName || 'M').split(' ').map((n: string) => n[0]).join(''),
+          amount: c.amount || 0,
+          date: c.date ? new Date(c.date).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' }) : '',
+          status: c.status || 'pending',
+          confirmedBy: c.confirmedBy,
+          confirmedAt: c.confirmedAt ? new Date(c.confirmedAt).toLocaleString('en-ZA') : undefined
+        })));
+      } catch (err) {
+        console.error('Failed to load contributions', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchContributions();
+  }, [profileId]);
+
+  const activeProfile = profiles.find(p => p.id === profileId) || profiles[0] || { id: profileId, name: '', stokvelName: 'Stokvel' };
 
   // Get unique members for filter dropdown
-  const uniqueMembers = Array.from(new Set(profileContributions.map(c => c.memberName)));
+  const uniqueMembers = Array.from(new Set(contributions.map(c => c.memberName)));
 
   // Apply filters
-  const filteredContributions = profileContributions.filter(c => {
+  const filteredContributions = contributions.filter(c => {
     // Status filter
     if (filter !== 'all' && c.status !== filter) return false;
     // Member filter
@@ -171,10 +100,10 @@ export default function ContributionHistory() {
   });
 
   const stats = {
-    totalCollected: profileContributions.reduce((sum, c) => sum + c.amount, 0),
-    totalContributions: profileContributions.length,
-    confirmedCount: profileContributions.filter(c => c.status === 'confirmed').length,
-    pendingCount: profileContributions.filter(c => c.status === 'pending').length,
+    totalCollected: contributions.reduce((sum, c) => sum + c.amount, 0),
+    totalContributions: contributions.length,
+    confirmedCount: contributions.filter(c => c.status === 'confirmed').length,
+    pendingCount: contributions.filter(c => c.status === 'pending').length,
     uniqueMembers: uniqueMembers.length
   };
 
@@ -227,6 +156,11 @@ export default function ContributionHistory() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : (<>
         {/* Header with title */}
         <div className="mb-6">
           <h2 className="text-2xl font-semibold text-gray-800">Group Contributions</h2>
@@ -380,6 +314,7 @@ export default function ContributionHistory() {
             Back to Dashboard
           </Link>
         </div>
+        </>)}
       </main>
     </div>
   );

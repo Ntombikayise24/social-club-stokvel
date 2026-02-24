@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   ArrowLeft,
@@ -15,6 +15,7 @@ import {
   Clock,
   AlertCircle,
 } from 'lucide-react';
+import { helpApi } from '../../api';
 
 export default function HelpCenter() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -26,8 +27,9 @@ export default function HelpCenter() {
     message: ''
   });
   const [contactSuccess, setContactSuccess] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const faqs = [
+  const defaultFaqs = [
     {
       category: 'Getting Started',
       icon: <Book className="w-5 h-5" />,
@@ -59,12 +61,46 @@ export default function HelpCenter() {
       category: 'Groups',
       icon: <Users className="w-5 h-5" />,
       questions: [
-        { q: 'How many members are in a group?', a: 'COLLECTIVE POT has 18 members. SUMMER SAVERS is flexible up to 15 members.' },
-        { q: 'When are group meetings?', a: 'COLLECTIVE POT meets weekly on Sundays. SUMMER SAVERS meets monthly.' },
+        { q: 'How many members are in a group?', a: 'Group sizes vary. Check the group details page for specific member counts.' },
+        { q: 'When are group meetings?', a: 'Meeting schedules are set per group. Check the group details page.' },
         { q: 'How is interest shared?', a: 'At year end, total interest from loans is shared equally among members.' }
       ]
     }
   ];
+
+  const [faqs, setFaqs] = useState(defaultFaqs);
+
+  const iconMap: Record<string, JSX.Element> = {
+    'Getting Started': <Book className="w-5 h-5" />,
+    'Contributions': <DollarSign className="w-5 h-5" />,
+    'Loans': <Target className="w-5 h-5" />,
+    'Groups': <Users className="w-5 h-5" />,
+  };
+
+  useEffect(() => {
+    const fetchFaqs = async () => {
+      try {
+        setLoading(true);
+        const res = await helpApi.getFaqs();
+        const data = res.data;
+        if (Array.isArray(data) && data.length > 0) {
+          setFaqs(data.map((cat: any) => ({
+            category: cat.category || 'General',
+            icon: iconMap[cat.category] || <HelpCircle className="w-5 h-5" />,
+            questions: (cat.questions || []).map((q: any) => ({
+              q: q.question || q.q || '',
+              a: q.answer || q.a || ''
+            }))
+          })));
+        }
+      } catch (err) {
+        console.error('Failed to load FAQs, using defaults', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchFaqs();
+  }, []);
 
   // Filter FAQs based on search
   const filteredFaqs = faqs.map(category => ({
@@ -75,17 +111,20 @@ export default function HelpCenter() {
     )
   })).filter(category => category.questions.length > 0);
 
-  const handleContactSubmit = (e: React.FormEvent) => {
+  const handleContactSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulate sending message
-    setTimeout(() => {
+    try {
+      await helpApi.submitContact(contactForm);
       setContactSuccess(true);
       setContactForm({ name: '', email: '', message: '' });
       setTimeout(() => {
         setContactSuccess(false);
         setShowContactForm(false);
       }, 3000);
-    }, 1000);
+    } catch (err) {
+      console.error('Failed to submit contact form', err);
+      alert('Failed to send message. Please try again.');
+    }
   };
 
   return (
