@@ -1154,10 +1154,11 @@ interface ApproveUserModalProps {
   user: User;
   onClose: () => void;
   onApprove: (userId: number, selectedStokvels: number[]) => void;
+  onReject: (userId: number) => void;
   stokvels: Stokvel[];
 }
 
-function ApproveUserModal({ user, onClose, onApprove, stokvels }: ApproveUserModalProps) {
+function ApproveUserModal({ user, onClose, onApprove, onReject, stokvels }: ApproveUserModalProps) {
   const [selectedStokvels, setSelectedStokvels] = useState<number[]>([]);
   const [requestedStokvelIds, setRequestedStokvelIds] = useState<number[]>([]);
   const [loadingRequests, setLoadingRequests] = useState(true);
@@ -1309,18 +1310,27 @@ function ApproveUserModal({ user, onClose, onApprove, stokvels }: ApproveUserMod
             )}
           </div>
 
-          <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
-            <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-              Cancel
-            </button>
+          <div className="flex justify-between pt-4 border-t border-gray-200">
             <button
-              onClick={handleApprove}
-              disabled={selectedStokvels.length === 0}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={() => onReject(user.id)}
+              className="px-4 py-2 bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100 transition-colors flex items-center space-x-2"
             >
-              <CheckCircle className="w-4 h-4" />
-              <span>Approve User</span>
+              <XCircle className="w-4 h-4" />
+              <span>Reject User</span>
             </button>
+            <div className="flex space-x-3">
+              <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                Cancel
+              </button>
+              <button
+                onClick={handleApprove}
+                disabled={selectedStokvels.length === 0}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <CheckCircle className="w-4 h-4" />
+                <span>Approve User</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -2314,6 +2324,18 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleRejectUser = async (userId: number) => {
+    try {
+      await adminApi.rejectUser(userId);
+      setShowApproveUserModal(null);
+      showSuccess('User has been rejected and removed from pending.');
+      fetchData();
+    } catch (err: any) {
+      const msg = err.response?.data?.error || 'Failed to reject user';
+      showSuccess(msg);
+    }
+  };
+
   const handleConfirmContribution = async (contributionId: number) => {
     try {
       await adminApi.confirmContribution(contributionId);
@@ -2608,12 +2630,20 @@ export default function AdminDashboard() {
                           </div>
                           <p className="text-xs text-gray-400 mt-1">Registered: {user.joinedDate}</p>
                         </div>
-                        <button
-                          onClick={() => setShowApproveUserModal(user)}
-                          className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-                        >
-                          Review & Approve
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setShowApproveUserModal(user)}
+                            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+                          >
+                            Review & Approve
+                          </button>
+                          <button
+                            onClick={() => handleRejectUser(user.id)}
+                            className="px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors border border-red-200"
+                          >
+                            Reject
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -3054,6 +3084,7 @@ export default function AdminDashboard() {
           user={showApproveUserModal}
           onClose={() => setShowApproveUserModal(null)}
           onApprove={handleApproveUser}
+          onReject={handleRejectUser}
           stokvels={stokvels}
         />
       )}

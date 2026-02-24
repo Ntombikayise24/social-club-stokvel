@@ -951,18 +951,64 @@ router.post('/join-requests/:id/reject', async (req, res) => {
       return res.status(404).json({ error: 'Pending join request not found' });
     }
 
+    const userId = requests[0].user_id;
+
     await pool.query("UPDATE join_requests SET status = 'rejected' WHERE id = ?", [requestId]);
 
     const [stokvelInfo] = await pool.query('SELECT name FROM stokvels WHERE id = ?', [requests[0].stokvel_id]);
     await pool.query(
       'INSERT INTO notifications (user_id, type, title, message) VALUES (?, ?, ?, ?)',
-      [requests[0].user_id, 'warning', 'Join Request Declined', `Your request to join ${stokvelInfo[0].name} has been declined.`]
+      [userId, 'warning', 'Join Request Declined', `Your request to join ${stokvelInfo[0].name} has been declined.`]
     );
+
+    // If user is still pending and has no remaining pending join requests, mark them as deleted
+    const [userCheck] = await pool.query("SELECT status FROM users WHERE id = ?", [userId]);
+    if (userCheck.length > 0 && userCheck[0].status === 'pending') {
+      const [remainingRequests] = await pool.query(
+        "SELECT COUNT(*) as count FROM join_requests WHERE user_id = ? AND status = 'pending'",
+        [userId]
+      );
+      if (remainingRequests[0].count === 0) {
+        await pool.query("UPDATE users SET status = 'deleted', deleted_at = NOW(), delete_reason = 'All join requests rejected' WHERE id = ?", [userId]);
+      }
+    }
 
     res.json({ message: 'Join request rejected' });
   } catch (err) {
     console.error('Reject join request error:', err);
     res.status(500).json({ error: 'Failed to reject join request' });
+  }
+});
+
+// ── Reject pending user entirely ──
+router.post('/users/:id/reject', async (req, res) => {
+  try {
+    const userId = req.params.id;
+
+    const [users] = await pool.query("SELECT id, full_name, email FROM users WHERE id = ? AND status = 'pending'", [userId]);
+    if (users.length === 0) {
+      return res.status(404).json({ error: 'Pending user not found' });
+    }
+
+    // Reject all pending join requests for this user
+    await pool.query("UPDATE join_requests SET status = 'rejected' WHERE user_id = ? AND status = 'pending'", [userId]);
+
+    // Set user as deleted
+    await pool.query(
+      "UPDATE users SET status = 'deleted', deleted_at = NOW(), delete_reason = 'Registration rejected by admin' WHERE id = ?",
+      [userId]
+    );
+
+    // Notify user
+    await pool.query(
+      'INSERT INTO notifications (user_id, type, title, message) VALUES (?, ?, ?, ?)',
+      [userId, 'warning', 'Registration Declined', 'Your registration request has been declined by an administrator.']
+    );
+
+    res.json({ message: `${users[0].full_name} has been rejected` });
+  } catch (err) {
+    console.error('Reject user error:', err);
+    res.status(500).json({ error: 'Failed to reject user' });
   }
 });
 

@@ -199,6 +199,9 @@ export const adminApi = {
   approveUser: (id: number, stokvelIds?: number[]) =>
     api.post(`/admin/users/${id}/approve`, { stokvelIds }),
 
+  rejectUser: (id: number) =>
+    api.post(`/admin/users/${id}/reject`),
+
   getUserJoinRequests: (id: number) =>
     api.get(`/admin/users/${id}/join-requests`),
 
