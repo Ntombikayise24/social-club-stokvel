@@ -341,12 +341,35 @@ export default function MainDashboard() {
     }
   };
 
-  if (isLoading || !activeProfile) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin text-primary-600 mx-auto mb-3" />
           <p className="text-gray-500">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If no profiles exist at all, show a pending state
+  if (!activeProfile) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md px-6">
+          <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Clock className="w-8 h-8 text-amber-600" />
+          </div>
+          <h2 className="text-xl font-semibold text-gray-800 mb-2">Membership Pending</h2>
+          <p className="text-gray-600 mb-6">
+            Your membership is awaiting admin approval. You'll receive a notification once approved.
+          </p>
+          <button
+            onClick={() => { logout(); }}
+            className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+          >
+            Sign Out
+          </button>
         </div>
       </div>
     );

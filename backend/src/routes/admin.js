@@ -433,20 +433,35 @@ router.post('/users/:id/restore', async (req, res) => {
       return res.status(404).json({ error: 'Deleted user not found' });
     }
 
-    await pool.query(
-      "UPDATE users SET status = 'active', deleted_at = NULL, deleted_by = NULL, delete_reason = NULL WHERE id = ?",
+    // Check if user had any active profiles before deletion
+    const [existingProfiles] = await pool.query(
+      "SELECT COUNT(*) as count FROM profiles WHERE user_id = ?",
       [userId]
     );
 
-    // Reactivate profiles
-    await pool.query("UPDATE profiles SET status = 'active' WHERE user_id = ?", [userId]);
+    // If user had profiles, restore them to active; otherwise set to pending for stokvel assignment
+    const newStatus = existingProfiles[0].count > 0 ? 'active' : 'pending';
+
+    await pool.query(
+      "UPDATE users SET status = ?, deleted_at = NULL, deleted_by = NULL, delete_reason = NULL WHERE id = ?",
+      [newStatus, userId]
+    );
+
+    // Reactivate profiles if they existed
+    if (existingProfiles[0].count > 0) {
+      await pool.query("UPDATE profiles SET status = 'active' WHERE user_id = ?", [userId]);
+    }
+
+    const notificationMessage = newStatus === 'active' 
+      ? 'Your account has been restored. Welcome back!'
+      : 'Your account has been restored but needs stokvel assignment. Please wait for admin approval.';
 
     await pool.query(
       'INSERT INTO notifications (user_id, type, title, message) VALUES (?, ?, ?, ?)',
-      [userId, 'info', 'Account Restored', 'Your account has been restored. Welcome back!']
+      [userId, 'info', 'Account Restored', notificationMessage]
     );
 
-    res.json({ message: `${users[0].full_name} has been restored` });
+    res.json({ message: `${users[0].full_name} has been restored${newStatus === 'pending' ? ' (pending stokvel assignment)' : ''}` });
   } catch (err) {
     console.error('Restore user error:', err);
     res.status(500).json({ error: 'Failed to restore user' });
