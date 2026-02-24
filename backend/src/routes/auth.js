@@ -5,6 +5,7 @@ import { body } from 'express-validator';
 import { validate } from '../middleware/validate.js';
 import { authenticate } from '../middleware/auth.js';
 import pool from '../database/connection.js';
+import { sendPasswordResetEmail } from '../utils/email.js';
 
 const router = Router();
 
@@ -170,8 +171,8 @@ router.post(
       // In production, send email. For dev, log it.
       console.log(`\n📧 Password reset code for ${email}: ${code}\n`);
 
-      // TODO: Send email with nodemailer when SMTP is configured
-      // await sendResetEmail(email, code);
+      // Send email with the reset code
+      await sendPasswordResetEmail(email, code);
 
       res.json({ message: 'If an account exists with that email, a reset code has been sent.' });
     } catch (err) {

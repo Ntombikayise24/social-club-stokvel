@@ -156,3 +156,62 @@ export async function sendJoinRequestApprovedEmail(email, fullName, stokvelName)
     console.error(`⚠️  Failed to send join-approved email to ${email}:`, err.message);
   }
 }
+
+/**
+ * Send a password reset code via email.
+ */
+export async function sendPasswordResetEmail(email, code) {
+  const html = `
+  <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
+    <!-- Header -->
+    <div style="background:linear-gradient(135deg,#dc2626,#b91c1c);padding:32px 24px;text-align:center;">
+      <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;">Password Reset 🔐</h1>
+    </div>
+
+    <!-- Body -->
+    <div style="padding:32px 24px;">
+      <p style="margin:0 0 16px;color:#374151;font-size:16px;">
+        We received a request to reset your password. Use the verification code below to proceed:
+      </p>
+
+      <!-- Code Box -->
+      <div style="text-align:center;margin:32px 0;">
+        <div style="display:inline-block;background:#f3f4f6;border:2px dashed #d1d5db;border-radius:12px;padding:20px 40px;">
+          <p style="margin:0 0 4px;color:#6b7280;font-size:13px;font-weight:500;text-transform:uppercase;letter-spacing:1px;">Verification Code</p>
+          <p style="margin:0;color:#111827;font-size:36px;font-weight:700;letter-spacing:8px;">${code}</p>
+        </div>
+      </div>
+
+      <p style="margin:0 0 16px;color:#374151;font-size:14px;">
+        This code will expire in <strong>15 minutes</strong>. If you didn't request a password reset, you can safely ignore this email.
+      </p>
+
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;" />
+
+      <p style="margin:0;color:#9ca3af;font-size:13px;text-align:center;">
+        ⚠️ Never share this code with anyone. Our team will never ask for it.
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <div style="background:#f9fafb;padding:16px 24px;text-align:center;">
+      <p style="margin:0;color:#9ca3af;font-size:12px;">
+        &copy; ${new Date().getFullYear()} Stokvel Management System. All rights reserved.
+      </p>
+    </div>
+  </div>`;
+
+  const mailOptions = {
+    from: `"Stokvel Management" <${process.env.SMTP_USER || 'noreply@stokvel.co.za'}>`,
+    to: email,
+    subject: '🔐 Password Reset Code',
+    html,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`📧 Password reset email sent to ${email}`);
+  } catch (err) {
+    console.error(`⚠️  Failed to send password reset email to ${email}:`, err.message);
+  }
+}

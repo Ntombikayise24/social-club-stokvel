@@ -146,9 +146,9 @@ export default function ForgotPassword() {
               <span className="font-medium text-gray-800">{email}</span>
             </p>
 
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-              <p className="text-xs text-yellow-700">
-                Check the backend server console for the reset code (in dev mode).
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+              <p className="text-xs text-blue-700">
+                Check your email inbox (and spam folder) for the verification code.
               </p>
             </div>
 
