@@ -140,6 +140,19 @@ router.post(
         });
       }
 
+      // Check if user has at least one card
+      const [cards] = await pool.query(
+        'SELECT id FROM cards WHERE user_id = ? LIMIT 1',
+        [req.user.id]
+      );
+
+      if (cards.length === 0) {
+        return res.status(400).json({ 
+          error: 'No card found. Please add a card before requesting loans.',
+          code: 'NO_CARD'
+        });
+      }
+
       // Check for existing active loan in this stokvel
       const [existingLoan] = await pool.query(
         "SELECT id FROM loans WHERE user_id = ? AND stokvel_id = ? AND status IN ('active', 'overdue', 'pending')",
@@ -214,6 +227,19 @@ router.post(
       }
 
       const loan = loans[0];
+
+      // Check if user has at least one card
+      const [cards] = await pool.query(
+        'SELECT id FROM cards WHERE user_id = ? LIMIT 1',
+        [req.user.id]
+      );
+
+      if (cards.length === 0) {
+        return res.status(400).json({ 
+          error: 'No card found. Please add a card before repaying loans.',
+          code: 'NO_CARD'
+        });
+      }
 
       // Mark as repaid
       await pool.query(

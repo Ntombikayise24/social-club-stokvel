@@ -2,6 +2,7 @@ import mysql from 'mysql2/promise';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import path from 'path';
+import { seed } from './seed.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '../../.env') });
@@ -283,8 +284,17 @@ async function migrate() {
   console.log('✅ join_requests table created');
 
   console.log('\n✅ All migrations completed successfully!');
+  console.log('\n🌱 Starting database seeding...\n');
   await connection.end();
-  process.exit(0);
+  
+  // Run seed function
+  try {
+    await seed();
+    process.exit(0);
+  } catch (seedErr) {
+    console.error('❌ Seeding failed:', seedErr.message);
+    process.exit(1);
+  }
 }
 
 migrate().catch((err) => {

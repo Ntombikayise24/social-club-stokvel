@@ -331,7 +331,16 @@ export default function MainDashboard() {
 
     } catch (err: any) {
       setIsProcessingPayment(false);
-      showToast.error(err.response?.data?.error || 'Failed to initialize payment. Please try again.');
+      const errorCode = err.response?.data?.code;
+      const errorMsg = err.response?.data?.error || 'Failed to initialize payment. Please try again.';
+      
+      if (errorCode === 'NO_CARD') {
+        showToast.error(errorMsg);
+        // Navigate to cards page
+        setTimeout(() => navigate('/cards'), 1500);
+      } else {
+        showToast.error(errorMsg);
+      }
     }
   };
 

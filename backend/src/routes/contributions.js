@@ -152,6 +152,21 @@ router.post(
         return res.status(404).json({ error: 'Profile not found' });
       }
 
+      // Check if user has at least one card (for card payments)
+      if (paymentMethod === 'card') {
+        const [cards] = await pool.query(
+          'SELECT id FROM cards WHERE user_id = ? LIMIT 1',
+          [req.user.id]
+        );
+
+        if (cards.length === 0) {
+          return res.status(400).json({ 
+            error: 'No card found. Please add a card before making contributions.',
+            code: 'NO_CARD'
+          });
+        }
+      }
+
       const reference = `CON-${Date.now()}-${uuidv4().slice(0, 6).toUpperCase()}`;
 
       const [result] = await pool.query(

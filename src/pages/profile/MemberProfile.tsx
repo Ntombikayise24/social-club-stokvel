@@ -13,7 +13,8 @@ import {
   ArrowLeft,
   ChevronRight,
   Target,
-  LogOut
+  LogOut,
+  CreditCard
 } from 'lucide-react';
 import { userApi } from '../../api';
 import { showToast } from '../../utils/toast';
@@ -380,11 +381,11 @@ export default function MemberProfile() {
             <span className="text-sm text-gray-600">Contributions</span>
           </Link>
           <Link 
-            to={`/loans?profile=${userData.profiles[0]?.id || '1'}`} 
+            to={`/cards?profile=${userData.profiles[0]?.id || '1'}`} 
             className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 hover:bg-gray-50 transition-colors text-center"
           >
-            <DollarSign className="w-6 h-6 text-primary-600 mx-auto mb-2" />
-            <span className="text-sm text-gray-600">Loans</span>
+            <CreditCard className="w-6 h-6 text-primary-600 mx-auto mb-2" />
+            <span className="text-sm text-gray-600">Cards</span>
           </Link>
           <Link 
             to={`/dashboard?profile=${userData.profiles[0]?.id || '1'}`} 

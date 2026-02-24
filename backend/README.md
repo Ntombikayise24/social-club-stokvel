@@ -19,19 +19,16 @@ npm install
 #    Edit .env and set your MySQL credentials (DB_USER, DB_PASSWORD)
 #    The database will be auto-created by the migration script.
 
-# 3. Run database migration (creates all tables)
+# 3. Run database migration (creates all tables AND seeds demo data)
 npm run migrate
 
-# 4. Seed sample data (optional but recommended for testing)
-npm run seed
-
-# 5. Start the dev server
+# 4. Start the dev server
 npm run dev
 ```
 
 The API will start on **http://localhost:5000**.
 
-## Default Login Credentials (after seeding)
+## Default Login Credentials (auto-seeded)
 
 | Role    | Email                  | Password   |
 |---------|------------------------|------------|
@@ -39,6 +36,8 @@ The API will start on **http://localhost:5000**.
 | Member  | thabo@example.com      | Member@123 |
 | Member  | naledi@example.com     | Member@123 |
 | Pending | sipho@example.com      | Member@123 |
+
+> **Note:** The admin account and sample data are automatically created when you run `npm run migrate`.
 
 ## API Endpoints
 

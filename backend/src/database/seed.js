@@ -257,10 +257,14 @@ async function seed() {
   console.log('   Pending: sipho@example.com / Member@123');
 
   await connection.end();
-  process.exit(0);
 }
 
-seed().catch((err) => {
-  console.error('❌ Seeding failed:', err.message);
-  process.exit(1);
-});
+export { seed };
+
+// Run seed directly if this file is executed as main module
+if (import.meta.url === `file://${process.argv[1]}`) {
+  seed().catch((err) => {
+    console.error('❌ Seeding failed:', err.message);
+    process.exit(1);
+  });
+}

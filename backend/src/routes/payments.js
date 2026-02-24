@@ -34,6 +34,19 @@ router.post(
         return res.status(404).json({ error: 'Profile not found' });
       }
 
+      // Check if user has at least one card
+      const [cards] = await pool.query(
+        'SELECT id FROM cards WHERE user_id = ? LIMIT 1',
+        [req.user.id]
+      );
+
+      if (cards.length === 0) {
+        return res.status(400).json({ 
+          error: 'No card found. Please add a card before making contributions.',
+          code: 'NO_CARD'
+        });
+      }
+
       // Get user email
       const [users] = await pool.query('SELECT email, full_name FROM users WHERE id = ?', [req.user.id]);
       const user = users[0];
