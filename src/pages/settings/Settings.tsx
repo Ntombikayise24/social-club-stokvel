@@ -19,6 +19,8 @@ import {
   EyeOff
 } from 'lucide-react';
 import { userApi, settingsApi, cardApi } from '../../api';
+import { showToast } from '../../utils/toast';
+import { logout } from '../../utils/auth';
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -68,6 +70,7 @@ export default function Settings() {
 
   // Cards data
   const [cards, setCards] = useState<any[]>([]);
+  const [memberSince, setMemberSince] = useState('');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -86,6 +89,12 @@ export default function Settings() {
           phone: user.phone || '',
           language: 'en'
         });
+
+        // Set member since from created_at
+        if (user.createdAt || user.created_at) {
+          const d = new Date(user.createdAt || user.created_at);
+          setMemberSince(d.toLocaleDateString('en-ZA', { month: 'short', year: 'numeric' }));
+        }
 
         const s = settingsRes.data || {};
         setNotifications({
@@ -124,7 +133,7 @@ export default function Settings() {
       setShowSuccessMessage('Profile updated successfully');
       setTimeout(() => setShowSuccessMessage(''), 3000);
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to update profile');
+      showToast.error(err.response?.data?.error || 'Failed to update profile');
     }
   };
 
@@ -193,11 +202,7 @@ export default function Settings() {
   };
 
   const handleLogout = () => {
-    // Clear any stored user data
-    localStorage.removeItem('user');
-    sessionStorage.removeItem('user');
-    localStorage.removeItem('activeProfileId');
-    navigate('/');
+    logout();
   };
 
   const tabs = [
@@ -270,15 +275,11 @@ export default function Settings() {
               <div className="space-y-2 text-xs">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Member since</span>
-                  <span className="font-medium">Jan 2026</span>
+                  <span className="font-medium">{memberSince || '—'}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Last login</span>
-                  <span className="font-medium">Today</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">2FA Status</span>
-                  <span className="text-green-600 font-medium">Enabled</span>
+                  <span className="text-gray-600">Account</span>
+                  <span className="text-green-600 font-medium">Active</span>
                 </div>
               </div>
             </div>
@@ -562,25 +563,10 @@ export default function Settings() {
                     <div className="flex items-center justify-between text-sm">
                       <div>
                         <p className="font-medium">Current Session</p>
-                        <p className="text-gray-500">Johannesburg, SA • Chrome on Windows</p>
+                        <p className="text-gray-500">Active now</p>
                       </div>
                       <span className="text-green-600 text-xs bg-green-50 px-2 py-1 rounded-full">Active Now</span>
                     </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <div>
-                        <p className="font-medium">Yesterday, 14:30</p>
-                        <p className="text-gray-500">Johannesburg, SA • Chrome on Windows</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <div>
-                        <p className="font-medium">Feb 20, 2026</p>
-                        <p className="text-gray-500">Johannesburg, SA • Chrome on Windows</p>
-                      </div>
-                    </div>
-                    <button className="text-primary-600 text-sm hover:text-primary-700 mt-2">
-                      View All Login History →
-                    </button>
                   </div>
                 </div>
               </div>

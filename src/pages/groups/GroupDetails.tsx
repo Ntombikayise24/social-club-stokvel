@@ -8,6 +8,7 @@ import {
   Wallet
 } from 'lucide-react';
 import { stokvelApi, userApi } from '../../api';
+import ErrorState from '../../components/ErrorState';
 
 interface Member {
   id: string;
@@ -59,6 +60,7 @@ export default function GroupDetails() {
   const profileId = searchParams.get('profile') || '1';
   const [showAllMembers, setShowAllMembers] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   const [groupData, setGroupData] = useState<GroupData>({
     id: '',
@@ -83,6 +85,7 @@ export default function GroupDetails() {
     const fetchGroupData = async () => {
       try {
         setLoading(true);
+        setError(false);
         // Get the stokvelId from user's profile
         const profilesRes = await userApi.getProfiles();
         const profile = (profilesRes.data || []).find((p: any) => String(p.id) === profileId);
@@ -140,6 +143,7 @@ export default function GroupDetails() {
         });
       } catch (err) {
         console.error('Failed to load group data', err);
+        setError(true);
       } finally {
         setLoading(false);
       }
@@ -210,6 +214,8 @@ export default function GroupDetails() {
           <div className="flex items-center justify-center py-20">
             <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
           </div>
+        ) : error ? (
+          <ErrorState message="Could not load group details. Please try again." onRetry={() => window.location.reload()} />
         ) : (<>
         {/* Group Header */}
         <div className={`bg-gradient-to-r from-${groupData.color}-50 to-white rounded-xl shadow-sm border border-${groupData.color}-200 p-6 mb-6`}>

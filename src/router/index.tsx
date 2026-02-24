@@ -16,7 +16,9 @@ import HelpCenter from "../pages/help/HelpCenter";
 import ForgotPassword from "../pages/auth/ForgotPassword";
 import Terms from "../pages/legal/Terms";
 import Privacy from "../pages/legal/Privacy";
-import Cards from "../pages/payments/Cards";  // ← Add this line
+import Cards from "../pages/payments/Cards";
+import NotFound from "../pages/NotFound";
+import AuthGuard from "../components/AuthGuard";
 
 const router = createBrowserRouter([
   {
@@ -37,43 +39,43 @@ const router = createBrowserRouter([
   },
   {
     path: "/dashboard",
-    element: <MainDashboard />,
+    element: <AuthGuard><MainDashboard /></AuthGuard>,
   },
   {
     path: "/profile",
-    element: <MemberProfile />,
+    element: <AuthGuard><MemberProfile /></AuthGuard>,
   },
   {
     path: "/contributions",
-    element: <ContributionHistory />,
+    element: <AuthGuard><ContributionHistory /></AuthGuard>,
   },
   {
     path: "/loans",
-    element: <LoanHistory />,
+    element: <AuthGuard><LoanHistory /></AuthGuard>,
   },
   {
     path: "/loans/request",
-    element: <LoanRequest />,
+    element: <AuthGuard><LoanRequest /></AuthGuard>,
   },
   {
     path: "/admin",
-    element: <AdminDashboard />,
+    element: <AuthGuard requireAdmin><AdminDashboard /></AuthGuard>,
   },
   {
     path: "/group/:groupId",
-    element: <GroupDetails />,
+    element: <AuthGuard><GroupDetails /></AuthGuard>,
   },
   {
     path: "/notifications",
-    element: <Notifications />,
+    element: <AuthGuard><Notifications /></AuthGuard>,
   },
   {
     path: "/settings",
-    element: <Settings />,
+    element: <AuthGuard><Settings /></AuthGuard>,
   },
   {
     path: "/help",
-    element: <HelpCenter />,
+    element: <AuthGuard><HelpCenter /></AuthGuard>,
   },
   {
     path: "/forgot-password",
@@ -88,8 +90,12 @@ const router = createBrowserRouter([
     element: <Privacy />,
   },
   {
-    path: "/cards",           // ← Add this route
-    element: <Cards />,
+    path: "/cards",
+    element: <AuthGuard><Cards /></AuthGuard>,
+  },
+  {
+    path: "*",
+    element: <NotFound />,
   },
 ]);
 

@@ -13,6 +13,7 @@ import {
   CreditCard
 } from 'lucide-react';
 import { userApi, loanApi, cardApi } from '../../api';
+import { showToast } from '../../utils/toast';
 
 export default function LoanRequest() {
   const navigate = useNavigate();
@@ -130,10 +131,7 @@ export default function LoanRequest() {
 
       setShowConfirmation(false);
       
-      const card = cards.find((c: any) => c.id === selectedCard);
-      const cardMessage = card ? card.label : 'Card';
-      
-      alert(`Loan Successful!\n\nR ${requestedAmount} loan from ${currentProfile.stokvelName}\nWill be sent to: ${cardMessage}\nInterest: R ${interestAmount}\nTotal to repay: R ${totalRepayable}\nDue: ${formattedDueDate}`);
+      showToast.success(`Loan of R ${requestedAmount} approved! Funds will be sent to your card.`);
       
       navigate(`/loans?profile=${profileId}`, { 
         state: { 
@@ -142,7 +140,7 @@ export default function LoanRequest() {
         } 
       });
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to process loan request');
+      showToast.error(err.response?.data?.error || 'Failed to process loan request');
     } finally {
       setIsSubmitting(false);
     }

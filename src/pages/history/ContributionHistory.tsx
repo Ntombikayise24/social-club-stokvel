@@ -10,6 +10,7 @@ import {
   Users,
 } from 'lucide-react';
 import { contributionApi, userApi } from '../../api';
+import ErrorState from '../../components/ErrorState';
 
 interface Contribution {
   id: number;
@@ -35,6 +36,7 @@ export default function ContributionHistory() {
   const [filter, setFilter] = useState('all');
   const [selectedMember, setSelectedMember] = useState('all');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [contributions, setContributions] = useState<Contribution[]>([]);
 
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -59,6 +61,7 @@ export default function ContributionHistory() {
     const fetchContributions = async () => {
       try {
         setLoading(true);
+        setError(false);
         // Get stokvelId from profiles
         const profilesRes = await userApi.getProfiles();
         const profile = (profilesRes.data || []).find((p: any) => String(p.id) === profileId);
@@ -78,6 +81,7 @@ export default function ContributionHistory() {
         })));
       } catch (err) {
         console.error('Failed to load contributions', err);
+        setError(true);
       } finally {
         setLoading(false);
       }
@@ -160,6 +164,8 @@ export default function ContributionHistory() {
           <div className="flex items-center justify-center py-20">
             <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
           </div>
+        ) : error ? (
+          <ErrorState message="Failed to load contribution history." onRetry={() => window.location.reload()} />
         ) : (<>
         {/* Header with title */}
         <div className="mb-6">

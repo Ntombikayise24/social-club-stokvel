@@ -16,15 +16,20 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { helpApi } from '../../api';
+import { showToast } from '../../utils/toast';
+import { getCurrentUser } from '../../utils/auth';
 
 export default function HelpCenter() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [showContactForm, setShowContactForm] = useState(false);
-  const [contactForm, setContactForm] = useState({
-    name: '',
-    email: '',
-    message: ''
+  const [contactForm, setContactForm] = useState(() => {
+    const user = getCurrentUser();
+    return {
+      name: user?.name || '',
+      email: user?.email || '',
+      message: ''
+    };
   });
   const [contactSuccess, setContactSuccess] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -123,7 +128,7 @@ export default function HelpCenter() {
       }, 3000);
     } catch (err) {
       console.error('Failed to submit contact form', err);
-      alert('Failed to send message. Please try again.');
+      showToast.error('Failed to send message. Please try again.');
     }
   };
 

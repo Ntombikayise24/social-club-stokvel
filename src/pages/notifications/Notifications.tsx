@@ -12,6 +12,7 @@ import {
   X
 } from 'lucide-react';
 import { notificationApi } from '../../api';
+import ErrorState from '../../components/ErrorState';
 
 // Remove "export default" from here - just "interface"
 interface Notification {
@@ -29,11 +30,13 @@ interface Notification {
 export default function Notifications() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     const fetchNotifications = async () => {
       try {
         setLoading(true);
+        setError(false);
         const res = await notificationApi.list();
         const data = res.data?.data || res.data || [];
         setNotifications(data.map((n: any) => ({
@@ -49,6 +52,7 @@ export default function Notifications() {
         })));
       } catch (err) {
         console.error('Failed to load notifications', err);
+        setError(true);
       } finally {
         setLoading(false);
       }
@@ -138,6 +142,8 @@ export default function Notifications() {
           <div className="flex items-center justify-center py-20">
             <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
           </div>
+        ) : error ? (
+          <ErrorState message="Failed to load notifications." onRetry={() => window.location.reload()} />
         ) : (<>
         {/* Header with actions */}
         <div className="flex items-center justify-between mb-6">

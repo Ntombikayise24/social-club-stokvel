@@ -25,6 +25,8 @@ import {
 } from 'lucide-react';
 import ProfileSwitcher from './ProfileSwitcher';
 import { userApi, stokvelApi, loanApi, contributionApi, notificationApi, cardApi, paymentApi } from '../../api';
+import { showToast } from '../../utils/toast';
+import { logout } from '../../utils/auth';
 
 interface Profile {
   id: string;
@@ -268,10 +270,10 @@ export default function MainDashboard() {
   const handleJoinRequest = async (stokvelId: string) => {
     try {
       await stokvelApi.joinRequest(Number(stokvelId));
-      alert('Join request sent! Awaiting admin approval.');
+      showToast.success('Join request sent! Awaiting admin approval.');
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to send join request');
+      showToast.error(err.response?.data?.error || 'Failed to send join request');
     }
   };
 
@@ -309,10 +311,11 @@ export default function MainDashboard() {
           const verifyRes = await paymentApi.verify(reference);
           if (verifyRes.data.data?.status === 'success') {
             clearInterval(checkPayment);
+            clearTimeout(pollTimeout);
             setShowAddContribution(false);
             setIsProcessingPayment(false);
             setContributionData({ amount: '', paymentMethod: 'card' });
-            alert(`✅ Payment of R ${contributionData.amount} confirmed! Your contribution has been recorded.`);
+            showToast.success(`Payment of R ${contributionData.amount} confirmed! Your contribution has been recorded.`);
             fetchData();
           }
         } catch {
@@ -321,14 +324,20 @@ export default function MainDashboard() {
       }, 5000);
 
       // Stop polling after 5 minutes
-      setTimeout(() => {
+      const pollTimeout = setTimeout(() => {
         clearInterval(checkPayment);
         setIsProcessingPayment(false);
       }, 300000);
 
+      // Store cleanup refs so component unmount can clear them
+      return () => {
+        clearInterval(checkPayment);
+        clearTimeout(pollTimeout);
+      };
+
     } catch (err: any) {
       setIsProcessingPayment(false);
-      alert(err.response?.data?.error || 'Failed to initialize payment. Please try again.');
+      showToast.error(err.response?.data?.error || 'Failed to initialize payment. Please try again.');
     }
   };
 
@@ -379,6 +388,8 @@ export default function MainDashboard() {
 
                 {/* Notifications Dropdown */}
                 {showNotifications && (
+                  <>
+                  <div className="fixed inset-0 z-10" onClick={() => setShowNotifications(false)} />
                   <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-lg border border-gray-200 z-20">
                     <div className="p-3 border-b border-gray-100 flex justify-between items-center">
                       <h3 className="font-semibold text-gray-700">Notifications</h3>
@@ -390,7 +401,7 @@ export default function MainDashboard() {
                     </div>
                     <div className="max-h-96 overflow-y-auto">
                       {/* Regular notifications */}
-                      {notifications.slice(0, 2).map(notif => (
+                      {notifications.slice(0, 5).map(notif => (
                         <div key={notif.id} className={`p-3 hover:bg-gray-50 border-b border-gray-100 ${!notif.read ? 'bg-primary-50/50' : ''}`}>
                           <p className="text-sm text-gray-800">{notif.message}</p>
                           <p className="text-xs text-gray-500 mt-1">{notif.time}</p>
@@ -418,7 +429,7 @@ export default function MainDashboard() {
                                     <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded-full">
                                       Rejected
                                     </span>
-                                    <span className="text-gray-500 ml-2">2 days ago</span>
+                                    <span className="text-gray-500 ml-2">Recently</span>
                                   </div>
                                   <button 
                                     className="mt-2 text-xs text-primary-600 hover:text-primary-700 font-medium"
@@ -443,6 +454,7 @@ export default function MainDashboard() {
                       View All Notifications
                     </Link>
                   </div>
+                  </>
                 )}
               </div>
 
@@ -466,6 +478,8 @@ export default function MainDashboard() {
 
                 {/* User Dropdown Menu */}
                 {showUserMenu && (
+                  <>
+                  <div className="fixed inset-0 z-10" onClick={() => setShowUserMenu(false)} />
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 z-20">
                     <div className="px-4 py-3 border-b border-gray-100">
                       <p className="text-sm font-medium text-gray-800">{activeProfile.name}</p>
@@ -499,18 +513,17 @@ export default function MainDashboard() {
                     <Link 
                       to="/" 
                       className="flex items-center space-x-2 px-4 py-3 hover:bg-gray-50 text-red-600 transition-colors"
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.preventDefault();
                         setShowUserMenu(false);
-                        localStorage.removeItem('token');
-                        localStorage.removeItem('currentUser');
-                        sessionStorage.removeItem('token');
-                        sessionStorage.removeItem('user');
+                        logout();
                       }}
                     >
                       <LogOut className="w-4 h-4" />
                       <span className="text-sm">Logout</span>
                     </Link>
                   </div>
+                  </>
                 )}
               </div>
             </div>

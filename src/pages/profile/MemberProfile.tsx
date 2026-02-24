@@ -16,6 +16,8 @@ import {
   LogOut
 } from 'lucide-react';
 import { userApi } from '../../api';
+import { showToast } from '../../utils/toast';
+import ErrorState from '../../components/ErrorState';
 
 interface Profile {
   id: string;
@@ -41,6 +43,7 @@ interface UserData {
 export default function MemberProfile() {
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [saving, setSaving] = useState(false);
   
   const [userData, setUserData] = useState<UserData>({
@@ -57,6 +60,7 @@ export default function MemberProfile() {
     const fetchProfile = async () => {
       try {
         setLoading(true);
+        setError(false);
         const res = await userApi.getMe();
         const user = res.data;
         const colors = ['primary', 'secondary', 'blue', 'green', 'purple'];
@@ -83,6 +87,7 @@ export default function MemberProfile() {
         setEditedUserData(mapped);
       } catch (err) {
         console.error('Failed to load profile', err);
+        setError(true);
       } finally {
         setLoading(false);
       }
@@ -106,8 +111,10 @@ export default function MemberProfile() {
       });
       setUserData(editedUserData);
       setIsEditing(false);
+      showToast.success('Profile updated successfully');
     } catch (err) {
       console.error('Failed to save profile', err);
+      showToast.error('Failed to save profile. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -146,6 +153,8 @@ export default function MemberProfile() {
           <div className="flex items-center justify-center py-20">
             <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
           </div>
+        ) : error ? (
+          <ErrorState message="Failed to load your profile." onRetry={() => window.location.reload()} />
         ) : (<>
         {/* Profile Header with Single Edit Button */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">

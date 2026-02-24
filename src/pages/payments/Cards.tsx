@@ -10,6 +10,8 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { cardApi } from '../../api';
+import { showToast } from '../../utils/toast';
+import ErrorState from '../../components/ErrorState';
 
 interface Card {
   id: string;
@@ -24,15 +26,16 @@ interface Card {
 export default function Cards() {
   const [cards, setCards] = useState<Card[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   const [showAddCard, setShowAddCard] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
-  const [showSuccessMessage, setShowSuccessMessage] = useState('');
 
   useEffect(() => {
     const fetchCards = async () => {
       try {
         setLoading(true);
+        setError(false);
         const res = await cardApi.list();
         setCards((res.data || []).map((c: any) => ({
           id: String(c.id),
@@ -45,6 +48,7 @@ export default function Cards() {
         })));
       } catch (err) {
         console.error('Failed to load cards', err);
+        setError(true);
       } finally {
         setLoading(false);
       }
@@ -59,8 +63,7 @@ export default function Cards() {
         ...card,
         isDefault: card.id === id
       })));
-      setShowSuccessMessage('Default card updated successfully');
-      setTimeout(() => setShowSuccessMessage(''), 3000);
+      showToast.success('Default card updated successfully');
     } catch (err) {
       console.error('Failed to set default card', err);
     }
@@ -71,8 +74,7 @@ export default function Cards() {
       await cardApi.remove(Number(id));
       setCards(cards.filter(card => card.id !== id));
       setShowDeleteConfirm(null);
-      setShowSuccessMessage('Card removed successfully');
-      setTimeout(() => setShowSuccessMessage(''), 3000);
+      showToast.success('Card removed successfully');
     } catch (err) {
       console.error('Failed to delete card', err);
     }
@@ -96,8 +98,7 @@ export default function Cards() {
       setCards([...cards, newCard]);
     }
     setShowAddCard(false);
-    setShowSuccessMessage('Card added successfully');
-    setTimeout(() => setShowSuccessMessage(''), 3000);
+    showToast.success('Card added successfully');
   };
 
   const getCardIcon = (type: string) => {
@@ -129,12 +130,7 @@ export default function Cards() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Success Message Toast */}
-      {showSuccessMessage && (
-        <div className="fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg shadow-lg z-50 flex items-center">
-          <CheckCircle className="w-5 h-5 mr-2" />
-          {showSuccessMessage}
-        </div>
-      )}
+
 
       {/* Header */}
       <header className="bg-white shadow-sm border-b sticky top-0 z-10">
@@ -155,6 +151,8 @@ export default function Cards() {
           <div className="flex items-center justify-center py-20">
             <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
           </div>
+        ) : error ? (
+          <ErrorState message="Could not load your cards. Please try again." onRetry={() => window.location.reload()} />
         ) : (<>
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
@@ -247,8 +245,8 @@ export default function Cards() {
 
                 {/* Card Meta Info */}
                 <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
-                  <span>Added on {new Date().toLocaleDateString()}</span>
-                  <span>Last used: Today</span>
+                  <span>Expires {card.expiryMonth}/{card.expiryYear}</span>
+                  <span>{card.isDefault ? 'Default card' : ''}</span>
                 </div>
               </div>
             </div>
@@ -425,7 +423,7 @@ function AddCardModal({ onClose, onAdd }: { onClose: () => void; onAdd: (card: C
 
       onAdd(newCard);
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to add card');
+      showToast.error(err.response?.data?.error || 'Failed to add card');
     } finally {
       setIsProcessing(false);
     }

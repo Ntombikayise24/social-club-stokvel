@@ -215,7 +215,7 @@ export default function LoanHistory() {
         setRepaymentSuccess(false);
       }, 1500);
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to process repayment');
+      showToast.error(err.response?.data?.error || 'Failed to process repayment');
     } finally {
       setIsProcessing(false);
     }

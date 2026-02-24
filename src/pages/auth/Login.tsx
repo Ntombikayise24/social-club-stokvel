@@ -87,7 +87,7 @@ export default function Login() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                placeholder="admin@admin.com"
+                placeholder="you@example.com"
               />
             </div>
           </div>
@@ -164,21 +164,11 @@ export default function Login() {
           </p>
         </div>
 
-        {/* Demo Credentials */}
+        {/* Powered by line */}
         <div className="mt-6 pt-4 border-t border-gray-200">
-          <p className="text-xs text-gray-400 text-center mb-2">Demo Credentials:</p>
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="bg-gray-50 p-2 rounded">
-              <p className="font-medium text-gray-700">Admin</p>
-              <p className="text-gray-500">admin@stokvel.co.za</p>
-              <p className="text-gray-500">Admin@123</p>
-            </div>
-            <div className="bg-gray-50 p-2 rounded">
-              <p className="font-medium text-gray-700">Member</p>
-              <p className="text-gray-500">thabo@example.com</p>
-              <p className="text-gray-500">Member@123</p>
-            </div>
-          </div>
+          <p className="text-xs text-gray-400 text-center">
+            Secured by SOCIAL CLUB • Bank-level encryption
+          </p>
         </div>
       </div>
     </div>

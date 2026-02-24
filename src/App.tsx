@@ -272,10 +272,10 @@ function App() {
               </button>
 
               <Link 
-                to="/register" 
+                to="/login" 
                 className="bg-gradient-to-r from-primary-600 to-primary-500 text-white px-6 py-2.5 rounded-xl hover:from-primary-700 hover:to-primary-600 transition-all shadow-lg shadow-primary-200 font-semibold"
               >
-                Join Now
+                Sign In
               </Link>
             </div>
 
@@ -299,10 +299,10 @@ function App() {
                 <span>Admin</span>
               </button>
               <Link 
-                to="/register" 
+                to="/login" 
                 className="bg-primary-600 text-white px-4 py-2 rounded-lg text-center"
               >
-                Join Now
+                Sign In
               </Link>
             </div>
           </div>
@@ -348,7 +348,7 @@ function App() {
                 ))}
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex flex-col sm:flex-row items-start gap-4">
                 <Link 
                   to="/register" 
                   className="group inline-flex items-center justify-center px-8 py-4 bg-gradient-to-r from-primary-600 to-primary-500 text-white rounded-xl hover:from-primary-700 hover:to-primary-600 transition-all shadow-lg shadow-primary-200 font-semibold text-lg"
@@ -356,15 +356,9 @@ function App() {
                   Get Started
                   <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
                 </Link>
-                <Link 
-                  to="/login" 
-                  className="inline-flex items-center justify-center px-8 py-4 border-2 border-gray-300 text-gray-700 rounded-xl hover:border-primary-600 hover:text-primary-600 transition-all font-semibold text-lg"
-                >
-                  Sign In
-                </Link>
               </div>
 
-              <div className="flex items-center space-x-4 text-sm text-gray-500">
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-gray-500">
                 <div className="flex items-center space-x-1">
                   <CheckCircle className="w-4 h-4 text-green-500" />
                   <span>SSL Secure</span>
@@ -502,12 +496,12 @@ function App() {
       <section className="py-20 bg-gradient-to-r from-primary-600 to-primary-500">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">Ready to Start Saving?</h2>
-          <p className="text-white/90 text-lg mb-8 max-w-2xl mx-auto">Join SOCIAL CLUB today and take control of your financial future</p>
+          <p className="text-white/90 text-lg mb-8 max-w-2xl mx-auto">Join SOCIAL CLUB today and take control of your financial future with our trusted community</p>
           <Link
             to="/register"
             className="inline-flex items-center space-x-2 bg-white text-primary-600 px-8 py-4 rounded-xl hover:bg-gray-100 transition-all shadow-xl font-bold text-lg"
           >
-            <span>Create Your Account</span>
+            <span>Join Now</span>
             <ArrowRight className="w-5 h-5" />
           </Link>
         </div>

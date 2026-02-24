@@ -87,6 +87,23 @@ export default function Register() {
     e.preventDefault();
     setApiError('');
     
+    // Validate phone number (SA format)
+    const cleanPhone = formData.phone.replace(/\s|-/g, '');
+    if (cleanPhone && !/^(\+27|0)\d{9}$/.test(cleanPhone)) {
+      setErrors({ ...errors, phone: 'Enter a valid SA phone number (e.g. 0812345678)' });
+      return;
+    }
+
+    // Validate password strength
+    if (formData.password.length < 8) {
+      setErrors({ ...errors, password: 'Password must be at least 8 characters' });
+      return;
+    }
+    if (!/[A-Z]/.test(formData.password) || !/[0-9]/.test(formData.password) || !/[!@#$%^&*]/.test(formData.password)) {
+      setErrors({ ...errors, password: 'Password must contain uppercase, number, and special character' });
+      return;
+    }
+
     // Validate passwords match
     if (formData.password !== formData.confirmPassword) {
       setErrors({
@@ -218,6 +235,10 @@ export default function Register() {
                 {showPassword ? <EyeOff className="w-5 h-5 text-gray-400" /> : <Eye className="w-5 h-5 text-gray-400" />}
               </button>
             </div>
+            {errors.password && (
+              <p className="text-xs text-red-500 mt-1">{errors.password}</p>
+            )}
+            <p className="text-xs text-gray-400 mt-1">Min 8 chars, uppercase, number & special character (!@#$%^&*)</p>
           </div>
 
           {/* Confirm Password */}
