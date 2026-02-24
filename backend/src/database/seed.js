@@ -74,7 +74,7 @@ async function seed() {
     `INSERT INTO stokvels (name, type, description, target_amount, max_members, interest_rate, cycle, meeting_day, next_payout, status, icon, color, created_by)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)`,
-    ['Umoja Growth Fund', 'flexible', 'Investment-focused stokvel for long-term wealth building with flexible contribution amounts.', 100000, 20, 30, 'monthly', '1st of Month', '2026-03-15', 'active', '📈', 'green', adminId]
+    ['Collective Pot', 'traditional', 'Traditional Stokvel saving for festive season celebrations', 7000, 18, 30, 'weekly', 'Sunday', '2026-03-15', 'active', '🌱', 'green', adminId]
   );
   const stokvel2Id = s2.insertId;
 
@@ -183,7 +183,7 @@ async function seed() {
   const notifications = [
     [memberId, 'contribution', 'Contribution Confirmed', 'Your R2,500 contribution to Kasi Savings Club has been confirmed.', false],
     [memberId, 'loan', 'Loan Approved', 'Your loan of R4,000 from Kasi Savings Club has been approved.', false],
-    [memberId, 'reminder', 'Contribution Reminder', 'Your monthly contribution to Umoja Growth Fund is due in 3 days.', false],
+    [memberId, 'reminder', 'Contribution Reminder', 'Your monthly contribution to Collective Pot is due in 3 days.', false],
     [memberId, 'payment', 'Payment Received', 'You received a payout of R5,000 from Kasi Savings Club.', true],
     [memberId, 'info', 'Welcome!', 'Welcome to the Stokvel Management System. Get started by exploring your dashboard.', true],
     [member2Id, 'contribution', 'Contribution Confirmed', 'Your R2,500 contribution to Ubuntu Circle has been confirmed.', false],
