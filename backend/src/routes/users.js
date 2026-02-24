@@ -235,4 +235,78 @@ router.get('/me/dashboard', async (req, res) => {
   }
 });
 
+// ────────────────── DELETE OWN ACCOUNT ──────────────────
+router.delete(
+  '/me',
+  [
+    body('password').notEmpty().withMessage('Password is required to confirm account deletion'),
+    validate,
+  ],
+  async (req, res) => {
+    const conn = await pool.getConnection();
+    try {
+      const { password } = req.body;
+      const userId = req.user.id;
+
+      // Verify password
+      const [users] = await conn.query('SELECT password_hash, role FROM users WHERE id = ?', [userId]);
+      if (users.length === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      // Prevent admin from deleting themselves
+      if (users[0].role === 'admin') {
+        return res.status(403).json({ error: 'Admin accounts cannot be self-deleted. Contact another admin.' });
+      }
+
+      const isValid = await bcrypt.compare(password, users[0].password_hash);
+      if (!isValid) {
+        return res.status(400).json({ error: 'Incorrect password' });
+      }
+
+      // Check for active/overdue loans
+      const [activeLoans] = await conn.query(
+        "SELECT COUNT(*) as count FROM loans WHERE user_id = ? AND status IN ('active', 'overdue')",
+        [userId]
+      );
+      if (activeLoans[0].count > 0) {
+        return res.status(400).json({ error: 'You have outstanding loans. Please repay all loans before deleting your account.' });
+      }
+
+      await conn.beginTransaction();
+
+      // Soft-delete: set status to 'deleted' and anonymize
+      await conn.query(
+        "UPDATE users SET status = 'deleted', email = CONCAT('deleted_', id, '@removed.com'), phone = '', full_name = 'Deleted User' WHERE id = ?",
+        [userId]
+      );
+
+      // Deactivate all profiles
+      await conn.query("UPDATE profiles SET status = 'inactive' WHERE user_id = ?", [userId]);
+
+      // Delete notifications
+      await conn.query('DELETE FROM notifications WHERE user_id = ?', [userId]);
+
+      // Delete settings
+      await conn.query('DELETE FROM user_settings WHERE user_id = ?', [userId]);
+
+      // Delete cards
+      await conn.query('DELETE FROM cards WHERE user_id = ?', [userId]);
+
+      // Delete password reset tokens
+      await conn.query('DELETE FROM password_reset_tokens WHERE user_id = ?', [userId]);
+
+      await conn.commit();
+
+      res.json({ message: 'Account deleted successfully' });
+    } catch (err) {
+      await conn.rollback();
+      console.error('Delete account error:', err);
+      res.status(500).json({ error: 'Failed to delete account' });
+    } finally {
+      conn.release();
+    }
+  }
+);
+
 export default router;

@@ -44,6 +44,9 @@ export const userApi = {
   getProfiles: () => api.get('/users/me/profiles'),
 
   getDashboard: () => api.get('/users/me/dashboard'),
+
+  deleteAccount: (password: string) =>
+    api.delete('/users/me', { data: { password } }),
 };
 
 // ══════════════════════════════════════════

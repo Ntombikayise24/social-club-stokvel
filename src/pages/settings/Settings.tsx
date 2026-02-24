@@ -60,6 +60,12 @@ export default function Settings() {
   });
   const [passwordError, setPasswordError] = useState('');
 
+  // Delete Account
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteError, setDeleteError] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+
   // Cards data
   const [cards, setCards] = useState<any[]>([]);
 
@@ -163,6 +169,26 @@ export default function Settings() {
       setTimeout(() => setShowSuccessMessage(''), 3000);
     } catch (err: any) {
       setPasswordError(err.response?.data?.error || 'Failed to change password');
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!deletePassword) {
+      setDeleteError('Please enter your password to confirm');
+      return;
+    }
+    setDeleteError('');
+    setIsDeleting(true);
+    try {
+      await userApi.deleteAccount(deletePassword);
+      // Clear all stored data and redirect to login
+      localStorage.clear();
+      sessionStorage.clear();
+      navigate('/login');
+    } catch (err: any) {
+      setDeleteError(err.response?.data?.error || 'Failed to delete account');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -639,7 +665,7 @@ export default function Settings() {
                     </div>
                     <p className="text-xs text-gray-500 mt-1">Terms and conditions of using HENNESSY SOCIAL CLUB</p>
                   </Link>
-                  <button className="w-full text-left p-3 hover:bg-gray-50 rounded-lg border border-gray-200">
+                  <button onClick={() => { setShowDeleteModal(true); setDeletePassword(''); setDeleteError(''); }} className="w-full text-left p-3 hover:bg-red-50 rounded-lg border border-gray-200">
                     <div className="flex items-center justify-between">
                       <span className="font-medium text-red-600">Delete Account</span>
                       <ChevronRight className="w-5 h-5 text-gray-400" />
@@ -670,6 +696,62 @@ export default function Settings() {
         </div>
         </>)}
       </main>
+
+      {/* Delete Account Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 animate-fadeIn">
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                <AlertCircle className="w-5 h-5 text-red-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-800">Delete Account</h3>
+            </div>
+
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+              <p className="text-sm text-red-700 font-medium">This action is permanent and cannot be undone.</p>
+              <ul className="text-xs text-red-600 mt-2 space-y-1 list-disc list-inside">
+                <li>All your profile data will be removed</li>
+                <li>Your cards and settings will be deleted</li>
+                <li>You will lose access to all stokvels</li>
+                <li>Contribution history will be anonymized</li>
+              </ul>
+            </div>
+
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Enter your password to confirm
+            </label>
+            <input
+              type="password"
+              value={deletePassword}
+              onChange={(e) => setDeletePassword(e.target.value)}
+              placeholder="Your current password"
+              className="w-full border border-gray-300 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-red-500 focus:border-red-500 mb-2"
+            />
+
+            {deleteError && (
+              <p className="text-sm text-red-600 mb-3">{deleteError}</p>
+            )}
+
+            <div className="flex space-x-3 mt-4">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className="flex-1 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm font-medium"
+                disabled={isDeleting}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                disabled={isDeleting || !deletePassword}
+                className="flex-1 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium disabled:opacity-50"
+              >
+                {isDeleting ? 'Deleting...' : 'Delete My Account'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Animation Styles */}
       <style>{`

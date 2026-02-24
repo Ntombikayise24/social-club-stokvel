@@ -1,15 +1,16 @@
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Shield, Scale, Clock, Users, DollarSign, AlertCircle } from 'lucide-react';
 
 export default function Terms() {
+  const navigate = useNavigate();
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm border-b sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center space-x-4">
-            <Link to="/register" className="text-gray-600 hover:text-primary-600">
+            <button onClick={() => navigate(-1)} className="text-gray-600 hover:text-primary-600">
               <ArrowLeft className="w-5 h-5" />
-            </Link>
+            </button>
             <h1 className="text-2xl font-bold text-primary-800">HENNESSY SOCIAL CLUB</h1>
           </div>
         </div>
