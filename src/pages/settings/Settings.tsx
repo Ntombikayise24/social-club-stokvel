@@ -18,7 +18,7 @@ import {
   Eye,
   EyeOff
 } from 'lucide-react';
-import { userApi, settingsApi, cardApi } from '../../api';
+import { userApi, settingsApi } from '../../api';
 import { showToast } from '../../utils/toast';
 import { logout } from '../../utils/auth';
 
@@ -68,18 +68,15 @@ export default function Settings() {
   const [deleteError, setDeleteError] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Cards data
-  const [cards, setCards] = useState<any[]>([]);
   const [memberSince, setMemberSince] = useState('');
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [userRes, settingsRes, cardsRes] = await Promise.all([
+        const [userRes, settingsRes] = await Promise.all([
           userApi.getMe(),
-          settingsApi.get().catch(() => ({ data: {} })),
-          cardApi.list().catch(() => ({ data: [] }))
+          settingsApi.get().catch(() => ({ data: {} }))
         ]);
 
         const user = userRes.data;
@@ -105,14 +102,6 @@ export default function Settings() {
           groupAnnouncements: s.pushNotifications ?? true,
           marketingEmails: false
         });
-
-        setCards((cardsRes.data || []).map((c: any) => ({
-          id: String(c.id),
-          type: c.cardType || 'visa',
-          last4: c.last4 || '****',
-          expiry: `${c.expiryMonth || '??'}/${c.expiryYear || '??'}`,
-          isDefault: !!c.isDefault
-        })));
       } catch (err) {
         console.error('Failed to load settings', err);
       } finally {
@@ -209,7 +198,7 @@ export default function Settings() {
     { id: 'profile', label: 'Profile', icon: User },
     { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'security', label: 'Security', icon: Lock },
-    { id: 'payment', label: 'Payment Methods', icon: CreditCard },
+    { id: 'payment', label: 'Payments', icon: CreditCard },
     { id: 'privacy', label: 'Privacy & Legal', icon: Shield }
   ];
 
@@ -575,56 +564,67 @@ export default function Settings() {
             {/* Payment Methods */}
             {activeTab === 'payment' && (
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center justify-between">
-                  <div className="flex items-center">
-                    <CreditCard className="w-5 h-5 mr-2 text-primary-600" />
-                    Payment Methods
-                  </div>
-                  <button
-                    onClick={() => navigate('/cards')}
-                    className="text-sm bg-primary-600 text-white px-3 py-1.5 rounded-lg hover:bg-primary-700"
-                  >
-                    Manage Cards
-                  </button>
+                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                  <CreditCard className="w-5 h-5 mr-2 text-primary-600" />
+                  Payments
                 </h3>
 
-                <div className="space-y-3 mb-6">
-                  {cards.map(card => (
-                    <div key={card.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
-                      <div className="flex items-center space-x-3">
-                        <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${
-                          card.type === 'visa' ? 'from-blue-500 to-blue-600' : 'from-orange-500 to-red-500'
-                        } flex items-center justify-center text-white font-bold text-sm`}>
-                          {card.type === 'visa' ? 'V' : 'MC'}
-                        </div>
-                        <div>
-                          <p className="font-medium">
-                            {card.type === 'visa' ? 'Visa' : 'Mastercard'} •••• {card.last4}
-                          </p>
-                          <p className="text-xs text-gray-500">Expires {card.expiry}</p>
-                        </div>
-                      </div>
-                      {card.isDefault && (
-                        <span className="text-xs bg-primary-100 text-primary-700 px-2 py-1 rounded-full">
-                          Default
-                        </span>
-                      )}
+                {/* Payment Provider Info */}
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                      <Lock className="w-6 h-6 text-green-600" />
                     </div>
-                  ))}
+                    <div>
+                      <p className="font-medium text-gray-800">Secure Payments via Paystack</p>
+                      <p className="text-sm text-gray-600">All contributions are processed securely through Paystack</p>
+                    </div>
+                  </div>
                 </div>
 
-                <Link
-                  to="/cards"
-                  className="block w-full text-center py-3 border border-dashed border-gray-300 rounded-lg hover:bg-gray-50 text-gray-600 hover:text-primary-600 transition-colors"
-                >
-                  + Add New Card
-                </Link>
-
-                <div className="mt-4 pt-4 border-t border-gray-200">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">Default Payment</span>
-                    <span className="font-medium">Visa •••• 4242</span>
+                {/* How it works */}
+                <div className="space-y-4 mb-6">
+                  <h4 className="font-medium text-gray-700">How Contributions Work</h4>
+                  <div className="space-y-3">
+                    <div className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
+                      <div className="w-6 h-6 bg-primary-100 rounded-full flex items-center justify-center text-xs font-bold text-primary-700">1</div>
+                      <div>
+                        <p className="font-medium text-sm">Click "Contribute" on your dashboard</p>
+                        <p className="text-xs text-gray-500">Enter the amount you want to contribute</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
+                      <div className="w-6 h-6 bg-primary-100 rounded-full flex items-center justify-center text-xs font-bold text-primary-700">2</div>
+                      <div>
+                        <p className="font-medium text-sm">Secure payment page opens</p>
+                        <p className="text-xs text-gray-500">Enter your card details on Paystack's secure page</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
+                      <div className="w-6 h-6 bg-primary-100 rounded-full flex items-center justify-center text-xs font-bold text-primary-700">3</div>
+                      <div>
+                        <p className="font-medium text-sm">Payment confirmed instantly</p>
+                        <p className="text-xs text-gray-500">Your contribution is recorded and your balance updates</p>
+                      </div>
+                    </div>
                   </div>
+                </div>
+
+                {/* Supported Methods */}
+                <div className="border-t border-gray-200 pt-4">
+                  <h4 className="font-medium text-gray-700 mb-3">Supported Payment Methods</h4>
+                  <div className="flex flex-wrap gap-2">
+                    <span className="px-3 py-1.5 bg-gray-100 rounded-lg text-sm font-medium">💳 Visa</span>
+                    <span className="px-3 py-1.5 bg-gray-100 rounded-lg text-sm font-medium">💳 Mastercard</span>
+                    <span className="px-3 py-1.5 bg-gray-100 rounded-lg text-sm font-medium">🏦 Bank Transfer</span>
+                    <span className="px-3 py-1.5 bg-gray-100 rounded-lg text-sm font-medium">📱 USSD</span>
+                  </div>
+                </div>
+
+                {/* Security Badge */}
+                <div className="mt-4 pt-4 border-t border-gray-200 flex items-center justify-between text-sm text-gray-500">
+                  <span>🔒 256-bit SSL encryption</span>
+                  <span>PCI DSS compliant</span>
                 </div>
               </div>
             )}

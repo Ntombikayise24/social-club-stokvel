@@ -24,7 +24,7 @@ import {
   Loader2
 } from 'lucide-react';
 import ProfileSwitcher from './ProfileSwitcher';
-import { userApi, stokvelApi, loanApi, contributionApi, notificationApi, cardApi, paymentApi } from '../../api';
+import { userApi, stokvelApi, loanApi, contributionApi, notificationApi, paymentApi } from '../../api';
 import { showToast } from '../../utils/toast';
 import { logout } from '../../utils/auth';
 
@@ -80,17 +80,15 @@ export default function MainDashboard() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loanStats, setLoanStats] = useState({ available: 0, borrowed: 0, remaining: 0, progress: 0 });
   const [stokvelDetails, setStokvelDetails] = useState<StokvelData | null>(null);
-  const [userCards, setUserCards] = useState<any[]>([]);
   
   // Fetch data from backend
   const fetchData = useCallback(async () => {
     try {
       setIsLoading(true);
-      const [userRes, stokvelsRes, notifRes, cardsRes] = await Promise.all([
+      const [userRes, stokvelsRes, notifRes] = await Promise.all([
         userApi.getMe(),
         stokvelApi.list(),
         notificationApi.list({ limit: 10 }).catch(() => ({ data: [] })),
-        cardApi.list().catch(() => ({ data: [] })),
       ]);
 
       const user = userRes.data;
@@ -132,9 +130,6 @@ export default function MainDashboard() {
         time: n.createdAt ? new Date(n.createdAt).toLocaleDateString() : '',
         read: n.isRead || false,
       })));
-
-      // Cards
-      setUserCards(Array.isArray(cardsRes.data) ? cardsRes.data : []);
 
       // Fetch loan stats
       try {
@@ -239,8 +234,7 @@ export default function MainDashboard() {
 
   // Contribution form state
   const [contributionData, setContributionData] = useState({
-    amount: '',
-    paymentMethod: 'card'
+    amount: ''
   });
 
   // Calculate remaining amount for this profile
@@ -314,7 +308,7 @@ export default function MainDashboard() {
             clearTimeout(pollTimeout);
             setShowAddContribution(false);
             setIsProcessingPayment(false);
-            setContributionData({ amount: '', paymentMethod: 'card' });
+            setContributionData({ amount: '' });
             showToast.success(`Payment of R ${contributionData.amount} confirmed! Your contribution has been recorded.`);
             fetchData();
           }
@@ -784,10 +778,10 @@ export default function MainDashboard() {
                   <span className="text-xs font-medium text-gray-700">Profile</span>
                 </Link>
 
-                {/* CARDS BUTTON - KEPT AS IS */}
-                <Link to="/cards" className="flex flex-col items-center p-4 bg-green-50 hover:bg-green-100 rounded-xl transition-colors group">
-                  <CreditCard className="w-6 h-6 text-green-600 mb-2 group-hover:scale-110 transition-transform" />
-                  <span className="text-xs font-medium text-gray-700">Cards</span>
+                {/* LOANS BUTTON */}
+                <Link to={`/loans?profile=${activeProfile.id}`} className="flex flex-col items-center p-4 bg-green-50 hover:bg-green-100 rounded-xl transition-colors group">
+                  <Wallet className="w-6 h-6 text-green-600 mb-2 group-hover:scale-110 transition-transform" />
+                  <span className="text-xs font-medium text-gray-700">Loans</span>
                 </Link>
 
                 {/* DISCOVER BUTTON - ADDED AS EXTRA */}
