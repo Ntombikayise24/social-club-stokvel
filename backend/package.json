@@ -8,7 +8,9 @@
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
     "migrate": "node src/database/migrate.js",
-    "seed": "node src/database/seed.js"
+    "seed": "node src/database/seed.js",
+    "setup": "node -e \"const fs=require('fs'); if(!fs.existsSync('.env')){fs.copyFileSync('.env.example','.env');console.log('✅ .env created from .env.example — edit it with your DB password if needed')}else{console.log('ℹ️  .env already exists')}\" && npm install && npm run migrate",
+    "reset-db": "node src/database/migrate.js && node src/database/seed.js"
   },
   "dependencies": {
     "axios": "^1.13.5",

@@ -1,6 +1,13 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import path from 'path';
+
+// Load .env BEFORE any other imports that might need env vars
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.join(__dirname, '../.env') });
+
 import pool from './database/connection.js';
 
 // Route imports
@@ -15,8 +22,6 @@ import settingsRoutes from './routes/settings.js';
 import helpRoutes from './routes/help.js';
 import adminRoutes from './routes/admin.js';
 import paymentRoutes from './routes/payments.js';
-
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;

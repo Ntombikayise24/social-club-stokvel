@@ -1,73 +1,46 @@
-# React + TypeScript + Vite
+# Social Club Stokvel Management System
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A full-stack stokvel (savings club) management system built with React + TypeScript (frontend) and Express + MySQL (backend).
 
-Currently, two official plugins are available:
+## Quick Start (After Cloning)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+### Prerequisites
+- **Node.js** 18+
+- **MySQL** 8.0+ (must be running)
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### 1. Backend Setup
+```bash
+cd backend
+npm run setup          # Creates .env, installs deps, runs DB migration
+npm run seed           # Creates admin account & demo data
+npm run dev            # Starts API server on http://localhost:5000
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+> If your MySQL root user has a password, edit `backend/.env` and set `DB_PASSWORD=your_password` before running `npm run setup`.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### 2. Frontend Setup
+```bash
+# In the project root (not backend/)
+npm install
+npm run dev            # Starts frontend on http://localhost:5173
 ```
+
+### 3. Login Credentials (after seeding)
+
+| Role    | Email               | Password    |
+|---------|---------------------|-------------|
+| Admin   | admin@stokvel.co.za | Admin@123   |
+| Member  | thabo@example.com   | Member@123  |
+| Member  | naledi@example.com  | Member@123  |
+
+## Troubleshooting
+
+| Error | Solution |
+|-------|----------|
+| `ECONNREFUSED` | MySQL is not running. Start MySQL service first. |
+| `ER_ACCESS_DENIED_ERROR` | Wrong DB credentials. Edit `backend/.env` and fix `DB_PASSWORD`. |
+| `ER_BAD_DB_ERROR` | Database doesn't exist. Run `cd backend && npm run migrate`. |
+| `Login failed` (500) | Check backend terminal for the actual error message. |
+
+---
+

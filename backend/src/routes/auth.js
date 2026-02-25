@@ -64,7 +64,10 @@ router.post(
         userId,
       });
     } catch (err) {
-      console.error('Register error:', err);
+      console.error('Register error:', err.message || err);
+      if (err.code === 'ECONNREFUSED' || err.code === 'ER_ACCESS_DENIED_ERROR' || err.code === 'ER_BAD_DB_ERROR') {
+        return res.status(503).json({ error: 'Database unavailable. Please try again later.' });
+      }
       res.status(500).json({ error: 'Registration failed' });
     }
   }
@@ -133,8 +136,12 @@ router.post(
         },
       });
     } catch (err) {
-      console.error('Login error:', err);
-      res.status(500).json({ error: 'Login failed' });
+      console.error('Login error:', err.message || err);
+      // Distinguish DB connection errors from other server errors
+      if (err.code === 'ECONNREFUSED' || err.code === 'ER_ACCESS_DENIED_ERROR' || err.code === 'ER_BAD_DB_ERROR') {
+        return res.status(503).json({ error: 'Database unavailable. Please try again later.' });
+      }
+      res.status(500).json({ error: 'Login failed. Server error.' });
     }
   }
 );

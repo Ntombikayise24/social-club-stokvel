@@ -1,6 +1,11 @@
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
-dotenv.config();
+import { fileURLToPath } from 'url';
+import path from 'path';
+
+// Always resolve .env relative to this file so it works from any CWD
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.join(__dirname, '../../.env') });
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 

@@ -12,19 +12,24 @@ Express.js + MySQL backend for the Stokvel Management System.
 ```bash
 cd backend
 
-# 1. Install dependencies
-npm install
+# 1. Quick setup (creates .env, installs deps, runs migration)
+npm run setup
 
-# 2. Configure environment
-#    Edit .env and set your MySQL credentials (DB_USER, DB_PASSWORD)
-#    The database will be auto-created by the migration script.
+# 2. (Optional) Edit .env if your MySQL root password is not empty
+#    Open backend/.env and set DB_PASSWORD=your_mysql_root_password
 
-# 3. Run database migration (creates all tables AND seeds demo data)
-npm run migrate
+# 3. Seed demo data (admin account, sample stokvels, etc.)
+npm run seed
 
 # 4. Start the dev server
 npm run dev
 ```
+
+> **IMPORTANT for cloning to a new PC:**
+> 1. Make sure MySQL is installed and running
+> 2. Run `npm run setup` — this creates `.env` from `.env.example` and runs migrations
+> 3. If your MySQL root user has a password, edit `backend/.env` and set `DB_PASSWORD`
+> 4. Run `npm run seed` to create the admin account and demo data
 
 The API will start on **http://localhost:5000**.
 
