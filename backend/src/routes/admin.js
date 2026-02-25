@@ -263,10 +263,13 @@ router.put(
       const userId = req.params.id;
       const { fullName, email, phone, status, role, stokvelIds } = req.body;
 
-      const [users] = await pool.query('SELECT id FROM users WHERE id = ?', [userId]);
+      const [users] = await pool.query('SELECT id, status AS currentStatus FROM users WHERE id = ?', [userId]);
       if (users.length === 0) {
         return res.status(404).json({ error: 'User not found' });
       }
+
+      // Detect if user is being activated from pending
+      const wasPending = users[0].currentStatus === 'pending' && status === 'active';
 
       const updates = [];
       const values = [];
@@ -316,6 +319,19 @@ router.put(
               [userId, currentId]
             );
           }
+        }
+      }
+
+      // Send approval email if user was activated
+      if (wasPending) {
+        const [activatedUser] = await pool.query('SELECT full_name, email, status FROM users WHERE id = ?', [userId]);
+        if (activatedUser.length > 0 && activatedUser[0].status === 'active') {
+          const [userProfiles] = await pool.query(
+            'SELECT s.name FROM profiles p JOIN stokvels s ON s.id = p.stokvel_id WHERE p.user_id = ? AND p.status = "active"',
+            [userId]
+          );
+          const stokvelNames = userProfiles.map(p => p.name);
+          sendApprovalEmail(activatedUser[0].email, activatedUser[0].full_name, stokvelNames);
         }
       }
 
@@ -795,9 +811,9 @@ router.post('/contributions/:id/confirm', async (req, res) => {
       ['confirmed', req.user.id, contributionId]
     );
 
-    // Update profile saved amount
+    // Update profile saved amount (capped at target)
     await pool.query(
-      'UPDATE profiles SET saved_amount = saved_amount + ? WHERE id = ?',
+      'UPDATE profiles SET saved_amount = LEAST(saved_amount + ?, target_amount) WHERE id = ?',
       [contribution.amount, contribution.profile_id]
     );
 

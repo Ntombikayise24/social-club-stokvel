@@ -8,30 +8,41 @@ A full-stack stokvel (savings club) management system built with React + TypeScr
 - **Node.js** 18+
 - **MySQL** 8.0+ (must be running)
 
-### 1. Backend Setup
+### One-Command Setup (Windows)
 ```bash
-cd backend
-npm run setup          # Creates .env, installs deps, runs DB migration
-npm run seed           # Creates admin account & demo data
-npm run dev            # Starts API server on http://localhost:5000
+# Double-click setup.bat OR run:
+setup.bat
 ```
+This installs all dependencies and sets up the database. SMTP and Paystack keys are already configured.
 
-> If your MySQL root user has a password, edit `backend/.env` and set `DB_PASSWORD=your_password` before running `npm run setup`.
-
-### 2. Frontend Setup
+### Manual Setup
 ```bash
-# In the project root (not backend/)
+# 1. Install frontend dependencies
 npm install
-npm run dev            # Starts frontend on http://localhost:5173
+
+# 2. Install backend dependencies & migrate database
+cd backend
+npm install
+npm run migrate        # Creates DB, tables & seeds demo data
+npm run dev            # Starts API server on http://localhost:5000
+
+# 3. Start frontend (in a second terminal, from project root)
+npm run dev            # Starts frontend on http://localhost:5174
 ```
 
-### 3. Login Credentials (after seeding)
+> If your MySQL root user has a password, edit `backend/.env` and set `DB_PASSWORD=your_password` before running `npm run migrate`.
+
+### Login Credentials (after seeding)
 
 | Role    | Email               | Password    |
 |---------|---------------------|-------------|
 | Admin   | admin@stokvel.co.za | Admin@123   |
 | Member  | thabo@example.com   | Member@123  |
 | Member  | naledi@example.com  | Member@123  |
+
+### Pre-configured Services
+- **Paystack** (test mode) — payment processing is ready to use
+- **Gmail SMTP** — approval emails are sent automatically
 
 ## Troubleshooting
 

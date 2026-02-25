@@ -27,11 +27,24 @@ router.post(
 
       // Verify profile belongs to user
       const [profiles] = await pool.query(
-        'SELECT id, stokvel_id, user_id FROM profiles WHERE id = ? AND user_id = ?',
+        'SELECT id, stokvel_id, user_id, target_amount, saved_amount FROM profiles WHERE id = ? AND user_id = ?',
         [profileId, req.user.id]
       );
       if (profiles.length === 0) {
         return res.status(404).json({ error: 'Profile not found' });
+      }
+
+      // Check contribution does not exceed target
+      const profile = profiles[0];
+      const remaining = parseFloat(profile.target_amount) - parseFloat(profile.saved_amount);
+      if (remaining <= 0) {
+        return res.status(400).json({ error: 'You have already reached your contribution target.' });
+      }
+      if (amount > remaining) {
+        return res.status(400).json({
+          error: `Amount exceeds your remaining target. You can contribute up to R${remaining.toLocaleString()}.`,
+          maxAmount: remaining,
+        });
       }
 
       // Check if user has at least one card
@@ -134,10 +147,19 @@ router.get('/verify/:reference', async (req, res) => {
       if (contributions.length > 0) {
         const contrib = contributions[0];
 
-        // Update saved amount on profile
+        // Cap saved_amount so it never exceeds target_amount
+        const [profileRows] = await pool.query(
+          'SELECT target_amount, saved_amount FROM profiles WHERE id = ?',
+          [contrib.profile_id]
+        );
+        const profileTarget = parseFloat(profileRows[0].target_amount);
+        const currentSaved = parseFloat(profileRows[0].saved_amount);
+        const addAmount = Math.min(parseFloat(contrib.amount), Math.max(profileTarget - currentSaved, 0));
+
+        // Update saved amount on profile (capped at target)
         await pool.query(
-          'UPDATE profiles SET saved_amount = saved_amount + ? WHERE id = ?',
-          [contrib.amount, contrib.profile_id]
+          'UPDATE profiles SET saved_amount = LEAST(saved_amount + ?, target_amount) WHERE id = ?',
+          [addAmount, contrib.profile_id]
         );
 
         // Create success notification
@@ -214,7 +236,8 @@ router.post('/webhook', async (req, res) => {
         const contrib = contributions[0];
 
         await pool.query("UPDATE contributions SET status = 'confirmed' WHERE id = ?", [contrib.id]);
-        await pool.query('UPDATE profiles SET saved_amount = saved_amount + ? WHERE id = ?', [contrib.amount, contrib.profile_id]);
+        // Cap saved_amount so it never exceeds target_amount
+        await pool.query('UPDATE profiles SET saved_amount = LEAST(saved_amount + ?, target_amount) WHERE id = ?', [contrib.amount, contrib.profile_id]);
 
         const [stokvel] = await pool.query('SELECT name FROM stokvels WHERE id = ?', [contrib.stokvel_id]);
         await pool.query(

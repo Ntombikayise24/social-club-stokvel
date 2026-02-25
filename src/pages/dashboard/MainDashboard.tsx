@@ -770,7 +770,7 @@ export default function MainDashboard() {
               <h3 className="font-semibold text-gray-700 mb-4">Quick Actions</h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <button 
-                  onClick={() => setShowAddContribution(true)}
+                  onClick={() => remainingAmount > 0 ? setShowAddContribution(true) : showToast.info('You have already reached your contribution target!')}
                   className="flex flex-col items-center p-4 bg-primary-50 hover:bg-primary-100 rounded-xl transition-colors group"
                 >
                   <PlusCircle className="w-6 h-6 text-primary-600 mb-2 group-hover:scale-110 transition-transform" />
@@ -966,6 +966,14 @@ export default function MainDashboard() {
 
               {/* Amount Input */}
               <div className="mb-6">
+                {remainingAmount <= 0 ? (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+                    <CheckCircle className="w-8 h-8 text-green-600 mx-auto mb-2" />
+                    <p className="text-sm font-medium text-green-800">Target Reached!</p>
+                    <p className="text-xs text-green-600 mt-1">You've already met your contribution target for this stokvel.</p>
+                  </div>
+                ) : (
+                  <>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Amount (ZAR) *
                 </label>
@@ -988,6 +996,11 @@ export default function MainDashboard() {
                     Remaining: R{remainingAmount.toLocaleString()}
                   </p>
                 </div>
+                {contributionData.amount && parseInt(contributionData.amount) > remainingAmount && (
+                  <p className="text-xs text-red-600 mt-1">Amount exceeds your remaining target of R{remainingAmount.toLocaleString()}</p>
+                )}
+                  </>
+                )}
               </div>
 
               {/* Payment Method - Paystack */}

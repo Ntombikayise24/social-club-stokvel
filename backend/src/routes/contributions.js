@@ -144,12 +144,25 @@ router.post(
 
       // Verify profile belongs to user
       const [profiles] = await pool.query(
-        'SELECT id, stokvel_id, user_id FROM profiles WHERE id = ? AND user_id = ?',
+        'SELECT id, stokvel_id, user_id, target_amount, saved_amount FROM profiles WHERE id = ? AND user_id = ?',
         [profileId, req.user.id]
       );
 
       if (profiles.length === 0) {
         return res.status(404).json({ error: 'Profile not found' });
+      }
+
+      // Check contribution does not exceed target
+      const profile = profiles[0];
+      const remaining = parseFloat(profile.target_amount) - parseFloat(profile.saved_amount);
+      if (remaining <= 0) {
+        return res.status(400).json({ error: 'You have already reached your contribution target.' });
+      }
+      if (amount > remaining) {
+        return res.status(400).json({
+          error: `Amount exceeds your remaining target. You can contribute up to R${remaining.toLocaleString()}.`,
+          maxAmount: remaining,
+        });
       }
 
       // Check if user has at least one card (for card payments)
