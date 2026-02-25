@@ -54,7 +54,7 @@ async function migrate() {
   await connection.query(`
     CREATE TABLE IF NOT EXISTS stokvels (
       id INT AUTO_INCREMENT PRIMARY KEY,
-      name VARCHAR(255) NOT NULL,
+      name VARCHAR(255) NOT NULL UNIQUE,
       type ENUM('traditional', 'flexible') DEFAULT 'traditional',
       description TEXT,
       target_amount DECIMAL(15,2) DEFAULT 0,
@@ -284,6 +284,48 @@ async function migrate() {
   console.log('✅ join_requests table created');
 
   console.log('\n✅ All migrations completed successfully!');
+
+  // ── Clean up duplicate stokvels (from previous seed runs without unique constraint) ──
+  try {
+    const [dupes] = await connection.query(`
+      SELECT name, MIN(id) AS keep_id, COUNT(*) AS cnt
+      FROM stokvels
+      GROUP BY name
+      HAVING cnt > 1
+    `);
+    for (const d of dupes) {
+      // Remove profiles referencing duplicate stokvel IDs
+      await connection.query(
+        'DELETE FROM profiles WHERE stokvel_id IN (SELECT id FROM stokvels WHERE name = ? AND id != ?)',
+        [d.name, d.keep_id]
+      );
+      // Remove contributions referencing duplicates
+      await connection.query(
+        'DELETE FROM contributions WHERE stokvel_id IN (SELECT id FROM stokvels WHERE name = ? AND id != ?)',
+        [d.name, d.keep_id]
+      );
+      // Remove join requests referencing duplicates
+      await connection.query(
+        'DELETE FROM join_requests WHERE stokvel_id IN (SELECT id FROM stokvels WHERE name = ? AND id != ?)',
+        [d.name, d.keep_id]
+      );
+      // Remove the duplicate stokvels
+      await connection.query('DELETE FROM stokvels WHERE name = ? AND id != ?', [d.name, d.keep_id]);
+      console.log(`🧹 Removed ${d.cnt - 1} duplicate(s) of stokvel "${d.name}"`);
+    }
+
+    // Add unique index if it doesn't exist yet
+    const [indexes] = await connection.query(
+      `SHOW INDEX FROM stokvels WHERE Key_name = 'name'`
+    );
+    if (indexes.length === 0) {
+      await connection.query('ALTER TABLE stokvels ADD UNIQUE INDEX uk_name (name)');
+      console.log('✅ Added unique constraint on stokvels.name');
+    }
+  } catch (cleanupErr) {
+    console.warn('⚠️ Duplicate cleanup skipped:', cleanupErr.message);
+  }
+
   console.log('\n🌱 Starting database seeding...\n');
   await connection.end();
   

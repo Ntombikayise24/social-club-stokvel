@@ -88,13 +88,8 @@ async function seed() {
   console.log('✅ 3 stokvels created');
 
   // ── Profiles (memberships) ──
+  // NOTE: Admin does NOT get stokvel profiles — admin is a system-level user only
   const today = new Date().toISOString().split('T')[0];
-  const [p1] = await connection.query(
-    `INSERT INTO profiles (user_id, stokvel_id, role, target_amount, saved_amount, status, joined_date)
-     VALUES (?, ?, 'admin', 50000, 12500, 'active', ?)
-     ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)`,
-    [adminId, stokvel1Id, today]
-  );
 
   const [p2] = await connection.query(
     `INSERT INTO profiles (user_id, stokvel_id, role, target_amount, saved_amount, status, joined_date)

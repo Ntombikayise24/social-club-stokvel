@@ -7,6 +7,22 @@ import pool from '../database/connection.js';
 const router = Router();
 router.use(authenticate);
 
+// Luhn algorithm to validate card numbers
+function luhnCheck(cardNumber) {
+  let sum = 0;
+  let alternate = false;
+  for (let i = cardNumber.length - 1; i >= 0; i--) {
+    let n = parseInt(cardNumber.charAt(i), 10);
+    if (alternate) {
+      n *= 2;
+      if (n > 9) n -= 9;
+    }
+    sum += n;
+    alternate = !alternate;
+  }
+  return sum % 10 === 0;
+}
+
 // ────────────────── LIST CARDS ──────────────────
 router.get('/', async (req, res) => {
   try {
@@ -45,8 +61,24 @@ router.post(
     try {
       const { cardNumber, cardholderName, expiryMonth, expiryYear } = req.body;
 
-      // Detect card type
+      // Validate card number with Luhn algorithm
       const cleanNumber = cardNumber.replace(/\s/g, '');
+      if (!/^\d{13,19}$/.test(cleanNumber)) {
+        return res.status(400).json({ error: 'Card number must be 13–19 digits' });
+      }
+      if (!luhnCheck(cleanNumber)) {
+        return res.status(400).json({ error: 'Invalid card number' });
+      }
+
+      // Validate expiry isn't in the past
+      const now = new Date();
+      const currentMonth = now.getMonth() + 1;
+      const currentYear = now.getFullYear();
+      if (expiryYear < currentYear || (expiryYear === currentYear && expiryMonth < currentMonth)) {
+        return res.status(400).json({ error: 'Card has expired' });
+      }
+
+      // Detect card type
       let cardType = 'visa';
       if (/^5[1-5]/.test(cleanNumber) || /^2[2-7]/.test(cleanNumber)) cardType = 'mastercard';
       else if (/^3[47]/.test(cleanNumber)) cardType = 'amex';

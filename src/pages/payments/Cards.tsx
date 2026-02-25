@@ -352,16 +352,38 @@ function AddCardModal({ onClose, onAdd }: { onClose: () => void; onAdd: (card: C
     return 'visa';
   };
 
+  // Luhn algorithm to validate card numbers
+  const luhnCheck = (cardNumber: string): boolean => {
+    let sum = 0;
+    let alternate = false;
+    for (let i = cardNumber.length - 1; i >= 0; i--) {
+      let n = parseInt(cardNumber.charAt(i), 10);
+      if (alternate) {
+        n *= 2;
+        if (n > 9) n -= 9;
+      }
+      sum += n;
+      alternate = !alternate;
+    }
+    return sum % 10 === 0;
+  };
+
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
     const cleanNumber = formData.cardNumber.replace(/\s/g, '');
 
-    if (!cleanNumber.match(/^\d{16}$/)) {
-      newErrors.cardNumber = 'Card number must be 16 digits';
+    if (!cleanNumber.match(/^\d{13,19}$/)) {
+      newErrors.cardNumber = 'Card number must be 13–19 digits';
+    } else if (!luhnCheck(cleanNumber)) {
+      newErrors.cardNumber = 'Invalid card number';
     }
 
     if (!formData.cardholderName.trim()) {
       newErrors.cardholderName = 'Cardholder name is required';
+    } else if (formData.cardholderName.trim().length < 3) {
+      newErrors.cardholderName = 'Name must be at least 3 characters';
+    } else if (!/^[a-zA-Z\s\-'.]+$/.test(formData.cardholderName.trim())) {
+      newErrors.cardholderName = 'Name contains invalid characters';
     }
 
     if (!formData.expiryMonth || !formData.expiryYear) {

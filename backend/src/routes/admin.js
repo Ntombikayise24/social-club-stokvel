@@ -40,6 +40,9 @@ router.get('/stats', async (_req, res) => {
     const [deletedUsers] = await pool.query(
       "SELECT COUNT(*) as count FROM users WHERE status = 'deleted'"
     );
+    const [totalSaved] = await pool.query(
+      "SELECT COALESCE(SUM(saved_amount), 0) as total FROM profiles WHERE status = 'active'"
+    );
 
     // Monthly contributions (last 6 months)
     const [monthlyData] = await pool.query(
@@ -72,6 +75,7 @@ router.get('/stats', async (_req, res) => {
       overdueLoans: overdueLoans[0].count,
       totalStokvels: totalStokvels[0].count,
       deletedUsers: deletedUsers[0].count,
+      totalSaved: parseFloat(totalSaved[0].total),
       monthlyContributions: monthlyData.map(m => ({
         month: m.month,
         total: parseFloat(m.total),
@@ -500,6 +504,45 @@ router.get('/deleted-users', async (req, res) => {
        ORDER BY u.deleted_at DESC`
     );
 
+    // Get join requests and profiles for each deleted user
+    const userIds = users.map(u => u.id);
+    let joinRequestsMap = {};
+    let profilesMap = {};
+
+    if (userIds.length > 0) {
+      const [joinRequests] = await pool.query(
+        `SELECT jr.user_id, jr.stokvel_id, s.name AS stokvel_name, jr.status
+         FROM join_requests jr
+         JOIN stokvels s ON s.id = jr.stokvel_id
+         WHERE jr.user_id IN (?)`,
+        [userIds]
+      );
+      for (const jr of joinRequests) {
+        if (!joinRequestsMap[jr.user_id]) joinRequestsMap[jr.user_id] = [];
+        joinRequestsMap[jr.user_id].push({
+          stokvelId: jr.stokvel_id,
+          stokvelName: jr.stokvel_name,
+          status: jr.status,
+        });
+      }
+
+      const [profiles] = await pool.query(
+        `SELECT p.user_id, p.stokvel_id, s.name AS stokvel_name, p.status
+         FROM profiles p
+         JOIN stokvels s ON s.id = p.stokvel_id
+         WHERE p.user_id IN (?)`,
+        [userIds]
+      );
+      for (const p of profiles) {
+        if (!profilesMap[p.user_id]) profilesMap[p.user_id] = [];
+        profilesMap[p.user_id].push({
+          stokvelId: p.stokvel_id,
+          stokvelName: p.stokvel_name,
+          status: p.status,
+        });
+      }
+    }
+
     res.json(users.map(u => ({
       id: u.id,
       name: u.full_name,
@@ -508,6 +551,8 @@ router.get('/deleted-users', async (req, res) => {
       deletedAt: u.deleted_at,
       deletedBy: u.deleted_by_name,
       reason: u.delete_reason,
+      joinRequests: joinRequestsMap[u.id] || [],
+      stokvels: profilesMap[u.id] || [],
     })));
   } catch (err) {
     console.error('List deleted users error:', err);

@@ -787,10 +787,10 @@ export default function MainDashboard() {
                   <span className="text-xs font-medium text-gray-700">Profile</span>
                 </Link>
 
-                {/* LOANS BUTTON */}
-                <Link to={`/loans?profile=${activeProfile.id}`} className="flex flex-col items-center p-4 bg-green-50 hover:bg-green-100 rounded-xl transition-colors group">
-                  <Wallet className="w-6 h-6 text-green-600 mb-2 group-hover:scale-110 transition-transform" />
-                  <span className="text-xs font-medium text-gray-700">Loans</span>
+                {/* CARDS BUTTON */}
+                <Link to="/cards" className="flex flex-col items-center p-4 bg-green-50 hover:bg-green-100 rounded-xl transition-colors group">
+                  <CreditCard className="w-6 h-6 text-green-600 mb-2 group-hover:scale-110 transition-transform" />
+                  <span className="text-xs font-medium text-gray-700">Cards</span>
                 </Link>
 
                 {/* DISCOVER BUTTON - ADDED AS EXTRA */}

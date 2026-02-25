@@ -98,6 +98,8 @@ interface DeletedUser {
   deletedAt: string;
   deletedBy: string;
   reason?: string;
+  joinRequests?: { stokvelId: number; stokvelName: string; status: string }[];
+  stokvels?: { stokvelId: number; stokvelName: string; status: string }[];
   originalData: User;
 }
 
@@ -1930,6 +1932,36 @@ function DeletedUsersModal({ onClose, deletedUsers, onRestore, onPermanentDelete
                       <p className="text-xs text-gray-500 mt-1">
                         Deleted: {user.deletedAt} • Reason: {user.reason || 'Not specified'}
                       </p>
+                      {/* Show stokvels the user was part of */}
+                      {user.stokvels && user.stokvels.length > 0 && (
+                        <div className="mt-2">
+                          <p className="text-xs font-medium text-gray-600">Member of:</p>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {user.stokvels.map((s, i) => (
+                              <span key={i} className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">
+                                {s.stokvelName}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {/* Show stokvels the user wanted to join */}
+                      {user.joinRequests && user.joinRequests.length > 0 && (
+                        <div className="mt-2">
+                          <p className="text-xs font-medium text-gray-600">Requested to join:</p>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {user.joinRequests.map((jr, i) => (
+                              <span key={i} className={`text-xs px-2 py-0.5 rounded-full ${
+                                jr.status === 'approved' ? 'bg-green-100 text-green-700' :
+                                jr.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                                'bg-yellow-100 text-yellow-700'
+                              }`}>
+                                {jr.stokvelName} ({jr.status})
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                     <div className="flex space-x-2">
                       <button
@@ -2096,6 +2128,8 @@ export default function AdminDashboard() {
             : '',
           deletedBy: d.deletedBy || 'Admin',
           reason: d.reason,
+          joinRequests: d.joinRequests || [],
+          stokvels: d.stokvels || [],
           originalData: d,
         }))
       );
@@ -2122,6 +2156,7 @@ export default function AdminDashboard() {
         activeStokvels: apiStats.totalStokvels,
         upcomingStokvels: 0,
         totalContributions: apiStats.totalContributions,
+        totalSaved: apiStats.totalSaved || 0,
         pendingContributions: apiStats.pendingContributionCount,
         pendingAmount: apiStats.pendingContributionAmount,
       }
@@ -2134,6 +2169,7 @@ export default function AdminDashboard() {
         activeStokvels: stokvels.filter(s => s.status === 'active').length,
         upcomingStokvels: stokvels.filter(s => s.status === 'upcoming').length,
         totalContributions: contributions.reduce((sum, c) => sum + c.amount, 0),
+        totalSaved: 0,
         pendingContributions: contributions.filter(c => c.status === 'pending').length,
         pendingAmount: contributions.filter(c => c.status === 'pending').reduce((sum, c) => sum + c.amount, 0),
       };
@@ -2550,7 +2586,10 @@ export default function AdminDashboard() {
         ) : activeTab === 'overview' && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <button
+                onClick={() => setActiveTab('users')}
+                className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 text-left hover:border-primary-300 hover:shadow-md transition-all cursor-pointer"
+              >
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-sm text-gray-500">Total Users</p>
                   <Users className="w-5 h-5 text-primary-600" />
@@ -2561,23 +2600,26 @@ export default function AdminDashboard() {
                   <span className="mx-2 text-gray-300">•</span>
                   <span className="text-yellow-600">{stats.pendingUsers} pending</span>
                 </div>
-              </div>
+              </button>
 
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <button
+                onClick={() => setShowDeletedUsersModal(true)}
+                className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 text-left hover:border-orange-300 hover:shadow-md transition-all cursor-pointer"
+              >
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-sm text-gray-500">Deleted Users</p>
                   <Archive className="w-5 h-5 text-orange-600" />
                 </div>
                 <p className="text-3xl font-bold text-gray-800">{stats.deletedUsers}</p>
-                <button
-                  onClick={() => setShowDeletedUsersModal(true)}
-                  className="text-xs text-orange-600 hover:text-orange-700 mt-2"
-                >
+                <p className="text-xs text-orange-600 hover:text-orange-700 mt-2">
                   View Archive →
-                </button>
-              </div>
+                </p>
+              </button>
 
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <button
+                onClick={() => setActiveTab('stokvels')}
+                className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 text-left hover:border-blue-300 hover:shadow-md transition-all cursor-pointer"
+              >
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-sm text-gray-500">Stokvels</p>
                   <Target className="w-5 h-5 text-blue-600" />
@@ -2588,9 +2630,12 @@ export default function AdminDashboard() {
                   <span className="mx-2 text-gray-300">•</span>
                   <span className="text-blue-600">{stats.upcomingStokvels} upcoming</span>
                 </div>
-              </div>
+              </button>
 
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <button
+                onClick={() => setActiveTab('contributions')}
+                className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 text-left hover:border-green-300 hover:shadow-md transition-all cursor-pointer"
+              >
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-sm text-gray-500">Contributions</p>
                   <DollarSign className="w-5 h-5 text-green-600" />
@@ -2599,16 +2644,19 @@ export default function AdminDashboard() {
                 <div className="flex items-center mt-2 text-sm">
                   <span className="text-yellow-600">{stats.pendingContributions} pending</span>
                 </div>
-              </div>
+              </button>
 
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <button
+                onClick={() => setActiveTab('contributions')}
+                className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 text-left hover:border-purple-300 hover:shadow-md transition-all cursor-pointer"
+              >
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-sm text-gray-500">Total Saved</p>
                   <RefreshCw className="w-5 h-5 text-purple-600" />
                 </div>
-                <p className="text-3xl font-bold text-gray-800">{formatCurrency(stats.totalContributions)}</p>
+                <p className="text-3xl font-bold text-gray-800">{formatCurrency(stats.totalSaved)}</p>
                 <p className="text-xs text-gray-500 mt-2">Across all stokvels</p>
-              </div>
+              </button>
             </div>
 
             {pendingUsers.length > 0 && (
