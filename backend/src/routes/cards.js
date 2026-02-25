@@ -53,7 +53,7 @@ router.post(
     body('cardNumber').trim().isLength({ min: 13, max: 19 }).withMessage('Invalid card number'),
     body('cardholderName').trim().notEmpty().withMessage('Cardholder name is required'),
     body('expiryMonth').isInt({ min: 1, max: 12 }),
-    body('expiryYear').isInt({ min: new Date().getFullYear() }),
+    body('expiryYear').isInt({ min: 1 }),
     body('cvv').isLength({ min: 3, max: 4 }),
     validate,
   ],
@@ -70,11 +70,14 @@ router.post(
         return res.status(400).json({ error: 'Invalid card number' });
       }
 
+      // Normalize 2-digit year to 4-digit
+      const normalizedYear = expiryYear < 100 ? 2000 + expiryYear : expiryYear;
+
       // Validate expiry isn't in the past
       const now = new Date();
       const currentMonth = now.getMonth() + 1;
       const currentYear = now.getFullYear();
-      if (expiryYear < currentYear || (expiryYear === currentYear && expiryMonth < currentMonth)) {
+      if (normalizedYear < currentYear || (normalizedYear === currentYear && expiryMonth < currentMonth)) {
         return res.status(400).json({ error: 'Card has expired' });
       }
 
@@ -91,7 +94,7 @@ router.post(
 
       const [result] = await pool.query(
         'INSERT INTO cards (user_id, card_type, last4, expiry_month, expiry_year, cardholder_name, is_default) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [req.user.id, cardType, last4, expiryMonth, expiryYear, cardholderName.toUpperCase(), isDefault]
+        [req.user.id, cardType, last4, expiryMonth, normalizedYear, cardholderName.toUpperCase(), isDefault]
       );
 
       res.status(201).json({
@@ -101,7 +104,7 @@ router.post(
           cardType,
           last4,
           expiryMonth,
-          expiryYear,
+          expiryYear: normalizedYear,
           cardholderName: cardholderName.toUpperCase(),
           isDefault,
         },

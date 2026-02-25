@@ -416,11 +416,15 @@ function AddCardModal({ onClose, onAdd }: { onClose: () => void; onAdd: (card: C
 
     try {
       const cleanNumber = formData.cardNumber.replace(/\s/g, '');
+      // Convert 2-digit year to 4-digit for the backend
+      const expYearRaw = parseInt(formData.expiryYear);
+      const expiryYear4 = expYearRaw < 100 ? 2000 + expYearRaw : expYearRaw;
+
       const res = await cardApi.add({
         cardNumber: cleanNumber,
         cardholderName: formData.cardholderName,
         expiryMonth: parseInt(formData.expiryMonth),
-        expiryYear: parseInt(formData.expiryYear),
+        expiryYear: expiryYear4,
         cvv: formData.cvv
       });
 
