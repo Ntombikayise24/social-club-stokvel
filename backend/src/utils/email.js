@@ -307,6 +307,69 @@ export async function sendStokvelUnassignmentEmail(email, fullName, stokvelNames
 }
 
 /**
+ * Send an email when admin deletes/archives a user account.
+ */
+export async function sendAccountDeletionEmail(email, fullName, reason = 'Removed by admin') {
+  const html = `
+  <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
+    <!-- Header -->
+    <div style="background:linear-gradient(135deg,#dc2626,#991b1b);padding:32px 24px;text-align:center;">
+      <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;">Account Removed</h1>
+    </div>
+
+    <!-- Body -->
+    <div style="padding:32px 24px;">
+      <p style="margin:0 0 16px;color:#374151;font-size:16px;">
+        Hi <strong>${fullName}</strong>,
+      </p>
+      <p style="margin:0 0 16px;color:#374151;font-size:16px;">
+        We're writing to inform you that your account on the Stokvel Management System has been <strong style="color:#dc2626;">removed</strong> by an administrator.
+      </p>
+
+      <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:16px;margin:0 0 24px;">
+        <p style="margin:0 0 4px;font-weight:600;color:#991b1b;font-size:14px;">Reason:</p>
+        <p style="margin:0;color:#374151;font-size:15px;">${reason}</p>
+      </div>
+
+      <p style="margin:0 0 16px;color:#374151;font-size:16px;">
+        All your stokvel memberships have been deactivated. If you believe this was done in error, please contact the administrator or our support team.
+      </p>
+
+      <p style="margin:0 0 16px;color:#374151;font-size:16px;">
+        You can reach us at <a href="mailto:info@socialclub.co.za" style="color:#2563eb;">info@socialclub.co.za</a>.
+      </p>
+
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;" />
+
+      <p style="margin:0;color:#9ca3af;font-size:13px;text-align:center;">
+        This is an automated notification from the Stokvel Management System.
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <div style="background:#f9fafb;padding:16px 24px;text-align:center;">
+      <p style="margin:0;color:#9ca3af;font-size:12px;">
+        &copy; ${new Date().getFullYear()} Stokvel Management System. All rights reserved.
+      </p>
+    </div>
+  </div>`;
+
+  const mailOptions = {
+    from: `"Stokvel Management" <${process.env.SMTP_USER || 'noreply@stokvel.co.za'}>`,
+    to: email,
+    subject: 'Your Account Has Been Removed',
+    html,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`📧 Account deletion email sent to ${email}`);
+  } catch (err) {
+    console.error(`⚠️  Failed to send account deletion email to ${email}:`, err.message);
+  }
+}
+
+/**
  * Send a password reset code via email.
  */
 export async function sendPasswordResetEmail(email, code) {

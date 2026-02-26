@@ -4,7 +4,7 @@ import { body } from 'express-validator';
 import { validate } from '../middleware/validate.js';
 import { authenticate, requireAdmin } from '../middleware/auth.js';
 import pool from '../database/connection.js';
-import { sendApprovalEmail, sendJoinRequestApprovedEmail, sendStokvelAssignmentEmail, sendStokvelUnassignmentEmail } from '../utils/email.js';
+import { sendApprovalEmail, sendJoinRequestApprovedEmail, sendStokvelAssignmentEmail, sendStokvelUnassignmentEmail, sendAccountDeletionEmail } from '../utils/email.js';
 
 const router = Router();
 router.use(authenticate);
@@ -464,18 +464,23 @@ router.delete('/users/:id', async (req, res) => {
     const userId = req.params.id;
     const { reason } = req.body;
 
-    const [users] = await pool.query("SELECT id, full_name FROM users WHERE id = ? AND status != 'deleted'", [userId]);
+    const [users] = await pool.query("SELECT id, full_name, email FROM users WHERE id = ? AND status != 'deleted'", [userId]);
     if (users.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
 
+    const deleteReason = reason || 'Removed by admin';
+
     await pool.query(
       "UPDATE users SET status = 'deleted', deleted_at = NOW(), deleted_by = ?, delete_reason = ? WHERE id = ?",
-      [req.user.id, reason || 'Removed by admin', userId]
+      [req.user.id, deleteReason, userId]
     );
 
     // Deactivate all profiles
     await pool.query("UPDATE profiles SET status = 'inactive' WHERE user_id = ?", [userId]);
+
+    // Send deletion notification email
+    sendAccountDeletionEmail(users[0].email, users[0].full_name, deleteReason);
 
     res.json({ message: `${users[0].full_name} has been archived` });
   } catch (err) {
