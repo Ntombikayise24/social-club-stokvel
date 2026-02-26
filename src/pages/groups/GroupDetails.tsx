@@ -112,7 +112,7 @@ export default function GroupDetails() {
           totalSaved: d.totalPool || 0,
           memberCount: d.currentMembers || 0,
           maxMembers: d.maxMembers || 0,
-          progress: d.targetAmount > 0 ? Math.round(((d.totalPool || 0) / d.targetAmount) * 100) : 0,
+          progress: d.targetAmount > 0 ? Math.min(100, Math.round(((d.totalPool || 0) / d.targetAmount) * 100)) : 0,
           cycle: d.cycle || '',
           nextPayout: d.nextPayout ? new Date(d.nextPayout).toLocaleDateString('en-ZA', {day:'2-digit', month:'short', year:'numeric'}) : '',
           interestRate: d.interestRate || 30,
@@ -124,7 +124,7 @@ export default function GroupDetails() {
             joinedDate: m.joinedDate ? new Date(m.joinedDate).toLocaleDateString('en-ZA', {day:'2-digit', month:'short', year:'numeric'}) : '',
             totalContributed: m.savedAmount || 0,
             targetAmount: d.targetAmount || 0,
-            progress: d.targetAmount > 0 ? Math.round(((m.savedAmount || 0) / d.targetAmount) * 100) : 0,
+            progress: d.targetAmount > 0 ? Math.min(100, Math.round(((m.savedAmount || 0) / d.targetAmount) * 100)) : 0,
             status: 'active' as const,
             lastActive: m.lastActive || ''
           })),
@@ -256,11 +256,11 @@ export default function GroupDetails() {
               <p className="text-sm text-gray-500">Group Progress</p>
               <Target className={`w-4 h-4 text-${groupData.color}-600`} />
             </div>
-            <p className="text-2xl font-bold text-gray-800">{groupData.progress}%</p>
+            <p className="text-2xl font-bold text-gray-800">{Math.min(100, groupData.progress)}%</p>
             <div className="w-full bg-gray-200 rounded-full h-1.5 mt-2">
               <div 
                 className={`bg-${groupData.color}-600 h-1.5 rounded-full`} 
-                style={{ width: `${groupData.progress}%` }}
+                style={{ width: `${Math.min(100, groupData.progress)}%` }}
               ></div>
             </div>
           </div>
@@ -325,12 +325,12 @@ export default function GroupDetails() {
                 <div className="mt-3">
                   <div className="flex justify-between text-xs mb-1">
                     <span className="text-gray-500">Progress</span>
-                    <span className={`font-medium text-${groupData.color}-600`}>{member.progress}%</span>
+                    <span className={`font-medium text-${groupData.color}-600`}>{Math.min(100, member.progress)}%</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-1.5">
                     <div 
                       className={`bg-${groupData.color}-600 h-1.5 rounded-full`} 
-                      style={{ width: `${member.progress}%` }}
+                      style={{ width: `${Math.min(100, member.progress)}%` }}
                     ></div>
                   </div>
                 </div>
