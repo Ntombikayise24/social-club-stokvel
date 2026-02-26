@@ -17,6 +17,7 @@ async function migrate() {
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
     multipleStatements: true,
+    ...(process.env.DB_SSL === 'true' ? { ssl: { rejectUnauthorized: true } } : {}),
   });
 
   console.log('🔄 Running database migration...\n');
