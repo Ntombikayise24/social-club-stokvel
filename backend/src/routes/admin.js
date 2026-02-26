@@ -372,7 +372,7 @@ router.put(
             [userId]
           );
           const stokvelNames = userProfiles.map(p => p.name);
-          sendApprovalEmail(activatedUser[0].email, activatedUser[0].full_name, stokvelNames);
+          await sendApprovalEmail(activatedUser[0].email, activatedUser[0].full_name, stokvelNames);
         }
       }
 
@@ -1129,7 +1129,7 @@ router.post('/join-requests/:id/approve', async (req, res) => {
     // Send email to user
     const [userInfo] = await pool.query('SELECT email, full_name FROM users WHERE id = ?', [request.user_id]);
     if (userInfo.length > 0) {
-      sendJoinRequestApprovedEmail(userInfo[0].email, userInfo[0].full_name, stokvelInfo[0].name);
+      await sendJoinRequestApprovedEmail(userInfo[0].email, userInfo[0].full_name, stokvelInfo[0].name);
     }
 
     res.json({ message: 'Join request approved' });
