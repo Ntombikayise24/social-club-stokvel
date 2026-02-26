@@ -91,7 +91,7 @@ function App() {
       image: "👩🏼"
     },
     {
-      name: "Thabo Mbeki",
+      name: "Mandla Zulu",
       role: "Member since 2024",
       content: "Borrowed against my savings for my business. Best decision ever!",
       rating: 5,

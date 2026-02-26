@@ -38,8 +38,8 @@ The API will start on **http://localhost:5000**.
 | Role    | Email                  | Password   |
 |---------|------------------------|------------|
 | Admin   | admin@stokvel.co.za    | Admin@123  |
-| Member  | thabo@example.com      | Member@123 |
 | Member  | naledi@example.com     | Member@123 |
+| Member  | lerato@example.com     | Member@123 |
 | Pending | sipho@example.com      | Member@123 |
 
 > **Note:** The admin account and sample data are automatically created when you run `npm run migrate`.

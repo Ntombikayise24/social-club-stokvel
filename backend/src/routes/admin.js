@@ -4,7 +4,7 @@ import { body } from 'express-validator';
 import { validate } from '../middleware/validate.js';
 import { authenticate, requireAdmin } from '../middleware/auth.js';
 import pool from '../database/connection.js';
-import { sendApprovalEmail, sendJoinRequestApprovedEmail } from '../utils/email.js';
+import { sendApprovalEmail, sendJoinRequestApprovedEmail, sendStokvelAssignmentEmail, sendStokvelUnassignmentEmail } from '../utils/email.js';
 
 const router = Router();
 router.use(authenticate);
@@ -141,7 +141,7 @@ router.get('/users', async (req, res) => {
         `SELECT p.user_id, p.id as profile_id, p.role, p.status, s.id as stokvel_id, s.name as stokvel_name
          FROM profiles p
          JOIN stokvels s ON s.id = p.stokvel_id
-         WHERE p.user_id IN (?)`,
+         WHERE p.user_id IN (?) AND p.status = 'active'`,
         [userIds]
       );
       for (const p of profiles) {
@@ -291,33 +291,74 @@ router.put(
 
       // Update stokvel memberships if provided
       if (stokvelIds !== undefined) {
-        // Get current profiles
-        const [currentProfiles] = await pool.query(
-          'SELECT stokvel_id FROM profiles WHERE user_id = ?',
+        // Get current ACTIVE profiles only
+        const [currentActiveProfiles] = await pool.query(
+          "SELECT stokvel_id FROM profiles WHERE user_id = ? AND status = 'active'",
           [userId]
         );
-        const currentStokvelIds = currentProfiles.map(p => p.stokvel_id);
+        const currentActiveStokvelIds = currentActiveProfiles.map(p => p.stokvel_id);
 
-        // Add new memberships
+        // Also get ALL profiles (including inactive) to check for reactivation
+        const [allProfiles] = await pool.query(
+          'SELECT stokvel_id, status FROM profiles WHERE user_id = ?',
+          [userId]
+        );
+        const inactiveStokvelIds = allProfiles.filter(p => p.status === 'inactive').map(p => p.stokvel_id);
+
+        // Track newly assigned stokvels for email notification
+        const newlyAssignedStokvelNames = [];
+
+        // Add new memberships or reactivate inactive ones
         for (const stokvelId of stokvelIds) {
-          if (!currentStokvelIds.includes(stokvelId)) {
-            const [stokvel] = await pool.query('SELECT target_amount FROM stokvels WHERE id = ?', [stokvelId]);
-            if (stokvel.length > 0) {
+          if (!currentActiveStokvelIds.includes(stokvelId)) {
+            if (inactiveStokvelIds.includes(stokvelId)) {
+              // Reactivate previously inactive profile
               await pool.query(
-                'INSERT INTO profiles (user_id, stokvel_id, role, target_amount, status, joined_date) VALUES (?, ?, ?, ?, ?, CURDATE())',
-                [userId, stokvelId, 'member', stokvel[0].target_amount, 'active']
+                "UPDATE profiles SET status = 'active' WHERE user_id = ? AND stokvel_id = ?",
+                [userId, stokvelId]
               );
+              const [stokvel] = await pool.query('SELECT name FROM stokvels WHERE id = ?', [stokvelId]);
+              if (stokvel.length > 0) newlyAssignedStokvelNames.push(stokvel[0].name);
+            } else {
+              // Create new profile
+              const [stokvel] = await pool.query('SELECT name, target_amount FROM stokvels WHERE id = ?', [stokvelId]);
+              if (stokvel.length > 0) {
+                await pool.query(
+                  'INSERT INTO profiles (user_id, stokvel_id, role, target_amount, status, joined_date) VALUES (?, ?, ?, ?, ?, CURDATE())',
+                  [userId, stokvelId, 'member', stokvel[0].target_amount, 'active']
+                );
+                newlyAssignedStokvelNames.push(stokvel[0].name);
+              }
             }
           }
         }
 
-        // Remove memberships no longer in list
-        for (const currentId of currentStokvelIds) {
+        // Deactivate memberships no longer in list
+        const removedStokvelNames = [];
+        for (const currentId of currentActiveStokvelIds) {
           if (!stokvelIds.includes(currentId)) {
             await pool.query(
               "UPDATE profiles SET status = 'inactive' WHERE user_id = ? AND stokvel_id = ?",
               [userId, currentId]
             );
+            const [stokvel] = await pool.query('SELECT name FROM stokvels WHERE id = ?', [currentId]);
+            if (stokvel.length > 0) removedStokvelNames.push(stokvel[0].name);
+          }
+        }
+
+        // Send email notification for newly assigned stokvels
+        if (newlyAssignedStokvelNames.length > 0) {
+          const [assignedUser] = await pool.query('SELECT full_name, email FROM users WHERE id = ?', [userId]);
+          if (assignedUser.length > 0) {
+            sendStokvelAssignmentEmail(assignedUser[0].email, assignedUser[0].full_name, newlyAssignedStokvelNames);
+          }
+        }
+
+        // Send email notification for removed stokvels
+        if (removedStokvelNames.length > 0) {
+          const [removedUser] = await pool.query('SELECT full_name, email FROM users WHERE id = ?', [userId]);
+          if (removedUser.length > 0) {
+            sendStokvelUnassignmentEmail(removedUser[0].email, removedUser[0].full_name, removedStokvelNames);
           }
         }
       }

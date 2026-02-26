@@ -35,10 +35,10 @@ async function seed() {
     `INSERT INTO users (full_name, email, phone, password_hash, role, status)
      VALUES (?, ?, ?, ?, 'member', 'active')
      ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)`,
-    ['Thabo Mokoena', 'thabo@example.com', '+27611234567', memberPassword]
+    ['Naledi Dlamini', 'naledi@example.com', '+27629876543', memberPassword]
   );
   const memberId = memberResult.insertId;
-  console.log('✅ Demo member created (thabo@example.com / Member@123)');
+  console.log('✅ Demo member created (naledi@example.com / Member@123)');
 
   // ── Demo member 2 ──
   const member2Password = await bcrypt.hash('Member@123', 12);
@@ -46,10 +46,10 @@ async function seed() {
     `INSERT INTO users (full_name, email, phone, password_hash, role, status)
      VALUES (?, ?, ?, ?, 'member', 'active')
      ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)`,
-    ['Naledi Dlamini', 'naledi@example.com', '+27629876543', member2Password]
+    ['Lerato Molefe', 'lerato@example.com', '+27641234567', member2Password]
   );
   const member2Id = member2Result.insertId;
-  console.log('✅ Demo member 2 created (naledi@example.com / Member@123)');
+  console.log('✅ Demo member 2 created (lerato@example.com / Member@123)');
 
   // ── Pending member ──
   const pendingPassword = await bcrypt.hash('Member@123', 12);
@@ -164,12 +164,12 @@ async function seed() {
   // ── Cards ──
   await connection.query(
     `INSERT INTO cards (user_id, card_type, last4, expiry_month, expiry_year, cardholder_name, is_default)
-     VALUES (?, 'visa', '4532', 12, 2027, 'THABO MOKOENA', TRUE)`,
+     VALUES (?, 'visa', '4532', 12, 2027, 'NALEDI DLAMINI', TRUE)`,
     [memberId]
   );
   await connection.query(
     `INSERT INTO cards (user_id, card_type, last4, expiry_month, expiry_year, cardholder_name, is_default)
-     VALUES (?, 'mastercard', '8901', 6, 2028, 'THABO MOKOENA', FALSE)`,
+     VALUES (?, 'mastercard', '8901', 6, 2028, 'NALEDI DLAMINI', FALSE)`,
     [memberId]
   );
   console.log('✅ Sample cards created');
@@ -247,8 +247,8 @@ async function seed() {
   console.log('\n🎉 Seeding completed successfully!');
   console.log('\n📋 Login credentials:');
   console.log('   Admin:  admin@stokvel.co.za / Admin@123');
-  console.log('   Member: thabo@example.com / Member@123');
   console.log('   Member: naledi@example.com / Member@123');
+  console.log('   Member: lerato@example.com / Member@123');
   console.log('   Pending: sipho@example.com / Member@123');
 
   await connection.end();

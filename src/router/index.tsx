@@ -19,6 +19,9 @@ import Privacy from "../pages/legal/Privacy";
 import Cards from "../pages/payments/Cards";
 import NotFound from "../pages/NotFound";
 import AuthGuard from "../components/AuthGuard";
+import AboutUs from "../pages/about/AboutUs";
+import Blog from "../pages/blog/Blog";
+import FAQ from "../pages/faq/FAQ";
 
 const router = createBrowserRouter([
   {
@@ -92,6 +95,18 @@ const router = createBrowserRouter([
   {
     path: "/cards",
     element: <AuthGuard><Cards /></AuthGuard>,
+  },
+  {
+    path: "/about",
+    element: <AboutUs />,
+  },
+  {
+    path: "/blog",
+    element: <Blog />,
+  },
+  {
+    path: "/faq",
+    element: <FAQ />,
   },
   {
     path: "*",

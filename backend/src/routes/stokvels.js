@@ -139,6 +139,11 @@ router.post('/:id/join-request', authenticate, async (req, res) => {
     const stokvelId = req.params.id;
     const userId = req.user.id;
 
+    // Admin users cannot join stokvels — they are system-level only
+    if (req.user.role === 'admin') {
+      return res.status(403).json({ error: 'Admin users cannot join stokvels' });
+    }
+
     // Check if already a member
     const [existing] = await pool.query(
       'SELECT id FROM profiles WHERE user_id = ? AND stokvel_id = ?',

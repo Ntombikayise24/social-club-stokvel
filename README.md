@@ -37,8 +37,8 @@ npm run dev            # Starts frontend on http://localhost:5174
 | Role    | Email               | Password    |
 |---------|---------------------|-------------|
 | Admin   | admin@stokvel.co.za | Admin@123   |
-| Member  | thabo@example.com   | Member@123  |
 | Member  | naledi@example.com  | Member@123  |
+| Member  | lerato@example.com  | Member@123  |
 
 ### Pre-configured Services
 - **Paystack** (test mode) — payment processing is ready to use
