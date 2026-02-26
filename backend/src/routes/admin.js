@@ -350,7 +350,7 @@ router.put(
         if (newlyAssignedStokvelNames.length > 0) {
           const [assignedUser] = await pool.query('SELECT full_name, email FROM users WHERE id = ?', [userId]);
           if (assignedUser.length > 0) {
-            sendStokvelAssignmentEmail(assignedUser[0].email, assignedUser[0].full_name, newlyAssignedStokvelNames);
+            await sendStokvelAssignmentEmail(assignedUser[0].email, assignedUser[0].full_name, newlyAssignedStokvelNames);
           }
         }
 
@@ -358,7 +358,7 @@ router.put(
         if (removedStokvelNames.length > 0) {
           const [removedUser] = await pool.query('SELECT full_name, email FROM users WHERE id = ?', [userId]);
           if (removedUser.length > 0) {
-            sendStokvelUnassignmentEmail(removedUser[0].email, removedUser[0].full_name, removedStokvelNames);
+            await sendStokvelUnassignmentEmail(removedUser[0].email, removedUser[0].full_name, removedStokvelNames);
           }
         }
       }
@@ -490,7 +490,7 @@ router.delete('/users/:id', async (req, res) => {
     await pool.query("UPDATE profiles SET status = 'inactive' WHERE user_id = ?", [userId]);
 
     // Send deletion notification email
-    sendAccountDeletionEmail(users[0].email, users[0].full_name, deleteReason);
+    await sendAccountDeletionEmail(users[0].email, users[0].full_name, deleteReason);
 
     res.json({ message: `${users[0].full_name} has been archived` });
   } catch (err) {
@@ -509,13 +509,13 @@ router.post('/users/:id/restore', async (req, res) => {
       return res.status(404).json({ error: 'Deleted user not found' });
     }
 
-    // Check if user had any active profiles before deletion
+    // Check if user had any inactive profiles (deactivated during soft delete)
     const [existingProfiles] = await pool.query(
-      "SELECT COUNT(*) as count FROM profiles WHERE user_id = ?",
+      "SELECT COUNT(*) as count FROM profiles WHERE user_id = ? AND status = 'inactive'",
       [userId]
     );
 
-    // If user had profiles, restore them to active; otherwise set to pending for stokvel assignment
+    // If user had profiles that were deactivated, restore them; otherwise set to pending for stokvel assignment
     const newStatus = existingProfiles[0].count > 0 ? 'active' : 'pending';
 
     await pool.query(
@@ -523,9 +523,9 @@ router.post('/users/:id/restore', async (req, res) => {
       [newStatus, userId]
     );
 
-    // Reactivate profiles if they existed
+    // Reactivate only inactive profiles (the ones deactivated during deletion)
     if (existingProfiles[0].count > 0) {
-      await pool.query("UPDATE profiles SET status = 'active' WHERE user_id = ?", [userId]);
+      await pool.query("UPDATE profiles SET status = 'active' WHERE user_id = ? AND status = 'inactive'", [userId]);
     }
 
     const notificationMessage = newStatus === 'active' 
@@ -897,7 +897,11 @@ router.get('/settings', async (_req, res) => {
     const [settings] = await pool.query('SELECT setting_key, setting_value FROM site_settings');
     const result = {};
     for (const s of settings) {
-      result[s.setting_key] = s.setting_value;
+      try {
+        result[s.setting_key] = JSON.parse(s.setting_value);
+      } catch {
+        result[s.setting_key] = s.setting_value;
+      }
     }
     res.json(result);
   } catch (err) {
@@ -911,9 +915,10 @@ router.put('/settings', async (req, res) => {
     const settings = req.body;
 
     for (const [key, value] of Object.entries(settings)) {
+      const storedValue = typeof value === 'object' ? JSON.stringify(value) : String(value);
       await pool.query(
         'INSERT INTO site_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = ?',
-        [key, value, value]
+        [key, storedValue, storedValue]
       );
     }
 
@@ -963,12 +968,76 @@ router.post('/reports', async (req, res) => {
         data = rows;
         break;
       }
+      case 'users':
       case 'members': {
         const [rows] = await pool.query(
           `SELECT u.id, u.full_name, u.email, u.phone, u.status, u.role, u.created_at, u.last_active
            FROM users u
            WHERE u.created_at BETWEEN ? AND ?
            ORDER BY u.created_at DESC`,
+          [startDate, endDate]
+        );
+        data = rows;
+        break;
+      }
+      case 'stokvels': {
+        const [rows] = await pool.query(
+          `SELECT s.id, s.name, s.type, s.target_amount, s.max_members, s.cycle, s.status, s.created_at,
+                  COUNT(DISTINCT p.user_id) AS member_count,
+                  COALESCE(SUM(CASE WHEN c.status = 'confirmed' THEN c.amount ELSE 0 END), 0) AS total_contributions
+           FROM stokvels s
+           LEFT JOIN profiles p ON p.stokvel_id = s.id AND p.status = 'active'
+           LEFT JOIN contributions c ON c.stokvel_id = s.id
+           WHERE s.created_at BETWEEN ? AND ?
+           GROUP BY s.id
+           ORDER BY s.created_at DESC`,
+          [startDate, endDate]
+        );
+        data = rows;
+        break;
+      }
+      case 'payments': {
+        const [rows] = await pool.query(
+          `SELECT c.id, u.full_name, s.name AS stokvel_name, c.amount, c.payment_method, c.reference, c.status, c.confirmed_at, c.created_at
+           FROM contributions c
+           JOIN users u ON u.id = c.user_id
+           JOIN stokvels s ON s.id = c.stokvel_id
+           WHERE c.created_at BETWEEN ? AND ?
+           ORDER BY c.created_at DESC`,
+          [startDate, endDate]
+        );
+        data = rows;
+        break;
+      }
+      case 'financial': {
+        const [contribs] = await pool.query(
+          `SELECT COALESCE(SUM(CASE WHEN status = 'confirmed' THEN amount ELSE 0 END), 0) AS total_contributions,
+                  COUNT(CASE WHEN status = 'confirmed' THEN 1 END) AS confirmed_count,
+                  COUNT(CASE WHEN status = 'pending' THEN 1 END) AS pending_count
+           FROM contributions
+           WHERE created_at BETWEEN ? AND ?`,
+          [startDate, endDate]
+        );
+        const [loanData] = await pool.query(
+          `SELECT COALESCE(SUM(amount), 0) AS total_loans,
+                  COALESCE(SUM(interest), 0) AS total_interest,
+                  COUNT(*) AS loan_count
+           FROM loans
+           WHERE created_at BETWEEN ? AND ?`,
+          [startDate, endDate]
+        );
+        data = { contributions: contribs[0], loans: loanData[0] };
+        break;
+      }
+      case 'deleted': {
+        const [rows] = await pool.query(
+          `SELECT u.id, u.full_name, u.email, u.phone, u.deleted_at, u.delete_reason,
+                  du.full_name AS deleted_by_name
+           FROM users u
+           LEFT JOIN users du ON du.id = u.deleted_by
+           WHERE u.status = 'deleted'
+           AND u.deleted_at BETWEEN ? AND ?
+           ORDER BY u.deleted_at DESC`,
           [startDate, endDate]
         );
         data = rows;

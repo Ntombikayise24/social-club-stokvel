@@ -23,6 +23,7 @@ import {
   X,
   CheckCircle,
   AlertCircle,
+  AlertTriangle,
   Tag,
   Users as UsersIcon,
   Archive,
@@ -2027,6 +2028,7 @@ export default function AdminDashboard() {
   const [showReportModal, setShowReportModal] = useState(false);
   const [showDeletedUsersModal, setShowDeletedUsersModal] = useState(false);
   const [showSuccessMessage, setShowSuccessMessage] = useState('');
+  const [showErrorMessage, setShowErrorMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
   // Data from backend
@@ -2191,6 +2193,11 @@ export default function AdminDashboard() {
     setTimeout(() => setShowSuccessMessage(''), 3000);
   };
 
+  const showError = (msg: string) => {
+    setShowErrorMessage(msg);
+    setTimeout(() => setShowErrorMessage(''), 4000);
+  };
+
   const handleAddUser = async (newUser: any) => {
     try {
       await adminApi.createUser({
@@ -2205,7 +2212,7 @@ export default function AdminDashboard() {
       fetchData();
     } catch (err: any) {
       const msg = err.response?.data?.error || 'Failed to create user';
-      showSuccess(msg);
+      showError(msg);
     }
   };
 
@@ -2228,7 +2235,7 @@ export default function AdminDashboard() {
       fetchData();
     } catch (err: any) {
       const msg = err.response?.data?.error || 'Failed to create stokvel';
-      showSuccess(msg);
+      showError(msg);
     }
   };
 
@@ -2246,7 +2253,7 @@ export default function AdminDashboard() {
       fetchData();
     } catch (err: any) {
       const msg = err.response?.data?.error || 'Failed to update user';
-      showSuccess(msg);
+      showError(msg);
     }
   };
 
@@ -2260,7 +2267,7 @@ export default function AdminDashboard() {
       fetchData();
     } catch (err: any) {
       const msg = err.response?.data?.error || 'Failed to delete user';
-      showSuccess(msg);
+      showError(msg);
     }
   };
 
@@ -2273,7 +2280,7 @@ export default function AdminDashboard() {
       fetchData();
     } catch (err: any) {
       const msg = err.response?.data?.error || 'Failed to restore user';
-      showSuccess(msg);
+      showError(msg);
     }
   };
 
@@ -2286,7 +2293,7 @@ export default function AdminDashboard() {
       fetchData();
     } catch (err: any) {
       const msg = err.response?.data?.error || 'Failed to permanently delete user';
-      showSuccess(msg);
+      showError(msg);
     }
   };
 
@@ -2297,7 +2304,7 @@ export default function AdminDashboard() {
       fetchData();
     } catch (err: any) {
       const msg = err.response?.data?.error || 'Failed to approve join request';
-      showSuccess(msg);
+      showError(msg);
     }
   };
 
@@ -2308,7 +2315,7 @@ export default function AdminDashboard() {
       fetchData();
     } catch (err: any) {
       const msg = err.response?.data?.error || 'Failed to reject join request';
-      showSuccess(msg);
+      showError(msg);
     }
   };
 
@@ -2331,7 +2338,7 @@ export default function AdminDashboard() {
       fetchData();
     } catch (err: any) {
       const msg = err.response?.data?.error || 'Failed to update stokvel';
-      showSuccess(msg);
+      showError(msg);
     }
   };
 
@@ -2344,7 +2351,7 @@ export default function AdminDashboard() {
       fetchData();
     } catch (err: any) {
       const msg = err.response?.data?.error || 'Failed to delete stokvel';
-      showSuccess(msg);
+      showError(msg);
     }
   };
 
@@ -2356,7 +2363,7 @@ export default function AdminDashboard() {
       fetchData();
     } catch (err: any) {
       const msg = err.response?.data?.error || 'Failed to approve user';
-      showSuccess(msg);
+      showError(msg);
     }
   };
 
@@ -2368,7 +2375,7 @@ export default function AdminDashboard() {
       fetchData();
     } catch (err: any) {
       const msg = err.response?.data?.error || 'Failed to reject user';
-      showSuccess(msg);
+      showError(msg);
     }
   };
 
@@ -2380,7 +2387,7 @@ export default function AdminDashboard() {
       fetchData();
     } catch (err: any) {
       const msg = err.response?.data?.error || 'Failed to confirm payment';
-      showSuccess(msg);
+      showError(msg);
     }
   };
 
@@ -2472,6 +2479,12 @@ export default function AdminDashboard() {
         <div className="fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg shadow-lg z-50 flex items-center">
           <CheckCircle className="w-5 h-5 mr-2" />
           {showSuccessMessage}
+        </div>
+      )}
+      {showErrorMessage && (
+        <div className="fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg shadow-lg z-50 flex items-center">
+          <AlertTriangle className="w-5 h-5 mr-2" />
+          {showErrorMessage}
         </div>
       )}
 

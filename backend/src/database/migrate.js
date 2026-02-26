@@ -106,9 +106,9 @@ async function migrate() {
       profile_id INT NOT NULL,
       stokvel_id INT NOT NULL,
       amount DECIMAL(15,2) NOT NULL,
-      payment_method ENUM('card', 'bank', 'cash') DEFAULT 'card',
+      payment_method ENUM('card', 'bank', 'cash', 'paystack') DEFAULT 'card',
       reference VARCHAR(100),
-      status ENUM('confirmed', 'pending', 'deleted') DEFAULT 'pending',
+      status ENUM('confirmed', 'pending', 'deleted', 'failed') DEFAULT 'pending',
       confirmed_by INT,
       confirmed_at DATETIME,
       deleted_at DATETIME,
@@ -126,6 +126,12 @@ async function migrate() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
   console.log('✅ contributions table created');
+
+  // Ensure ENUMs are up to date for existing tables
+  try {
+    await connection.query(`ALTER TABLE contributions MODIFY COLUMN payment_method ENUM('card', 'bank', 'cash', 'paystack') DEFAULT 'card'`);
+    await connection.query(`ALTER TABLE contributions MODIFY COLUMN status ENUM('confirmed', 'pending', 'deleted', 'failed') DEFAULT 'pending'`);
+  } catch (e) { /* ignore if already correct */ }
 
   // ───────────────── LOANS TABLE ─────────────────
   await connection.query(`

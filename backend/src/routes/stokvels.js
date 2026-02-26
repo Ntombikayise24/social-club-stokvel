@@ -155,17 +155,24 @@ router.post('/:id/join-request', authenticate, async (req, res) => {
 
     // Check for existing pending request
     const [existingReq] = await pool.query(
-      "SELECT id FROM join_requests WHERE user_id = ? AND stokvel_id = ? AND status = 'pending'",
+      "SELECT id, status FROM join_requests WHERE user_id = ? AND stokvel_id = ?",
       [userId, stokvelId]
     );
     if (existingReq.length > 0) {
-      return res.status(409).json({ error: 'Join request already pending' });
+      if (existingReq[0].status === 'pending') {
+        return res.status(409).json({ error: 'Join request already pending' });
+      }
+      // If previously rejected, update existing row back to pending
+      await pool.query(
+        "UPDATE join_requests SET status = 'pending', updated_at = NOW() WHERE id = ?",
+        [existingReq[0].id]
+      );
+    } else {
+      await pool.query(
+        'INSERT INTO join_requests (user_id, stokvel_id, status) VALUES (?, ?, ?)',
+        [userId, stokvelId, 'pending']
+      );
     }
-
-    await pool.query(
-      'INSERT INTO join_requests (user_id, stokvel_id, status) VALUES (?, ?, ?)',
-      [userId, stokvelId, 'pending']
-    );
 
     // Notify stokvel admins
     const [admins] = await pool.query(

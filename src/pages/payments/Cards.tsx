@@ -214,7 +214,7 @@ export default function Cards() {
                       
                       <div className="flex items-center space-x-4 mt-2">
                         <p className="text-sm text-gray-600">
-                          Expires {card.expiryMonth}/{card.expiryYear}
+                          Expires {String(card.expiryMonth).padStart(2, '0')}/{String(card.expiryYear).slice(-2)}
                         </p>
                         <span className="text-gray-300">|</span>
                         <p className="text-sm text-gray-600">

@@ -7,11 +7,69 @@ import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
 
 const router = Router();
-router.use(authenticate);
-router.use(updateLastActive);
 
 const PAYSTACK_SECRET = () => process.env.PAYSTACK_SECRET_KEY || '';
 const PAYSTACK_BASE = 'https://api.paystack.co';
+
+// ────────────────── PAYSTACK WEBHOOK (before auth middleware) ──────────────────
+// Paystack sends webhooks server-side without JWT, so this must be unprotected
+router.post('/webhook', async (req, res) => {
+  try {
+    const crypto = await import('crypto');
+    const hash = crypto
+      .createHmac('sha512', PAYSTACK_SECRET())
+      .update(JSON.stringify(req.body))
+      .digest('hex');
+
+    if (hash !== req.headers['x-paystack-signature']) {
+      return res.status(400).json({ error: 'Invalid signature' });
+    }
+
+    const event = req.body;
+
+    if (event.event === 'charge.success') {
+      const { reference } = event.data;
+
+      const [contributions] = await pool.query(
+        "SELECT id, profile_id, amount, stokvel_id, user_id FROM contributions WHERE reference = ? AND status = 'pending'",
+        [reference]
+      );
+
+      if (contributions.length > 0) {
+        const contrib = contributions[0];
+
+        await pool.query(
+          "UPDATE contributions SET status = 'confirmed', confirmed_at = NOW() WHERE id = ?",
+          [contrib.id]
+        );
+        await pool.query(
+          'UPDATE profiles SET saved_amount = LEAST(saved_amount + ?, target_amount) WHERE id = ?',
+          [contrib.amount, contrib.profile_id]
+        );
+
+        const [stokvel] = await pool.query('SELECT name FROM stokvels WHERE id = ?', [contrib.stokvel_id]);
+        await pool.query(
+          'INSERT INTO notifications (user_id, type, title, message) VALUES (?, ?, ?, ?)',
+          [
+            contrib.user_id,
+            'contribution',
+            'Payment Confirmed ✅',
+            `Your R${parseFloat(contrib.amount).toLocaleString()} contribution to ${stokvel[0]?.name || 'your stokvel'} has been confirmed.`,
+          ]
+        );
+      }
+    }
+
+    res.sendStatus(200);
+  } catch (err) {
+    console.error('Webhook error:', err);
+    res.sendStatus(500);
+  }
+});
+
+// ── Auth middleware for all routes below ──
+router.use(authenticate);
+router.use(updateLastActive);
 
 // ────────────────── INITIALIZE PAYMENT ──────────────────
 router.post(
@@ -138,7 +196,7 @@ router.get('/verify/:reference', async (req, res) => {
     if (paystackData.status === 'success') {
       // Update contribution status to confirmed
       await pool.query(
-        "UPDATE contributions SET status = 'confirmed' WHERE reference = ?",
+        "UPDATE contributions SET status = 'confirmed', confirmed_at = NOW() WHERE reference = ?",
         [reference]
       );
 
@@ -191,7 +249,7 @@ router.get('/verify/:reference', async (req, res) => {
     } else {
       // Payment failed - update contribution
       await pool.query(
-        "UPDATE contributions SET status = 'failed' WHERE reference = ?",
+        "UPDATE contributions SET status = 'deleted', deleted_at = NOW() WHERE reference = ?",
         [reference]
       );
 
@@ -207,54 +265,6 @@ router.get('/verify/:reference', async (req, res) => {
   } catch (err) {
     console.error('Payment verify error:', err.response?.data || err.message);
     res.status(500).json({ error: 'Failed to verify payment' });
-  }
-});
-
-// ────────────────── PAYSTACK WEBHOOK ──────────────────
-// This handles automatic notifications from Paystack
-router.post('/webhook', async (req, res) => {
-  try {
-    // Verify webhook signature
-    const crypto = await import('crypto');
-    const hash = crypto
-      .createHmac('sha512', PAYSTACK_SECRET())
-      .update(JSON.stringify(req.body))
-      .digest('hex');
-
-    if (hash !== req.headers['x-paystack-signature']) {
-      return res.status(400).json({ error: 'Invalid signature' });
-    }
-
-    const event = req.body;
-
-    if (event.event === 'charge.success') {
-      const { reference } = event.data;
-
-      // Mark contribution as confirmed
-      const [contributions] = await pool.query(
-        "SELECT id, profile_id, amount, stokvel_id, user_id FROM contributions WHERE reference = ? AND status = 'pending'",
-        [reference]
-      );
-
-      if (contributions.length > 0) {
-        const contrib = contributions[0];
-
-        await pool.query("UPDATE contributions SET status = 'confirmed' WHERE id = ?", [contrib.id]);
-        // Cap saved_amount so it never exceeds target_amount
-        await pool.query('UPDATE profiles SET saved_amount = LEAST(saved_amount + ?, target_amount) WHERE id = ?', [contrib.amount, contrib.profile_id]);
-
-        const [stokvel] = await pool.query('SELECT name FROM stokvels WHERE id = ?', [contrib.stokvel_id]);
-        await pool.query(
-          'INSERT INTO notifications (user_id, type, title, message) VALUES (?, ?, ?, ?)',
-          [contrib.user_id, 'contribution', 'Payment Confirmed ✅', `Your R${parseFloat(contrib.amount).toLocaleString()} contribution to ${stokvel[0]?.name || 'your stokvel'} has been confirmed.`]
-        );
-      }
-    }
-
-    res.sendStatus(200);
-  } catch (err) {
-    console.error('Webhook error:', err);
-    res.sendStatus(500);
   }
 });
 
