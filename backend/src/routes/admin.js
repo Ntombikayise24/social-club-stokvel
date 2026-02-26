@@ -409,12 +409,16 @@ router.post('/users/:id/approve', async (req, res) => {
     const userId = req.params.id;
     const { stokvelIds = [] } = req.body;
 
-    const [users] = await pool.query("SELECT id, full_name, email FROM users WHERE id = ? AND status = 'pending'", [userId]);
+    // Accept users with any non-deleted status (pending, inactive, or even active for re-approval)
+    const [users] = await pool.query("SELECT id, full_name, email, status FROM users WHERE id = ? AND status != 'deleted'", [userId]);
     if (users.length === 0) {
-      return res.status(404).json({ error: 'Pending user not found' });
+      return res.status(404).json({ error: 'User not found' });
     }
 
-    await pool.query("UPDATE users SET status = 'active' WHERE id = ?", [userId]);
+    // Set status to active (no-op if already active)
+    if (users[0].status !== 'active') {
+      await pool.query("UPDATE users SET status = 'active' WHERE id = ?", [userId]);
+    }
 
     // Assign to stokvels
     for (const stokvelId of stokvelIds) {
@@ -449,7 +453,13 @@ router.post('/users/:id/approve', async (req, res) => {
       const [sv] = await pool.query('SELECT name FROM stokvels WHERE id = ?', [sid]);
       if (sv.length > 0) stokvelNames.push(sv[0].name);
     }
-    sendApprovalEmail(users[0].email, users[0].full_name, stokvelNames);
+    // Always send approval email (await to ensure it completes)
+    try {
+      await sendApprovalEmail(users[0].email, users[0].full_name, stokvelNames);
+      console.log(`📧 Approval email sent to ${users[0].email}`);
+    } catch (emailErr) {
+      console.error(`⚠️ Failed to send approval email:`, emailErr.message);
+    }
 
     res.json({ message: `${users[0].full_name} has been approved` });
   } catch (err) {

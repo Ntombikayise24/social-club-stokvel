@@ -109,7 +109,11 @@ router.post(
       });
     } catch (err) {
       console.error('Payment init error:', err.response?.data || err.message);
-      res.status(500).json({ error: 'Failed to initialize payment' });
+      const paystackError = err.response?.data?.message || err.message;
+      res.status(err.response?.status || 500).json({ 
+        error: `Payment initialization failed: ${paystackError}`,
+        details: err.response?.data?.data || null
+      });
     }
   }
 );
