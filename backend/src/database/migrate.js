@@ -135,6 +135,16 @@ async function migrate() {
 
   // Clamp any profiles where saved_amount exceeds target_amount
   try {
+    // Sync profile target_amount with stokvel target_amount
+    await connection.query(`
+      UPDATE profiles p
+      JOIN stokvels s ON p.stokvel_id = s.id
+      SET p.target_amount = s.target_amount
+      WHERE p.target_amount != s.target_amount
+    `);
+    console.log('✅ Synced profile target_amount with stokvel target_amount');
+
+    // Then clamp saved_amount to never exceed target_amount
     await connection.query(`UPDATE profiles SET saved_amount = target_amount WHERE saved_amount > target_amount AND target_amount > 0`);
     console.log('✅ Clamped saved_amount to target_amount for any over-contributed profiles');
   } catch (e) { /* ignore */ }
