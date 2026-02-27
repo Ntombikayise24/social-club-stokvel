@@ -247,18 +247,32 @@ router.post(
         ['repaid', loanId]
       );
 
-      // Add the interest back to the profile (earned by the group)
-      // Optionally update saved_amount — in real system this would be more complex
-      
+      const interest = parseFloat(loan.interest);
+      const totalRepayable = parseFloat(loan.total_repayable);
+
+      // Record interest as a confirmed contribution so it reflects in the financial records
+      const reference = `LOAN-INT-${loanId}-${Date.now()}`;
+      await pool.query(
+        `INSERT INTO contributions (user_id, profile_id, stokvel_id, amount, payment_method, reference, status, confirmed_at, card_id)
+         VALUES (?, ?, ?, ?, 'loan_repayment', ?, 'confirmed', NOW(), ?)`,
+        [req.user.id, loan.profile_id, loan.stokvel_id, interest, reference, cardId || loan.card_id || null]
+      );
+
+      // Update saved_amount: the interest goes back into the stokvel pool
+      await pool.query(
+        'UPDATE profiles SET saved_amount = LEAST(saved_amount + ?, target_amount) WHERE id = ?',
+        [interest, loan.profile_id]
+      );
+
       // Notification
       const [stokvel] = await pool.query('SELECT name FROM stokvels WHERE id = ?', [loan.stokvel_id]);
       await pool.query(
         'INSERT INTO notifications (user_id, type, title, message) VALUES (?, ?, ?, ?)',
         [req.user.id, 'success', 'Loan Repaid',
-          `Your loan of R${parseFloat(loan.total_repayable).toLocaleString()} to ${stokvel[0].name} has been repaid successfully.`]
+          `Your loan of R${totalRepayable.toLocaleString()} to ${stokvel[0].name} has been repaid. Interest of R${interest.toLocaleString()} has been added to your savings.`]
       );
 
-      res.json({ message: 'Loan repaid successfully' });
+      res.json({ message: 'Loan repaid successfully', interestPaid: interest });
     } catch (err) {
       console.error('Repay loan error:', err);
       res.status(500).json({ error: 'Failed to repay loan' });

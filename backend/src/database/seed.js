@@ -94,15 +94,15 @@ async function seed() {
   const [p2] = await connection.query(
     `INSERT INTO profiles (user_id, stokvel_id, role, target_amount, saved_amount, status, joined_date)
      VALUES (?, ?, 'member', 50000, 8500, 'active', ?)
-     ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)`,
+     ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id), saved_amount=VALUES(saved_amount)`,
     [memberId, stokvel1Id, today]
   );
   const profile2Id = p2.insertId;
 
   const [p3] = await connection.query(
     `INSERT INTO profiles (user_id, stokvel_id, role, target_amount, saved_amount, status, joined_date)
-     VALUES (?, ?, 'member', 100000, 22000, 'active', ?)
-     ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)`,
+     VALUES (?, ?, 'member', 7000, 5000, 'active', ?)
+     ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id), saved_amount=VALUES(saved_amount), target_amount=VALUES(target_amount)`,
     [memberId, stokvel2Id, today]
   );
   const profile3Id = p3.insertId;
@@ -110,7 +110,7 @@ async function seed() {
   const [p4] = await connection.query(
     `INSERT INTO profiles (user_id, stokvel_id, role, target_amount, saved_amount, status, joined_date)
      VALUES (?, ?, 'member', 25000, 5000, 'active', ?)
-     ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)`,
+     ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id), saved_amount=VALUES(saved_amount)`,
     [member2Id, stokvel3Id, today]
   );
   console.log('✅ Profiles/memberships created');
@@ -121,11 +121,9 @@ async function seed() {
     [memberId, profile2Id, stokvel1Id, 2500, 'card', 'REF-002', 'confirmed'],
     [memberId, profile2Id, stokvel1Id, 2000, 'bank', 'REF-003', 'confirmed'],
     [memberId, profile2Id, stokvel1Id, 1500, 'card', 'REF-004', 'pending'],
-    [memberId, profile3Id, stokvel2Id, 5000, 'card', 'REF-005', 'confirmed'],
-    [memberId, profile3Id, stokvel2Id, 5000, 'card', 'REF-006', 'confirmed'],
-    [memberId, profile3Id, stokvel2Id, 5000, 'bank', 'REF-007', 'confirmed'],
-    [memberId, profile3Id, stokvel2Id, 5000, 'card', 'REF-008', 'confirmed'],
-    [memberId, profile3Id, stokvel2Id, 2000, 'card', 'REF-009', 'pending'],
+    [memberId, profile3Id, stokvel2Id, 2500, 'card', 'REF-005', 'confirmed'],
+    [memberId, profile3Id, stokvel2Id, 2500, 'card', 'REF-006', 'confirmed'],
+    [memberId, profile3Id, stokvel2Id, 1500, 'card', 'REF-007', 'pending'],
     [member2Id, p4.insertId, stokvel3Id, 2500, 'card', 'REF-010', 'confirmed'],
     [member2Id, p4.insertId, stokvel3Id, 2500, 'cash', 'REF-011', 'confirmed'],
   ];

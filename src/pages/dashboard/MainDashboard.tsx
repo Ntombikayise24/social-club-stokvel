@@ -238,7 +238,7 @@ export default function MainDashboard() {
   });
 
   // Calculate remaining amount for this profile
-  const remainingAmount = activeProfile ? activeProfile.targetAmount - activeProfile.savedAmount : 0;
+  const remainingAmount = activeProfile ? Math.max(0, activeProfile.targetAmount - activeProfile.savedAmount) : 0;
   const progressPercentage = activeProfile ? (activeProfile.targetAmount > 0 ? Math.min(100, (activeProfile.savedAmount / activeProfile.targetAmount) * 100) : 0) : 0;
 
   // Use loan stats from backend

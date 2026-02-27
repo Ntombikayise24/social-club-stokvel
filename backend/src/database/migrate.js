@@ -106,7 +106,7 @@ async function migrate() {
       profile_id INT NOT NULL,
       stokvel_id INT NOT NULL,
       amount DECIMAL(15,2) NOT NULL,
-      payment_method ENUM('card', 'bank', 'cash', 'paystack') DEFAULT 'card',
+      payment_method ENUM('card', 'bank', 'cash', 'paystack', 'loan_repayment') DEFAULT 'card',
       reference VARCHAR(100),
       status ENUM('confirmed', 'pending', 'deleted', 'failed') DEFAULT 'pending',
       confirmed_by INT,
@@ -129,9 +129,15 @@ async function migrate() {
 
   // Ensure ENUMs are up to date for existing tables
   try {
-    await connection.query(`ALTER TABLE contributions MODIFY COLUMN payment_method ENUM('card', 'bank', 'cash', 'paystack') DEFAULT 'card'`);
+    await connection.query(`ALTER TABLE contributions MODIFY COLUMN payment_method ENUM('card', 'bank', 'cash', 'paystack', 'loan_repayment') DEFAULT 'card'`);
     await connection.query(`ALTER TABLE contributions MODIFY COLUMN status ENUM('confirmed', 'pending', 'deleted', 'failed') DEFAULT 'pending'`);
   } catch (e) { /* ignore if already correct */ }
+
+  // Clamp any profiles where saved_amount exceeds target_amount
+  try {
+    await connection.query(`UPDATE profiles SET saved_amount = target_amount WHERE saved_amount > target_amount AND target_amount > 0`);
+    console.log('✅ Clamped saved_amount to target_amount for any over-contributed profiles');
+  } catch (e) { /* ignore */ }
 
   // ───────────────── LOANS TABLE ─────────────────
   await connection.query(`
