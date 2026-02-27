@@ -80,7 +80,7 @@ router.get('/stats', async (req, res) => {
     const userId = req.user.id;
 
     const [active] = await pool.query(
-      "SELECT COUNT(*) as count, COALESCE(SUM(total_repayable), 0) as total FROM loans WHERE user_id = ? AND status IN ('active', 'overdue')",
+      "SELECT COUNT(*) as count, COALESCE(SUM(amount), 0) as total FROM loans WHERE user_id = ? AND status IN ('active', 'overdue')",
       [userId]
     );
 

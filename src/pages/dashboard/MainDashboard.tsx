@@ -133,19 +133,7 @@ export default function MainDashboard() {
         read: n.isRead || false,
       })));
 
-      // Fetch loan stats
-      try {
-        const loanRes = await loanApi.getStats();
-        const ls = loanRes.data;
-        const maxBorrowable = userProfiles.reduce((sum: number, p: Profile) => sum + Math.floor(p.savedAmount * 0.5), 0);
-        const borrowed = ls.activeAmount || 0;
-        setLoanStats({
-          available: maxBorrowable,
-          borrowed,
-          remaining: Math.max(0, maxBorrowable - borrowed),
-          progress: maxBorrowable > 0 ? Math.min(100, Math.floor((borrowed / maxBorrowable) * 100)) : 0,
-        });
-      } catch { /* no loans yet */ }
+      // Loan stats are now calculated per-profile in the activeProfile effect
 
     } catch (err: any) {
       console.error('Dashboard fetch error:', err);
@@ -196,9 +184,11 @@ export default function MainDashboard() {
     }
   }, [profiles]);
 
-  // Fetch stokvel details when active profile changes
+  // Fetch stokvel details and per-profile loan stats when active profile changes
   useEffect(() => {
     if (!activeProfile?.stokvelId) return;
+    
+    // Fetch stokvel details
     stokvelApi.getDetails(Number(activeProfile.stokvelId))
       .then(res => {
         const s = res.data;
@@ -229,6 +219,25 @@ export default function MainDashboard() {
           nextPayout: 'TBD',
           individualTarget: activeProfile.targetAmount,
         });
+      });
+
+    // Fetch per-profile loan stats (principal only)
+    loanApi.list({ profileId: Number(activeProfile.id) })
+      .then(res => {
+        const loans = res.data?.data || [];
+        const activeLoans = loans.filter((l: any) => l.status === 'active' || l.status === 'overdue');
+        const borrowed = activeLoans.reduce((sum: number, l: any) => sum + (l.amount || 0), 0);
+        const maxBorrowable = Math.floor(activeProfile.savedAmount * 0.5);
+        setLoanStats({
+          available: maxBorrowable,
+          borrowed,
+          remaining: Math.max(0, maxBorrowable - borrowed),
+          progress: maxBorrowable > 0 ? Math.min(100, Math.floor((borrowed / maxBorrowable) * 100)) : 0,
+        });
+      })
+      .catch(() => {
+        const maxBorrowable = Math.floor(activeProfile.savedAmount * 0.5);
+        setLoanStats({ available: maxBorrowable, borrowed: 0, remaining: maxBorrowable, progress: 0 });
       });
   }, [activeProfile]);
 
