@@ -111,7 +111,7 @@ router.get('/stats', async (req, res) => {
 router.post(
   '/request',
   [
-    body('amount').isFloat({ min: 100 }).withMessage('Amount must be at least R100'),
+    body('amount').isFloat({ min: 1 }).withMessage('Amount must be at least R1'),
     body('profileId').isInt().withMessage('Profile is required'),
     body('purpose').optional().trim(),
     body('cardId').optional().isInt(),

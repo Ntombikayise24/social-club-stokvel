@@ -118,7 +118,7 @@ export default function LoanRequest() {
     year: 'numeric'
   });
   
-  const isValidAmount = requestedAmount >= 100 && requestedAmount <= remainingToBorrow && !hasActiveLoan;
+  const isValidAmount = requestedAmount >= 1 && requestedAmount <= remainingToBorrow && !hasActiveLoan;
   const isFormValid = isValidAmount && acceptTerms && selectedCard !== 'new';
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -279,9 +279,9 @@ export default function LoanRequest() {
                     loanAmount && !isValidAmount ? 'border-red-500' : 'border-gray-300'
                   }`}
                   placeholder="Enter amount"
-                  min="100"
+                  min="1"
                   max={remainingToBorrow}
-                  step="100"
+                  step="0.01"
                 />
               </div>
               {hasActiveLoan && (
@@ -295,11 +295,11 @@ export default function LoanRequest() {
                   <AlertCircle className="w-4 h-4 mr-1" />
                   {requestedAmount > remainingToBorrow 
                     ? `You can only borrow up to ${formatCurrency(remainingToBorrow)}` 
-                    : 'Minimum loan amount is R 100'}
+                    : 'Minimum loan amount is R 1'}
                 </p>
               )}
               <p className="mt-1 text-xs text-gray-500">
-                Min: R100 | Max available: {formatCurrency(remainingToBorrow)}
+                Min: R1 | Max available: {formatCurrency(remainingToBorrow)}
               </p>
             </div>
 
