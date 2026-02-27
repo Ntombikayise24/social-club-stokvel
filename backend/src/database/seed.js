@@ -74,7 +74,7 @@ async function seed() {
     `INSERT INTO stokvels (name, type, description, target_amount, max_members, interest_rate, cycle, meeting_day, next_payout, status, icon, color, created_by)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)`,
-    ['Collective Pot', 'traditional', 'Traditional Stokvel saving for festive season celebrations', 7000, 18, 30, 'weekly', 'Sunday', '2026-03-15', 'active', '🌱', 'green', adminId]
+    ['Collective Pot', 'traditional', 'Traditional Stokvel saving for festive season celebrations', 7000, 18, 30, 'weekly', 'Sunday', '2026-12-12', 'active', '🌱', 'green', adminId]
   );
   const stokvel2Id = s2.insertId;
 
