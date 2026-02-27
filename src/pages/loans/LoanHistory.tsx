@@ -17,6 +17,7 @@ import {
   Users,
 } from 'lucide-react';
 import { loanApi, cardApi, userApi } from '../../api';
+import { downloadBlob, getExtension } from '../../utils/download';
 
 interface Loan {
   id: number;
@@ -58,6 +59,8 @@ export default function LoanHistory() {
   const [profiles, setProfiles] = useState<any[]>([]);
   const [cards, setCards] = useState<Card[]>([]);
   const [loans, setLoans] = useState<Loan[]>([]);
+  const [showDownloadMenu, setShowDownloadMenu] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -234,6 +237,21 @@ export default function LoanHistory() {
     return `R ${amount.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,')}`;
   };
 
+  const handleDownload = async (format: string) => {
+    try {
+      setIsDownloading(true);
+      setShowDownloadMenu(false);
+      const res = await loanApi.download({ profileId: Number(profileId), format });
+      const ext = getExtension(format);
+      downloadBlob(new Blob([res.data]), `loan-history.${ext}`);
+    } catch (err) {
+      console.error('Download error:', err);
+      alert('Failed to download report. Please try again.');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -255,9 +273,33 @@ export default function LoanHistory() {
               <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
                 <Filter className="w-5 h-5 text-gray-600" />
               </button>
-              <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                <Download className="w-5 h-5 text-gray-600" />
-              </button>
+              <div className="relative">
+                <button 
+                  onClick={() => setShowDownloadMenu(!showDownloadMenu)}
+                  disabled={isDownloading}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  {isDownloading ? (
+                    <div className="w-5 h-5 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Download className="w-5 h-5 text-gray-600" />
+                  )}
+                </button>
+                {showDownloadMenu && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
+                    <p className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Download Report</p>
+                    <button onClick={() => handleDownload('pdf')} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-2">
+                      <span className="text-red-500">📄</span><span>PDF Report</span>
+                    </button>
+                    <button onClick={() => handleDownload('excel')} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-2">
+                      <span className="text-green-500">📊</span><span>Excel Spreadsheet</span>
+                    </button>
+                    <button onClick={() => handleDownload('csv')} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-2">
+                      <span className="text-blue-500">📋</span><span>CSV File</span>
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>

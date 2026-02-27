@@ -4,6 +4,7 @@ import { validate } from '../middleware/validate.js';
 import { authenticate, updateLastActive } from '../middleware/auth.js';
 import pool from '../database/connection.js';
 import { v4 as uuidv4 } from 'uuid';
+import { generatePDF, generateExcel, generateCSV, formatRowData } from '../utils/reports.js';
 
 const router = Router();
 router.use(authenticate);
@@ -73,6 +74,63 @@ router.get('/', async (req, res) => {
   } catch (err) {
     console.error('List contributions error:', err);
     res.status(500).json({ error: 'Failed to fetch contributions' });
+  }
+});
+
+// ────────────────── DOWNLOAD CONTRIBUTIONS REPORT ──────────────────
+router.get('/download', async (req, res) => {
+  try {
+    const { profileId, format = 'pdf' } = req.query;
+
+    let where = 'WHERE c.user_id = ?';
+    const params = [req.user.id];
+    if (profileId) { where += ' AND c.profile_id = ?'; params.push(profileId); }
+
+    const [contributions] = await pool.query(
+      `SELECT c.id, u.full_name, s.name AS stokvel_name, c.amount, c.status, c.payment_method, c.reference, c.created_at, c.confirmed_at
+       FROM contributions c
+       JOIN users u ON u.id = c.user_id
+       JOIN stokvels s ON s.id = c.stokvel_id
+       ${where}
+       ORDER BY c.created_at DESC`,
+      params
+    );
+
+    const columns = [
+      { key: 'id', header: 'ID' },
+      { key: 'stokvel_name', header: 'Stokvel' },
+      { key: 'amount', header: 'Amount (R)' },
+      { key: 'status', header: 'Status' },
+      { key: 'payment_method', header: 'Payment Method' },
+      { key: 'reference', header: 'Reference' },
+      { key: 'created_at', header: 'Date' },
+      { key: 'confirmed_at', header: 'Confirmed At' },
+    ];
+    const rows = formatRowData(contributions, 'contributions');
+    const title = 'Contribution History Report';
+
+    if (format === 'pdf') {
+      const buffer = await generatePDF(title, columns, rows);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'attachment; filename="contribution-history.pdf"');
+      return res.send(buffer);
+    }
+    if (format === 'excel') {
+      const buffer = await generateExcel(title, columns, rows);
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', 'attachment; filename="contribution-history.xlsx"');
+      return res.send(Buffer.from(buffer));
+    }
+    if (format === 'csv') {
+      const csv = generateCSV(columns, rows);
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename="contribution-history.csv"');
+      return res.send(csv);
+    }
+    res.json({ data: rows });
+  } catch (err) {
+    console.error('Download contributions error:', err);
+    res.status(500).json({ error: 'Failed to generate report' });
   }
 });
 

@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { contributionApi, userApi } from '../../api';
 import ErrorState from '../../components/ErrorState';
+import { downloadBlob, getExtension } from '../../utils/download';
 
 interface Contribution {
   id: number;
@@ -38,6 +39,8 @@ export default function ContributionHistory() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [contributions, setContributions] = useState<Contribution[]>([]);
+  const [showDownloadMenu, setShowDownloadMenu] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const [profiles, setProfiles] = useState<Profile[]>([]);
 
@@ -93,6 +96,20 @@ export default function ContributionHistory() {
 
   // Get unique members for filter dropdown
   const uniqueMembers = Array.from(new Set(contributions.map(c => c.memberName)));
+
+  const handleDownload = async (format: string) => {
+    try {
+      setIsDownloading(true);
+      const res = await contributionApi.download({ profileId: Number(profileId), format });
+      const ext = getExtension(format);
+      downloadBlob(new Blob([res.data]), `contribution-history.${ext}`);
+    } catch (err) {
+      console.error('Download error:', err);
+      alert('Failed to download report. Please try again.');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   // Apply filters
   const filteredContributions = contributions.filter(c => {
@@ -247,10 +264,34 @@ export default function ContributionHistory() {
             </div>
 
             {/* Download Button */}
-            <button className="flex items-center justify-center space-x-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors">
-              <Download className="w-4 h-4" />
-              <span>Export</span>
-            </button>
+            <div className="relative">
+              <button
+                onClick={() => setShowDownloadMenu(!showDownloadMenu)}
+                disabled={isDownloading}
+                className="flex items-center justify-center space-x-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+              >
+                {isDownloading ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4" />
+                )}
+                <span>Export</span>
+              </button>
+              {showDownloadMenu && (
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
+                  <p className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Export As</p>
+                  <button onClick={() => { setShowDownloadMenu(false); handleDownload('pdf'); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-2">
+                    <span>📄</span><span>PDF Report</span>
+                  </button>
+                  <button onClick={() => { setShowDownloadMenu(false); handleDownload('excel'); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-2">
+                    <span>📊</span><span>Excel Spreadsheet</span>
+                  </button>
+                  <button onClick={() => { setShowDownloadMenu(false); handleDownload('csv'); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-2">
+                    <span>📋</span><span>CSV File</span>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

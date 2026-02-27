@@ -83,6 +83,9 @@ export const contributionApi = {
     cardId?: number;
     paymentMethod?: string;
   }) => api.post('/contributions', data),
+
+  download: (params: { profileId?: number; format: string }) =>
+    api.get('/contributions/download', { params, responseType: 'blob' }),
 };
 
 // ══════════════════════════════════════════
@@ -108,6 +111,9 @@ export const loanApi = {
 
   repay: (id: number, cardId?: number) =>
     api.post(`/loans/${id}/repay`, { cardId }),
+
+  download: (params: { profileId?: number; format: string }) =>
+    api.get('/loans/download', { params, responseType: 'blob' }),
 };
 
 // ══════════════════════════════════════════
@@ -244,7 +250,10 @@ export const adminApi = {
     reportType: string;
     dateRange?: { start: string; end: string };
     format?: string;
-  }) => api.post('/admin/reports', data),
+  }) => {
+    const isFile = data.format && data.format !== 'json';
+    return api.post('/admin/reports', data, isFile ? { responseType: 'blob' } : {});
+  },
 
   // Join requests
   listJoinRequests: () => api.get('/admin/join-requests'),

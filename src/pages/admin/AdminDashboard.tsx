@@ -2419,34 +2419,24 @@ export default function AdminDashboard() {
         format,
       });
 
-      const reportData = JSON.stringify(res.data, null, 2);
-      const extension = format === 'pdf' ? 'txt' : format;
-      const filename = `${reportType}-report-${dateRange}.${extension}`;
+      // For binary formats (PDF, Excel, CSV), the response is a blob
+      const extensions: Record<string, string> = { pdf: 'pdf', excel: 'xlsx', csv: 'csv' };
+      const ext = extensions[format] || 'pdf';
+      const filename = `${reportType}-report-${dateRange}.${ext}`;
 
-      const element = document.createElement('a');
-      const file = new Blob([reportData], { type: 'text/plain' });
-      element.href = URL.createObjectURL(file);
-      element.download = filename;
-      document.body.appendChild(element);
-      element.click();
-      document.body.removeChild(element);
+      const blob = new Blob([res.data]);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
 
-      showSuccess(`${reportType} report generated successfully!`);
+      showSuccess(`${reportType} report downloaded as ${ext.toUpperCase()}!`);
     } catch {
-      // Fallback to local data
-      let reportData = `${reportType} report for ${dateRange}`;
-      const extension = format === 'pdf' ? 'txt' : format;
-      const filename = `${reportType}-report-${dateRange}.${extension}`;
-
-      const element = document.createElement('a');
-      const file = new Blob([reportData], { type: 'text/plain' });
-      element.href = URL.createObjectURL(file);
-      element.download = filename;
-      document.body.appendChild(element);
-      element.click();
-      document.body.removeChild(element);
-
-      showSuccess(`${reportType} report generated (local data).`);
+      showError('Failed to generate report. Please try again.');
     }
   };
 

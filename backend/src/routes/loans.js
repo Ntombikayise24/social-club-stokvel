@@ -3,6 +3,7 @@ import { body } from 'express-validator';
 import { validate } from '../middleware/validate.js';
 import { authenticate, updateLastActive } from '../middleware/auth.js';
 import pool from '../database/connection.js';
+import { generatePDF, generateExcel, generateCSV, formatRowData } from '../utils/reports.js';
 
 const router = Router();
 router.use(authenticate);
@@ -71,6 +72,64 @@ router.get('/', async (req, res) => {
   } catch (err) {
     console.error('List loans error:', err);
     res.status(500).json({ error: 'Failed to fetch loans' });
+  }
+});
+
+// ────────────────── DOWNLOAD LOAN REPORT ──────────────────
+router.get('/download', async (req, res) => {
+  try {
+    const { profileId, format = 'pdf' } = req.query;
+
+    let where = 'WHERE l.user_id = ?';
+    const params = [req.user.id];
+    if (profileId) { where += ' AND l.profile_id = ?'; params.push(profileId); }
+
+    const [loans] = await pool.query(
+      `SELECT l.id, u.full_name, s.name AS stokvel_name, l.amount, l.interest, l.total_repayable, l.interest_rate, l.status, l.purpose, l.borrowed_date, l.due_date, l.repaid_date
+       FROM loans l
+       JOIN users u ON u.id = l.user_id
+       JOIN stokvels s ON s.id = l.stokvel_id
+       ${where}
+       ORDER BY l.created_at DESC`,
+      params
+    );
+
+    const columns = [
+      { key: 'id', header: 'ID' },
+      { key: 'stokvel_name', header: 'Stokvel' },
+      { key: 'amount', header: 'Principal (R)' },
+      { key: 'interest', header: 'Interest (R)' },
+      { key: 'total_repayable', header: 'Total (R)' },
+      { key: 'status', header: 'Status' },
+      { key: 'borrowed_date', header: 'Borrowed' },
+      { key: 'due_date', header: 'Due Date' },
+      { key: 'repaid_date', header: 'Repaid' },
+    ];
+    const rows = formatRowData(loans, 'loans');
+    const title = 'Loan History Report';
+
+    if (format === 'pdf') {
+      const buffer = await generatePDF(title, columns, rows);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'attachment; filename="loan-history.pdf"');
+      return res.send(buffer);
+    }
+    if (format === 'excel') {
+      const buffer = await generateExcel(title, columns, rows);
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', 'attachment; filename="loan-history.xlsx"');
+      return res.send(Buffer.from(buffer));
+    }
+    if (format === 'csv') {
+      const csv = generateCSV(columns, rows);
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename="loan-history.csv"');
+      return res.send(csv);
+    }
+    res.json({ data: rows });
+  } catch (err) {
+    console.error('Download loans error:', err);
+    res.status(500).json({ error: 'Failed to generate report' });
   }
 });
 

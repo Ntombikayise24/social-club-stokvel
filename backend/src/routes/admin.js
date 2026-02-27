@@ -5,6 +5,7 @@ import { validate } from '../middleware/validate.js';
 import { authenticate, requireAdmin } from '../middleware/auth.js';
 import pool from '../database/connection.js';
 import { sendApprovalEmail, sendJoinRequestApprovedEmail, sendStokvelAssignmentEmail, sendStokvelUnassignmentEmail, sendAccountDeletionEmail } from '../utils/email.js';
+import { generatePDF, generateExcel, generateCSV, REPORT_COLUMNS, formatRowData } from '../utils/reports.js';
 
 const router = Router();
 router.use(authenticate);
@@ -1047,14 +1048,57 @@ router.post('/reports', async (req, res) => {
         return res.status(400).json({ error: 'Invalid report type' });
     }
 
-    // For JSON format, return data directly
-    // In production, you'd generate PDF/Excel here
+    // Determine columns and format data
+    const colKey = reportType === 'members' ? 'users' : reportType;
+    const columns = REPORT_COLUMNS[colKey] || REPORT_COLUMNS.users;
+    const title = `${reportType.charAt(0).toUpperCase() + reportType.slice(1)} Report`;
+    const range = { start: startDate, end: endDate };
+
+    // Handle financial report (object, not array)
+    let rows;
+    if (reportType === 'financial') {
+      const fin = data;
+      rows = [
+        { metric: 'Total Contributions', value: `R ${parseFloat(fin.contributions?.total_contributions || 0).toFixed(2)}` },
+        { metric: 'Confirmed Contributions', value: fin.contributions?.confirmed_count || 0 },
+        { metric: 'Pending Contributions', value: fin.contributions?.pending_count || 0 },
+        { metric: 'Total Loans Issued', value: `R ${parseFloat(fin.loans?.total_loans || 0).toFixed(2)}` },
+        { metric: 'Total Interest Earned', value: `R ${parseFloat(fin.loans?.total_interest || 0).toFixed(2)}` },
+        { metric: 'Total Loan Count', value: fin.loans?.loan_count || 0 },
+      ];
+    } else {
+      rows = formatRowData(Array.isArray(data) ? data : [], reportType);
+    }
+
+    // Generate file based on format
+    if (format === 'pdf') {
+      const pdfBuffer = await generatePDF(title, columns, rows, range);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${reportType}-report.pdf"`);
+      return res.send(pdfBuffer);
+    }
+
+    if (format === 'excel') {
+      const excelBuffer = await generateExcel(title, columns, rows, range);
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${reportType}-report.xlsx"`);
+      return res.send(Buffer.from(excelBuffer));
+    }
+
+    if (format === 'csv') {
+      const csvContent = generateCSV(columns, rows);
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="${reportType}-report.csv"`);
+      return res.send(csvContent);
+    }
+
+    // Default: JSON
     res.json({
       reportType,
-      dateRange: { start: startDate, end: endDate },
+      dateRange: range,
       format,
-      recordCount: data.length,
-      data,
+      recordCount: rows.length,
+      data: rows,
     });
   } catch (err) {
     console.error('Generate report error:', err);
