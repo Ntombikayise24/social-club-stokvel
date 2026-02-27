@@ -37,20 +37,23 @@ export default function LoanRequest() {
     totalContributions: 0,
     memberSince: '',
     color: 'primary',
-    targetAmount: 0
+    targetAmount: 0,
+    interestRate: 30,
+    stokvelId: 0
   });
 
   const [cards, setCards] = useState<any[]>([]);
-  const [loanStats, setLoanStats] = useState<any>({ activeAmount: 0 });
+  const [activeLoanAmount, setActiveLoanAmount] = useState(0);
+  const [hasActiveLoan, setHasActiveLoan] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [profilesRes, cardsRes, statsRes] = await Promise.all([
+        const [profilesRes, cardsRes, loansRes] = await Promise.all([
           userApi.getProfiles(),
           cardApi.list(),
-          loanApi.getStats()
+          loanApi.list({ profileId: Number(profileId), status: 'active' })
         ]);
 
         const colors = ['primary', 'secondary', 'blue', 'green', 'purple'];
@@ -65,7 +68,8 @@ export default function LoanRequest() {
           totalContributions: p.savedAmount || 0,
           memberSince: p.joinedDate ? new Date(p.joinedDate).toLocaleDateString('en-ZA', {day:'2-digit', month:'short', year:'numeric'}) : '',
           color: colors[i % colors.length],
-          targetAmount: p.targetAmount || 0
+          targetAmount: p.targetAmount || 0,
+          interestRate: p.interestRate || 30
         }));
 
         const profile = profiles.find((p: any) => p.id === profileId) || profiles[0];
@@ -82,7 +86,11 @@ export default function LoanRequest() {
         const defaultCard = cardsList.find((c: any) => c.isDefault) || cardsList[0];
         if (defaultCard) setSelectedCard(defaultCard.id);
 
-        setLoanStats(statsRes.data || {});
+        // Calculate actual active loan amount for this profile
+        const activeLoans = (loansRes.data?.data || []).filter((l: any) => l.status === 'active' || l.status === 'overdue');
+        const totalActive = activeLoans.reduce((sum: number, l: any) => sum + (l.amount || 0), 0);
+        setActiveLoanAmount(totalActive);
+        setHasActiveLoan(activeLoans.length > 0);
       } catch (err) {
         console.error('Failed to load data', err);
       } finally {
@@ -92,13 +100,14 @@ export default function LoanRequest() {
     fetchData();
   }, [profileId]);
   
-  // Calculate loan amounts
+  // Calculate loan amounts using actual data
   const maxLoanAmount = Math.floor(currentProfile.savedAmount * 0.5);
-  const previouslyBorrowed = Math.floor(currentProfile.savedAmount * 0.3);
-  const remainingToBorrow = maxLoanAmount - previouslyBorrowed;
+  const previouslyBorrowed = activeLoanAmount;
+  const remainingToBorrow = hasActiveLoan ? 0 : maxLoanAmount;
   
   const requestedAmount = parseFloat(loanAmount) || 0;
-  const interestAmount = requestedAmount * 0.3;
+  const interestRate = currentProfile.interestRate || 30;
+  const interestAmount = requestedAmount * (interestRate / 100);
   const totalRepayable = requestedAmount + interestAmount;
   
   const dueDate = new Date();
@@ -109,7 +118,7 @@ export default function LoanRequest() {
     year: 'numeric'
   });
   
-  const isValidAmount = requestedAmount >= 100 && requestedAmount <= remainingToBorrow;
+  const isValidAmount = requestedAmount >= 100 && requestedAmount <= remainingToBorrow && !hasActiveLoan;
   const isFormValid = isValidAmount && acceptTerms && selectedCard !== 'new';
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -150,7 +159,8 @@ export default function LoanRequest() {
     return `R ${amount.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,')}`;
   };
 
-  const overdueAmount = requestedAmount * 0.6;
+  const overdueInterestRate = interestRate * 2;
+  const overdueAmount = requestedAmount * (overdueInterestRate / 100);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -221,7 +231,7 @@ export default function LoanRequest() {
               
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-white rounded-lg p-3">
-                  <p className="text-xs text-gray-500 mb-1">Previously Borrowed</p>
+                  <p className="text-xs text-gray-500 mb-1">Active Loan</p>
                   <p className="font-bold text-primary-700">{formatCurrency(previouslyBorrowed)}</p>
                 </div>
                 <div className="bg-white rounded-lg p-3">
@@ -274,7 +284,13 @@ export default function LoanRequest() {
                   step="100"
                 />
               </div>
-              {loanAmount && !isValidAmount && (
+              {hasActiveLoan && (
+                <p className="mt-1 text-sm text-red-600 flex items-center">
+                  <AlertCircle className="w-4 h-4 mr-1" />
+                  You already have an active loan of {formatCurrency(activeLoanAmount)} in this stokvel. Repay it first.
+                </p>
+              )}
+              {loanAmount && !isValidAmount && !hasActiveLoan && (
                 <p className="mt-1 text-sm text-red-600 flex items-center">
                   <AlertCircle className="w-4 h-4 mr-1" />
                   {requestedAmount > remainingToBorrow 
@@ -348,7 +364,7 @@ export default function LoanRequest() {
                 </div>
                 
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Interest (30%):</span>
+                  <span className="text-gray-600">Interest ({interestRate}%):</span>
                   <span className="font-medium text-secondary-600">+ {formatCurrency(interestAmount)}</span>
                 </div>
                 
@@ -382,8 +398,8 @@ export default function LoanRequest() {
                     <div>
                       <p className="text-xs font-medium text-yellow-800">Overdue Penalty</p>
                       <p className="text-xs text-yellow-700 mt-1">
-                        If not repaid by {formattedDueDate}, an additional 30% interest will be added.
-                        Total interest becomes 60% ({formatCurrency(overdueAmount)}).
+                        If not repaid by {formattedDueDate}, an additional {interestRate}% interest will be added.
+                        Total interest becomes {overdueInterestRate}% ({formatCurrency(overdueAmount)}).
                       </p>
                     </div>
                   </div>
@@ -401,8 +417,8 @@ export default function LoanRequest() {
               />
               <span className="ml-2 text-sm text-gray-600">
                 I understand that I have <span className="font-bold">30 days</span> to repay this loan with{' '}
-                <span className="font-bold">30% interest</span>. If I fail to repay on time, an additional{' '}
-                <span className="font-bold">30% interest</span> will be charged (total 60%).
+                <span className="font-bold">{interestRate}% interest</span>. If I fail to repay on time, an additional{' '}
+                <span className="font-bold">{interestRate}% interest</span> will be charged (total {overdueInterestRate}%).
               </span>
             </div>
 
@@ -429,7 +445,7 @@ export default function LoanRequest() {
             </li>
             <li className="flex items-start">
               <Percent className="w-4 h-4 text-secondary-600 mr-2 flex-shrink-0 mt-0.5" />
-              <span><span className="font-bold">30% interest</span> charged upfront</span>
+              <span><span className="font-bold">{interestRate}% interest</span> charged upfront</span>
             </li>
             <li className="flex items-start">
               <Clock className="w-4 h-4 text-blue-600 mr-2 flex-shrink-0 mt-0.5" />
@@ -437,7 +453,7 @@ export default function LoanRequest() {
             </li>
             <li className="flex items-start">
               <AlertTriangle className="w-4 h-4 text-yellow-600 mr-2 flex-shrink-0 mt-0.5" />
-              <span><span className="font-bold">Overdue penalty:</span> Additional 30% (total 60% interest)</span>
+              <span><span className="font-bold">Overdue penalty:</span> Additional {interestRate}% (total {overdueInterestRate}% interest)</span>
             </li>
           </ul>
         </div>
@@ -468,7 +484,7 @@ export default function LoanRequest() {
                 <span className="font-bold text-gray-800">{formatCurrency(requestedAmount)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Interest (30%):</span>
+                <span className="text-gray-600">Interest ({interestRate}%):</span>
                 <span className="font-bold text-secondary-600">{formatCurrency(interestAmount)}</span>
               </div>
               <div className="flex justify-between">

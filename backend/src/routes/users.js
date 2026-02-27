@@ -143,7 +143,7 @@ router.get('/me/profiles', async (req, res) => {
   try {
     const [profiles] = await pool.query(
       `SELECT p.id, p.stokvel_id, s.name AS stokvel_name, s.type AS stokvel_type,
-              s.icon, s.color, p.role, p.target_amount, p.saved_amount, p.status, p.joined_date,
+              s.icon, s.color, s.interest_rate, p.role, p.target_amount, p.saved_amount, p.status, p.joined_date,
               ROUND((p.saved_amount / NULLIF(p.target_amount, 0)) * 100, 1) AS progress
        FROM profiles p
        JOIN stokvels s ON s.id = p.stokvel_id
@@ -159,6 +159,7 @@ router.get('/me/profiles', async (req, res) => {
       stokvelType: p.stokvel_type,
       icon: p.icon,
       color: p.color,
+      interestRate: parseFloat(p.interest_rate || 30),
       role: p.role,
       targetAmount: parseFloat(p.target_amount),
       savedAmount: parseFloat(p.saved_amount),
