@@ -672,7 +672,7 @@ export default function MainDashboard() {
                 <div className="bg-gray-50 p-3 rounded-lg">
                   <p className="text-xs text-gray-500 mb-1">Available to borrow</p>
                   <span className="text-xl font-bold text-green-600">
-                    R {loanData.available.toLocaleString()}
+                    R {loanData.remaining.toLocaleString()}
                   </span>
                 </div>
                 <div className="bg-gray-50 p-3 rounded-lg">
@@ -687,7 +687,7 @@ export default function MainDashboard() {
               {loanData.available > 0 && (
                 <div className="mb-4">
                   <div className="flex justify-between text-xs mb-1">
-                    <span className="text-gray-500">Borrowed {loanData.progress}% of limit</span>
+                    <span className="text-gray-500">Borrowed R {loanData.borrowed.toLocaleString()} of R {loanData.available.toLocaleString()} limit</span>
                     <span className="text-gray-500">R {loanData.remaining.toLocaleString()} left</span>
                   </div>
                   <div className="w-full bg-gray-100 rounded-full h-2.5">

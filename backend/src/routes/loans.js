@@ -179,11 +179,8 @@ router.post(
         [req.user.id, profileId, profile.stokvel_id, amount, interestRate, interest, totalRepayable, purpose || null, borrowedDate, dueDate, cardId || null]
       );
 
-      // Deduct the principal from saved_amount (user is borrowing from the pool)
-      await pool.query(
-        'UPDATE profiles SET saved_amount = GREATEST(saved_amount - ?, 0) WHERE id = ?',
-        [amount, profileId]
-      );
+      // NOTE: saved_amount is NOT deducted — it tracks contributions only.
+      // The loan is tracked separately in the loans table.
 
       // Notification
       await pool.query(
@@ -265,19 +262,15 @@ router.post(
         [req.user.id, loan.profile_id, loan.stokvel_id, interest, reference, cardId || loan.card_id || null]
       );
 
-      // Add the PRINCIPAL back to saved_amount (the borrowed amount returns to the user's target)
-      // Interest does NOT go to saved_amount — it only goes to the interest pot
-      await pool.query(
-        'UPDATE profiles SET saved_amount = LEAST(saved_amount + ?, target_amount) WHERE id = ?',
-        [principal, loan.profile_id]
-      );
+      // NOTE: saved_amount is NOT modified — it tracks contributions only.
+      // The loan status change to 'repaid' is sufficient. Interest goes to the pot via the contribution above.
 
       // Notification
       const [stokvel] = await pool.query('SELECT name FROM stokvels WHERE id = ?', [loan.stokvel_id]);
       await pool.query(
         'INSERT INTO notifications (user_id, type, title, message) VALUES (?, ?, ?, ?)',
         [req.user.id, 'success', 'Loan Repaid',
-          `Your loan of R${totalRepayable.toLocaleString()} to ${stokvel[0].name} has been repaid. R${principal.toLocaleString()} returned to your savings, R${interest.toLocaleString()} added to the interest pot.`]
+          `Your loan of R${totalRepayable.toLocaleString()} to ${stokvel[0].name} has been repaid. R${interest.toLocaleString()} interest added to the group pot.`]
       );
 
       res.json({ message: 'Loan repaid successfully', principalReturned: principal, interestPaid: interest });
