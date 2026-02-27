@@ -179,6 +179,12 @@ router.post(
         [req.user.id, profileId, profile.stokvel_id, amount, interestRate, interest, totalRepayable, purpose || null, borrowedDate, dueDate, cardId || null]
       );
 
+      // Deduct the principal from saved_amount (user is borrowing from the pool)
+      await pool.query(
+        'UPDATE profiles SET saved_amount = GREATEST(saved_amount - ?, 0) WHERE id = ?',
+        [amount, profileId]
+      );
+
       // Notification
       await pool.query(
         'INSERT INTO notifications (user_id, type, title, message) VALUES (?, ?, ?, ?)',
@@ -248,9 +254,10 @@ router.post(
       );
 
       const interest = parseFloat(loan.interest);
+      const principal = parseFloat(loan.amount);
       const totalRepayable = parseFloat(loan.total_repayable);
 
-      // Record interest as a confirmed contribution so it reflects in the financial records
+      // Record interest as a confirmed contribution for the interest pot records
       const reference = `LOAN-INT-${loanId}-${Date.now()}`;
       await pool.query(
         `INSERT INTO contributions (user_id, profile_id, stokvel_id, amount, payment_method, reference, status, confirmed_at, card_id)
@@ -258,10 +265,11 @@ router.post(
         [req.user.id, loan.profile_id, loan.stokvel_id, interest, reference, cardId || loan.card_id || null]
       );
 
-      // Update saved_amount: the interest goes back into the stokvel pool
+      // Add the PRINCIPAL back to saved_amount (the borrowed amount returns to the user's target)
+      // Interest does NOT go to saved_amount — it only goes to the interest pot
       await pool.query(
         'UPDATE profiles SET saved_amount = LEAST(saved_amount + ?, target_amount) WHERE id = ?',
-        [interest, loan.profile_id]
+        [principal, loan.profile_id]
       );
 
       // Notification
@@ -269,10 +277,10 @@ router.post(
       await pool.query(
         'INSERT INTO notifications (user_id, type, title, message) VALUES (?, ?, ?, ?)',
         [req.user.id, 'success', 'Loan Repaid',
-          `Your loan of R${totalRepayable.toLocaleString()} to ${stokvel[0].name} has been repaid. Interest of R${interest.toLocaleString()} has been added to your savings.`]
+          `Your loan of R${totalRepayable.toLocaleString()} to ${stokvel[0].name} has been repaid. R${principal.toLocaleString()} returned to your savings, R${interest.toLocaleString()} added to the interest pot.`]
       );
 
-      res.json({ message: 'Loan repaid successfully', interestPaid: interest });
+      res.json({ message: 'Loan repaid successfully', principalReturned: principal, interestPaid: interest });
     } catch (err) {
       console.error('Repay loan error:', err);
       res.status(500).json({ error: 'Failed to repay loan' });
