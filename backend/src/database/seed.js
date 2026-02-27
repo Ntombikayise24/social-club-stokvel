@@ -138,14 +138,16 @@ async function seed() {
   console.log('✅ Sample contributions created');
 
   // ── Loans ──
+  // Only seed one small active loan for Naledi in Kasi Savings Club (stokvel1)
   const dueDate = new Date();
   dueDate.setDate(dueDate.getDate() + 30);
   await connection.query(
     `INSERT INTO loans (user_id, profile_id, stokvel_id, amount, interest_rate, interest, total_repayable, status, purpose, borrowed_date, due_date)
      VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)`,
-    [memberId, profile2Id, stokvel1Id, 4000, 30, 1200, 5200, 'Emergency medical expenses', today, dueDate.toISOString().split('T')[0]]
+    [memberId, profile2Id, stokvel1Id, 100, 30, 30, 130, 'Personal expenses', today, dueDate.toISOString().split('T')[0]]
   );
 
+  // One repaid loan for Naledi in Kasi Savings Club
   const pastDate = new Date();
   pastDate.setDate(pastDate.getDate() - 45);
   const pastDue = new Date();
@@ -155,7 +157,7 @@ async function seed() {
   await connection.query(
     `INSERT INTO loans (user_id, profile_id, stokvel_id, amount, interest_rate, interest, total_repayable, status, purpose, borrowed_date, due_date, repaid_date)
      VALUES (?, ?, ?, ?, ?, ?, ?, 'repaid', ?, ?, ?, ?)`,
-    [memberId, profile3Id, stokvel2Id, 10000, 30, 3000, 13000, 'Home renovation', pastDate.toISOString().split('T')[0], pastDue.toISOString().split('T')[0], repaidDate.toISOString().split('T')[0]]
+    [memberId, profile2Id, stokvel1Id, 100, 30, 30, 130, 'Groceries', pastDate.toISOString().split('T')[0], pastDue.toISOString().split('T')[0], repaidDate.toISOString().split('T')[0]]
   );
   console.log('✅ Sample loans created');
 
@@ -175,7 +177,7 @@ async function seed() {
   // ── Notifications ──
   const notifications = [
     [memberId, 'contribution', 'Contribution Confirmed', 'Your R2,500 contribution to Kasi Savings Club has been confirmed.', false],
-    [memberId, 'loan', 'Loan Approved', 'Your loan of R4,000 from Kasi Savings Club has been approved.', false],
+    [memberId, 'loan', 'Loan Approved', 'Your loan of R100 from Kasi Savings Club has been approved.', false],
     [memberId, 'reminder', 'Contribution Reminder', 'Your monthly contribution to Collective Pot is due in 3 days.', false],
     [memberId, 'payment', 'Payment Received', 'You received a payout of R5,000 from Kasi Savings Club.', true],
     [memberId, 'info', 'Welcome!', 'Welcome to the Stokvel Management System. Get started by exploring your dashboard.', true],
