@@ -112,6 +112,7 @@ export default function MainDashboard() {
 
       // Map available stokvels
       const userStokvelIds = userProfiles.map((p: Profile) => p.stokvelId);
+      const pendingStokvelIds = (user.pendingJoinRequests || []).map((jr: any) => String(jr.stokvelId));
       const allStokvels: AvailableStokvel[] = (stokvelsRes.data || []).map((s: any) => ({
         id: String(s.id),
         name: s.name,
@@ -120,7 +121,11 @@ export default function MainDashboard() {
         targetAmount: s.targetAmount || 0,
         cycle: s.cycle || 'Monthly',
         category: s.type || 'General',
-        status: userStokvelIds.includes(String(s.id)) ? 'active' as const : 'available' as const,
+        status: userStokvelIds.includes(String(s.id)) 
+          ? 'active' as const 
+          : pendingStokvelIds.includes(String(s.id))
+            ? 'pending' as const
+            : 'available' as const,
       }));
       setAvailableStokvels(allStokvels);
 

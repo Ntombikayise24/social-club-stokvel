@@ -35,6 +35,15 @@ router.get('/me', async (req, res) => {
       [req.user.id]
     );
 
+    // Get pending join requests so frontend can show "pending" status on stokvels
+    const [pendingJoinRequests] = await pool.query(
+      `SELECT jr.id, jr.stokvel_id, s.name AS stokvel_name, jr.status, jr.created_at
+       FROM join_requests jr
+       JOIN stokvels s ON s.id = jr.stokvel_id
+       WHERE jr.user_id = ? AND jr.status = 'pending'`,
+      [req.user.id]
+    );
+
     res.json({
       id: user.id,
       name: user.full_name,
@@ -55,6 +64,13 @@ router.get('/me', async (req, res) => {
         progress: parseFloat(p.progress || 0),
         status: p.status,
         joinedDate: p.joined_date,
+      })),
+      pendingJoinRequests: pendingJoinRequests.map(jr => ({
+        id: jr.id,
+        stokvelId: jr.stokvel_id,
+        stokvelName: jr.stokvel_name,
+        status: jr.status,
+        createdAt: jr.created_at,
       })),
     });
   } catch (err) {
