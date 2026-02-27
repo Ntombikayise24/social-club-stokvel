@@ -48,6 +48,7 @@ interface GroupData {
   maxMembers: number;
   progress: number;
   cycle: string;
+  meetingDay: string;
   nextPayout: string;
   interestRate: number;
   createdAt: string;
@@ -75,6 +76,7 @@ export default function GroupDetails() {
     progress: 0,
     cycle: '',
     nextPayout: '',
+    meetingDay: '',
     interestRate: 30,
     createdAt: '',
     members: [],
@@ -114,6 +116,7 @@ export default function GroupDetails() {
           maxMembers: d.maxMembers || 0,
           progress: d.targetAmount > 0 ? Math.min(100, Math.round(((d.totalPool || 0) / d.targetAmount) * 100)) : 0,
           cycle: d.cycle || '',
+          meetingDay: d.meetingDay || 'Sunday',
           nextPayout: d.nextPayout ? new Date(d.nextPayout).toLocaleDateString('en-ZA', {day:'2-digit', month:'short', year:'numeric'}) : '',
           interestRate: d.interestRate || 30,
           createdAt: d.createdAt ? new Date(d.createdAt).toLocaleDateString('en-ZA', {day:'2-digit', month:'short', year:'numeric'}) : '',
@@ -278,10 +281,10 @@ export default function GroupDetails() {
 
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-sm text-gray-500">Next Payout</p>
+              <p className="text-sm text-gray-500">Meeting Day</p>
               <Calendar className={`w-4 h-4 text-${groupData.color}-600`} />
             </div>
-            <p className="text-2xl font-bold text-gray-800">{groupData.nextPayout}</p>
+            <p className="text-2xl font-bold text-gray-800">{groupData.meetingDay || 'Sunday'}</p>
             <p className="text-xs text-gray-500 mt-1">{groupData.cycle}</p>
           </div>
         </div>

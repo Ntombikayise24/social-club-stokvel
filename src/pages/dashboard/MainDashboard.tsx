@@ -47,6 +47,7 @@ interface StokvelData {
   progress: number;
   memberCount: number;
   cycle: string;
+  meetingDay: string;
   nextPayout: string;
   individualTarget: number;
 }
@@ -207,6 +208,7 @@ export default function MainDashboard() {
           progress: 0,
           memberCount: s.currentMembers || 0,
           cycle: s.cycle ? `${s.cycle}${s.meetingDay ? ' (' + s.meetingDay + ')' : ''}` : 'Monthly',
+          meetingDay: s.meetingDay || 'Sunday',
           nextPayout: s.nextPayout ? new Date(s.nextPayout).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' }) : 'TBD',
           individualTarget: activeProfile.targetAmount,
         });
@@ -219,6 +221,7 @@ export default function MainDashboard() {
           progress: 0,
           memberCount: 0,
           cycle: 'Monthly',
+          meetingDay: 'Sunday',
           nextPayout: 'TBD',
           individualTarget: activeProfile.targetAmount,
         });
@@ -252,6 +255,7 @@ export default function MainDashboard() {
     progress: 0,
     memberCount: 0,
     cycle: 'Monthly',
+    meetingDay: 'Sunday',
     nextPayout: 'TBD',
     individualTarget: activeProfile?.targetAmount || 0,
   };
@@ -752,8 +756,8 @@ export default function MainDashboard() {
                   <p className="font-semibold text-gray-800">{currentStokvel.cycle}</p>
                 </div>
                 <div className="bg-white/60 p-3 rounded-lg">
-                  <p className="text-xs text-gray-500 mb-1">Next Payout</p>
-                  <p className="font-semibold text-primary-700">{currentStokvel.nextPayout}</p>
+                  <p className="text-xs text-gray-500 mb-1">Meeting Day</p>
+                  <p className="font-semibold text-primary-700">{currentStokvel.meetingDay || 'Sunday'}</p>
                 </div>
               </div>
 
