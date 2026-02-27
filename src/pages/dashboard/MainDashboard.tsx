@@ -81,6 +81,7 @@ export default function MainDashboard() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loanStats, setLoanStats] = useState({ available: 0, borrowed: 0, remaining: 0, progress: 0 });
   const [stokvelDetails, setStokvelDetails] = useState<StokvelData | null>(null);
+  const [interestPot, setInterestPot] = useState({ totalEarned: 0, repaidLoans: 0, pendingInterest: 0 });
   
   // Fetch data from backend
   const fetchData = useCallback(async () => {
@@ -212,6 +213,9 @@ export default function MainDashboard() {
           nextPayout: s.nextPayout ? new Date(s.nextPayout).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' }) : 'TBD',
           individualTarget: activeProfile.targetAmount,
         });
+        if (s.interestPot) {
+          setInterestPot(s.interestPot);
+        }
       })
       .catch(() => {
         setStokvelDetails({
@@ -767,6 +771,41 @@ export default function MainDashboard() {
               >
                 View Group Details →
               </Link>
+            </div>
+
+            {/* Interest Pot Card */}
+            <div className="bg-gradient-to-br from-amber-50 to-white rounded-xl shadow-sm border border-amber-200 p-5">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center space-x-2">
+                  <div className="p-2 bg-amber-200 rounded-lg">
+                    <span className="text-lg">🏺</span>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-800">Interest Pot</h3>
+                    <p className="text-xs text-gray-500">Earned from loan repayments</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mb-3">
+                <span className="text-2xl font-bold text-amber-700">
+                  R {interestPot.totalEarned.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
+                </span>
+                <p className="text-xs text-gray-500 mt-1">Total interest collected</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-white/70 p-2.5 rounded-lg">
+                  <p className="text-xs text-gray-500">Repaid Loans</p>
+                  <p className="font-bold text-green-700">{interestPot.repaidLoans}</p>
+                </div>
+                <div className="bg-white/70 p-2.5 rounded-lg">
+                  <p className="text-xs text-gray-500">Pending Interest</p>
+                  <p className="font-bold text-amber-600">R {interestPot.pendingInterest.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}</p>
+                </div>
+              </div>
+
+              <p className="text-xs text-gray-400 mt-3 text-center">30% interest charged on every loan goes here</p>
             </div>
 
             {/* Quick Actions - NOW WITH BOTH CARDS AND DISCOVER */}

@@ -84,6 +84,16 @@ router.get('/:id', authenticate, async (req, res) => {
       [req.params.id]
     );
 
+    // Interest Pot: sum of interest from all repaid loans in this stokvel
+    const [interestPotResult] = await pool.query(
+      `SELECT 
+        COALESCE(SUM(CASE WHEN status = 'repaid' THEN interest ELSE 0 END), 0) as total_interest_earned,
+        COUNT(CASE WHEN status = 'repaid' THEN 1 END) as repaid_count,
+        COALESCE(SUM(CASE WHEN status IN ('active', 'overdue') THEN interest ELSE 0 END), 0) as pending_interest
+       FROM loans WHERE stokvel_id = ?`,
+      [req.params.id]
+    );
+
     res.json({
       id: stokvel.id,
       name: stokvel.name,
@@ -126,6 +136,11 @@ router.get('/:id', authenticate, async (req, res) => {
         status: c.status,
         date: c.created_at,
       })),
+      interestPot: {
+        totalEarned: parseFloat(interestPotResult[0].total_interest_earned),
+        repaidLoans: parseInt(interestPotResult[0].repaid_count),
+        pendingInterest: parseFloat(interestPotResult[0].pending_interest),
+      },
     });
   } catch (err) {
     console.error('Get stokvel error:', err);
