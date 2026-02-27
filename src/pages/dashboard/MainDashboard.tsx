@@ -227,7 +227,9 @@ export default function MainDashboard() {
         const loans = res.data?.data || [];
         const activeLoans = loans.filter((l: any) => l.status === 'active' || l.status === 'overdue');
         const borrowed = activeLoans.reduce((sum: number, l: any) => sum + (l.amount || 0), 0);
-        const maxBorrowable = Math.floor(activeProfile.savedAmount * 0.5);
+        // Limit is 50% of TOTAL contributions (current savings + what's currently borrowed)
+        const totalContributions = activeProfile.savedAmount + borrowed;
+        const maxBorrowable = Math.floor(totalContributions * 0.5);
         setLoanStats({
           available: maxBorrowable,
           borrowed,

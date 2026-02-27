@@ -101,7 +101,9 @@ export default function LoanRequest() {
   }, [profileId]);
   
   // Calculate loan amounts using actual data
-  const maxLoanAmount = Math.floor(currentProfile.savedAmount * 0.5);
+  // Limit is 50% of TOTAL contributions (current savings + what's currently borrowed)
+  const totalContributions = currentProfile.savedAmount + activeLoanAmount;
+  const maxLoanAmount = Math.floor(totalContributions * 0.5);
   const previouslyBorrowed = activeLoanAmount;
   const remainingToBorrow = hasActiveLoan ? 0 : maxLoanAmount;
   

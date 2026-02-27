@@ -132,11 +132,20 @@ router.post(
       }
 
       const profile = profiles[0];
-      const maxLoanable = parseFloat(profile.saved_amount) * 0.5;
+      
+      // Get active loan principal to calculate total contributions
+      const [activeLoanRows] = await pool.query(
+        "SELECT COALESCE(SUM(amount), 0) as total FROM loans WHERE profile_id = ? AND status IN ('active', 'overdue')",
+        [profileId]
+      );
+      const activeLoanPrincipal = parseFloat(activeLoanRows[0].total);
+      // Limit is 50% of total contributions (current savings + any active loan principal already deducted)
+      const totalContributions = parseFloat(profile.saved_amount) + activeLoanPrincipal;
+      const maxLoanable = totalContributions * 0.5;
 
       if (amount > maxLoanable) {
         return res.status(400).json({
-          error: `Maximum loanable amount is R${maxLoanable.toFixed(2)} (50% of your savings)`,
+          error: `Maximum loanable amount is R${maxLoanable.toFixed(2)} (50% of your total contributions)`,
         });
       }
 
@@ -179,8 +188,11 @@ router.post(
         [req.user.id, profileId, profile.stokvel_id, amount, interestRate, interest, totalRepayable, purpose || null, borrowedDate, dueDate, cardId || null]
       );
 
-      // NOTE: saved_amount is NOT deducted — it tracks contributions only.
-      // The loan is tracked separately in the loans table.
+      // Deduct the principal from saved_amount (user is borrowing from their savings)
+      await pool.query(
+        'UPDATE profiles SET saved_amount = GREATEST(saved_amount - ?, 0) WHERE id = ?',
+        [amount, profileId]
+      );
 
       // Notification
       await pool.query(
@@ -262,8 +274,11 @@ router.post(
         [req.user.id, loan.profile_id, loan.stokvel_id, interest, reference, cardId || loan.card_id || null]
       );
 
-      // NOTE: saved_amount is NOT modified — it tracks contributions only.
-      // The loan status change to 'repaid' is sufficient. Interest goes to the pot via the contribution above.
+      // Return the principal back to saved_amount on repay
+      await pool.query(
+        'UPDATE profiles SET saved_amount = LEAST(saved_amount + ?, target_amount) WHERE id = ?',
+        [principal, loan.profile_id]
+      );
 
       // Notification
       const [stokvel] = await pool.query('SELECT name FROM stokvels WHERE id = ?', [loan.stokvel_id]);
