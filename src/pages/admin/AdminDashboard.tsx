@@ -1748,7 +1748,7 @@ function SettingsModal({ onClose, onSave }: SettingsModalProps) {
 // Report Modal Component
 interface ReportModalProps {
   onClose: () => void;
-  onGenerate: (reportType: string, dateRange: string, format: string) => void;
+  onGenerate: (reportType: string, dateRange: string, format: string) => Promise<void> | void;
 }
 
 function ReportModal({ onClose, onGenerate }: ReportModalProps) {
@@ -1756,14 +1756,20 @@ function ReportModal({ onClose, onGenerate }: ReportModalProps) {
   const [dateRange, setDateRange] = useState('month');
   const [format, setFormat] = useState('pdf');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState('');
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     setIsGenerating(true);
-    setTimeout(() => {
-      onGenerate(reportType, dateRange, format);
-      setIsGenerating(false);
+    try {
+      const range = dateRange === 'custom' ? `custom:${customStart}:${customEnd}` : dateRange;
+      await onGenerate(reportType, range, format);
       onClose();
-    }, 2000);
+    } catch {
+      // error handled by parent
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   return (
@@ -1786,6 +1792,7 @@ function ReportModal({ onClose, onGenerate }: ReportModalProps) {
             >
               <option value="users">User Report</option>
               <option value="contributions">Contributions Report</option>
+              <option value="loans">Loans Report</option>
               <option value="stokvels">Stokvel Performance Report</option>
               <option value="payments">Payment History Report</option>
               <option value="financial">Financial Summary Report</option>
@@ -1813,11 +1820,11 @@ function ReportModal({ onClose, onGenerate }: ReportModalProps) {
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="block text-xs text-gray-500 mb-1">From</label>
-                <input type="date" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
               </div>
               <div>
                 <label className="block text-xs text-gray-500 mb-1">To</label>
-                <input type="date" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
               </div>
             </div>
           )}
@@ -2404,18 +2411,25 @@ export default function AdminDashboard() {
 
   const handleGenerateReport = async (reportType: string, dateRange: string, format: string) => {
     try {
-      const dateRanges: Record<string, { start: string; end: string }> = {
-        today: { start: new Date().toISOString().split('T')[0], end: new Date().toISOString().split('T')[0] },
-        week: { start: new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0], end: new Date().toISOString().split('T')[0] },
-        month: { start: new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0], end: new Date().toISOString().split('T')[0] },
-        quarter: { start: new Date(Date.now() - 90 * 86400000).toISOString().split('T')[0], end: new Date().toISOString().split('T')[0] },
-        year: { start: new Date(Date.now() - 365 * 86400000).toISOString().split('T')[0], end: new Date().toISOString().split('T')[0] },
-      };
+      let resolvedRange: { start: string; end: string };
+      if (dateRange.startsWith('custom:')) {
+        const parts = dateRange.split(':');
+        resolvedRange = { start: parts[1], end: parts[2] };
+      } else {
+        const dateRanges: Record<string, { start: string; end: string }> = {
+          today: { start: new Date().toISOString().split('T')[0], end: new Date().toISOString().split('T')[0] },
+          week: { start: new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0], end: new Date().toISOString().split('T')[0] },
+          month: { start: new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0], end: new Date().toISOString().split('T')[0] },
+          quarter: { start: new Date(Date.now() - 90 * 86400000).toISOString().split('T')[0], end: new Date().toISOString().split('T')[0] },
+          year: { start: new Date(Date.now() - 365 * 86400000).toISOString().split('T')[0], end: new Date().toISOString().split('T')[0] },
+        };
+        resolvedRange = dateRanges[dateRange];
+      }
 
       const apiReportType = reportType === 'users' ? 'members' : reportType;
       const res = await adminApi.generateReport({
         reportType: apiReportType,
-        dateRange: dateRanges[dateRange],
+        dateRange: resolvedRange,
         format,
       });
 
@@ -2879,13 +2893,22 @@ export default function AdminDashboard() {
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-lg font-semibold text-gray-800">Stokvel Management</h3>
-                <button
-                  onClick={() => setShowAddStokvelModal(true)}
-                  className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors flex items-center space-x-2"
-                >
-                  <PlusCircle className="w-5 h-5" />
-                  <span>New Stokvel</span>
-                </button>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => setShowAddStokvelModal(true)}
+                    className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors flex items-center space-x-2"
+                  >
+                    <PlusCircle className="w-5 h-5" />
+                    <span>New Stokvel</span>
+                  </button>
+                  <button
+                    onClick={() => setShowReportModal(true)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-2"
+                  >
+                    <Download className="w-5 h-5 text-gray-600" />
+                    <span className="text-sm text-gray-600">Export</span>
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -2944,7 +2967,16 @@ export default function AdminDashboard() {
         {activeTab === 'contributions' && (
           <div className="space-y-6">
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">All Contributions</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-800">All Contributions</h3>
+                <button
+                  onClick={() => setShowReportModal(true)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-2"
+                >
+                  <Download className="w-5 h-5 text-gray-600" />
+                  <span className="text-sm text-gray-600">Export</span>
+                </button>
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-gray-50">
@@ -3003,10 +3035,19 @@ export default function AdminDashboard() {
                 <h2 className="text-xl font-bold text-gray-800">Pending Join Requests</h2>
                 <p className="text-sm text-gray-500 mt-1">Users who requested to join a stokvel during registration or from their dashboard</p>
               </div>
-              <button onClick={fetchData} className="flex items-center gap-2 px-4 py-2 bg-primary-50 text-primary-700 rounded-lg hover:bg-primary-100 transition-colors">
-                <RefreshCw className="w-4 h-4" />
-                Refresh
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowReportModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  <Download className="w-4 h-4 text-gray-600" />
+                  <span className="text-sm text-gray-600">Export</span>
+                </button>
+                <button onClick={fetchData} className="flex items-center gap-2 px-4 py-2 bg-primary-50 text-primary-700 rounded-lg hover:bg-primary-100 transition-colors">
+                  <RefreshCw className="w-4 h-4" />
+                  Refresh
+                </button>
+              </div>
             </div>
 
             {joinRequests.length === 0 ? (
