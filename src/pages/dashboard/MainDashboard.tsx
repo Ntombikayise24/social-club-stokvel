@@ -789,7 +789,7 @@ export default function MainDashboard() {
               </Link>
             </div>
 
-            {/* Interest Pot Card */}
+            {/* Interest Pot Card — Group/Stokvel-level metric */}
             <div className="bg-gradient-to-br from-amber-50 to-white rounded-xl shadow-sm border border-amber-200 p-5">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center space-x-2">
@@ -797,8 +797,8 @@ export default function MainDashboard() {
                     <span className="text-lg">🏺</span>
                   </div>
                   <div>
-                    <h3 className="font-semibold text-gray-800">Interest Pot</h3>
-                    <p className="text-xs text-gray-500">Earned from loan repayments</p>
+                    <h3 className="font-semibold text-gray-800">Group Interest Pot</h3>
+                    <p className="text-xs text-gray-500">Earned from all members' loan repayments</p>
                   </div>
                 </div>
               </div>
@@ -807,12 +807,12 @@ export default function MainDashboard() {
                 <span className="text-2xl font-bold text-amber-700">
                   R {interestPot.totalEarned.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
                 </span>
-                <p className="text-xs text-gray-500 mt-1">Total interest collected</p>
+                <p className="text-xs text-gray-500 mt-1">Total interest collected by {stokvelDetails?.name || 'this stokvel'}</p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-white/70 p-2.5 rounded-lg">
-                  <p className="text-xs text-gray-500">Repaid Loans</p>
+                  <p className="text-xs text-gray-500">Group Repaid Loans</p>
                   <p className="font-bold text-green-700">{interestPot.repaidLoans}</p>
                 </div>
                 <div className="bg-white/70 p-2.5 rounded-lg">
@@ -821,7 +821,7 @@ export default function MainDashboard() {
                 </div>
               </div>
 
-              <p className="text-xs text-gray-400 mt-3 text-center">30% interest charged on every loan goes here</p>
+              <p className="text-xs text-gray-400 mt-3 text-center">30% interest charged on every loan across all members goes here</p>
             </div>
 
             {/* Quick Actions - NOW WITH BOTH CARDS AND DISCOVER */}
