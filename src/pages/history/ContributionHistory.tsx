@@ -20,6 +20,7 @@ interface Contribution {
   amount: number;
   date: string;
   status: 'confirmed' | 'pending';
+  paymentMethod?: string;
   confirmedBy?: string;
   confirmedAt?: string;
 }
@@ -67,10 +68,19 @@ export default function ContributionHistory() {
         setError(false);
         // Get stokvelId from profiles
         const profilesRes = await userApi.getProfiles();
-        const profile = (profilesRes.data || []).find((p: any) => String(p.id) === profileId);
+        const allProfiles = profilesRes.data || [];
+        const profile = allProfiles.find((p: any) => String(p.id) === profileId);
         const stokvelId = profile?.stokvelId;
 
-        const res = await contributionApi.list({ stokvelId, profileId: Number(profileId) });
+        if (!stokvelId) {
+          // No profile found — user may not be a member of this stokvel
+          setContributions([]);
+          setLoading(false);
+          return;
+        }
+
+        // Fetch all group contributions for this stokvel
+        const res = await contributionApi.list({ stokvelId });
         const data = res.data?.data || res.data || [];
         setContributions(data.map((c: any) => ({
           id: c.id,
@@ -79,6 +89,7 @@ export default function ContributionHistory() {
           amount: c.amount || 0,
           date: c.date ? new Date(c.date).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' }) : '',
           status: c.status || 'pending',
+          paymentMethod: c.paymentMethod || '',
           confirmedBy: c.confirmedBy,
           confirmedAt: c.confirmedAt ? new Date(c.confirmedAt).toLocaleString('en-ZA') : undefined
         })));
@@ -100,7 +111,12 @@ export default function ContributionHistory() {
   const handleDownload = async (format: string) => {
     try {
       setIsDownloading(true);
-      const res = await contributionApi.download({ profileId: Number(profileId), format });
+      // Find stokvelId from profile to download group contributions
+      const profilesRes = await userApi.getProfiles();
+      const allProfiles = profilesRes.data || [];
+      const profile = allProfiles.find((p: any) => String(p.id) === profileId);
+      const stokvelId = profile?.stokvelId;
+      const res = await contributionApi.download({ stokvelId: stokvelId ? Number(stokvelId) : undefined, format });
       const ext = getExtension(format);
       downloadBlob(new Blob([res.data]), `contribution-history.${ext}`);
     } catch (err) {

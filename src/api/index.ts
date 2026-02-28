@@ -84,7 +84,7 @@ export const contributionApi = {
     paymentMethod?: string;
   }) => api.post('/contributions', data),
 
-  download: (params: { profileId?: number; format: string }) =>
+  download: (params: { profileId?: number; stokvelId?: number; format: string }) =>
     api.get('/contributions/download', { params, responseType: 'blob' }),
 };
 

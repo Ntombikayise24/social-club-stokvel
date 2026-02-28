@@ -16,20 +16,32 @@ router.get('/', async (req, res) => {
     const { stokvelId, status, profileId, page = 1, limit = 20 } = req.query;
     const offset = (page - 1) * limit;
 
-    let where = 'WHERE c.user_id = ?';
-    const params = [req.user.id];
+    let where = '';
+    const params = [];
 
+    // If stokvelId is provided, show GROUP contributions (all members of the stokvel)
+    // Otherwise show only the logged-in user's personal contributions
     if (stokvelId) {
-      where += ' AND c.stokvel_id = ?';
+      // Verify user is a member of this stokvel (or is admin)
+      if (req.user.role !== 'admin') {
+        const [membership] = await pool.query(
+          "SELECT id FROM profiles WHERE user_id = ? AND stokvel_id = ? AND status = 'active'",
+          [req.user.id, stokvelId]
+        );
+        if (membership.length === 0) {
+          return res.status(403).json({ error: 'You are not a member of this stokvel' });
+        }
+      }
+      where = 'WHERE c.stokvel_id = ?';
       params.push(stokvelId);
+    } else {
+      where = 'WHERE c.user_id = ?';
+      params.push(req.user.id);
     }
+
     if (status && status !== 'all') {
       where += ' AND c.status = ?';
       params.push(status);
-    }
-    if (profileId) {
-      where += ' AND c.profile_id = ?';
-      params.push(profileId);
     }
 
     const [countResult] = await pool.query(
@@ -41,9 +53,11 @@ router.get('/', async (req, res) => {
       `SELECT c.id, c.amount, c.payment_method, c.reference, c.status,
               c.confirmed_at, c.created_at,
               s.name AS stokvel_name, s.icon,
+              u.full_name AS member_name,
               u2.full_name AS confirmed_by_name
        FROM contributions c
        JOIN stokvels s ON s.id = c.stokvel_id
+       JOIN users u ON u.id = c.user_id
        LEFT JOIN users u2 ON u2.id = c.confirmed_by
        ${where}
        ORDER BY c.created_at DESC
@@ -60,6 +74,8 @@ router.get('/', async (req, res) => {
         status: c.status,
         stokvelName: c.stokvel_name,
         stokvelIcon: c.icon,
+        memberName: c.member_name,
+        memberInitials: c.member_name.split(' ').map(n => n[0]).join('').toUpperCase(),
         confirmedBy: c.confirmed_by_name,
         confirmedAt: c.confirmed_at,
         date: c.created_at,
@@ -80,11 +96,27 @@ router.get('/', async (req, res) => {
 // ────────────────── DOWNLOAD CONTRIBUTIONS REPORT ──────────────────
 router.get('/download', async (req, res) => {
   try {
-    const { profileId, format = 'pdf' } = req.query;
+    const { profileId, stokvelId, format = 'pdf' } = req.query;
 
-    let where = 'WHERE c.user_id = ?';
-    const params = [req.user.id];
-    if (profileId) { where += ' AND c.profile_id = ?'; params.push(profileId); }
+    let where = '';
+    const params = [];
+
+    if (stokvelId) {
+      // Group download — verify membership first
+      const [membership] = await pool.query(
+        'SELECT id FROM profiles WHERE user_id = ? AND stokvel_id = ?',
+        [req.user.id, stokvelId]
+      );
+      if (membership.length === 0) {
+        return res.status(403).json({ error: 'Not a member of this stokvel' });
+      }
+      where = 'WHERE c.stokvel_id = ?';
+      params.push(stokvelId);
+    } else {
+      where = 'WHERE c.user_id = ?';
+      params.push(req.user.id);
+      if (profileId) { where += ' AND c.profile_id = ?'; params.push(profileId); }
+    }
 
     const [contributions] = await pool.query(
       `SELECT c.id, u.full_name, s.name AS stokvel_name, c.amount, c.status, c.payment_method, c.reference, c.created_at, c.confirmed_at
