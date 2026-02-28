@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="64" fill="#166534"/>
+  <circle cx="256" cy="180" r="65" fill="white" opacity="0.95"/>
+  <circle cx="150" cy="220" r="50" fill="white" opacity="0.75"/>
+  <circle cx="362" cy="220" r="50" fill="white" opacity="0.75"/>
+  <path d="M256 270 C180 270 120 320 120 380 L392 380 C392 320 332 270 256 270Z" fill="white" opacity="0.95"/>
+  <path d="M150 270 C90 275 50 315 50 370 L140 370 C125 335 130 300 150 270Z" fill="white" opacity="0.75"/>
+  <path d="M362 270 C422 275 462 315 462 370 L372 370 C387 335 382 300 362 270Z" fill="white" opacity="0.75"/>
+  <rect x="196" y="400" width="120" height="8" rx="4" fill="white" opacity="0.5"/>
+  <text x="256" y="470" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="48" font-weight="bold" fill="white" letter-spacing="8">STOKVEL</text>
+</svg>

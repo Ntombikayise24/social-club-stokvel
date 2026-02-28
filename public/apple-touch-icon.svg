@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
+  <rect width="192" height="192" rx="24" fill="#166534"/>
+  <circle cx="96" cy="72" r="28" fill="white" opacity="0.9"/>
+  <circle cx="62" cy="88" r="22" fill="white" opacity="0.7"/>
+  <circle cx="130" cy="88" r="22" fill="white" opacity="0.7"/>
+  <path d="M96 108 C60 108 40 130 40 152 L152 152 C152 130 132 108 96 108Z" fill="white" opacity="0.9"/>
+  <path d="M62 108 C36 110 20 126 20 148 L56 148 C50 132 52 118 62 108Z" fill="white" opacity="0.7"/>
+  <path d="M130 108 C156 110 172 126 172 148 L136 148 C142 132 140 118 130 108Z" fill="white" opacity="0.7"/>
+  <text x="96" y="180" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="white">HSC</text>
+</svg>

@@ -1,0 +1,898 @@
+================================================================================
+         HENNESSY SOCIAL CLUB - STOKVEL MANAGEMENT SYSTEM
+                   BACKEND DOCUMENTATION
+================================================================================
+
+Date: 28 February 2026
+Branch: System-Presentation
+Repository: github.com/Ntombikayise24/social-club-stokvel
+
+================================================================================
+1. TECH STACK
+================================================================================
+
+Runtime:        Node.js (ES Modules)
+Framework:      Express.js 4
+Database:       MySQL (via mysql2/promise connection pool)
+Authentication: JWT (jsonwebtoken) + bcrypt password hashing
+Payments:       Paystack integration (test mode)
+Email:          Nodemailer with Gmail SMTP
+Reports:        PDFKit (PDF), ExcelJS (Excel), custom CSV generator
+Validation:     express-validator
+Server Port:    5000 (default)
+CORS:           localhost:5173 (dev) + FRONTEND_URL (production)
+
+
+================================================================================
+2. PROJECT STRUCTURE
+================================================================================
+
+backend/
+  package.json
+  src/
+    server.js                    - Express app entry point
+    database/
+      connection.js              - MySQL connection pool
+      migrate.js                 - Table creation (13 tables)
+      seed.js                    - Sample data seeding
+    middleware/
+      auth.js                    - JWT authentication middleware
+      validate.js                - Request validation middleware
+    routes/
+      auth.js                    - Registration, login, password reset
+      users.js                   - User profile management
+      stokvels.js                - Stokvel listing and join requests
+      contributions.js           - Member contributions
+      loans.js                   - Loan borrowing and repayment
+      payments.js                - Paystack payment processing
+      notifications.js           - In-app notifications
+      cards.js                   - Saved payment cards
+      settings.js                - User preferences
+      help.js                    - FAQ and contact messages
+      admin.js                   - Full admin dashboard API
+    utils/
+      email.js                   - Email template functions
+      reports.js                 - PDF/Excel/CSV report generation
+
+
+================================================================================
+3. DATABASE SCHEMA (13 TABLES)
+================================================================================
+
+TABLE: users
+  - id (INT, AUTO_INCREMENT, PRIMARY KEY)
+  - full_name (VARCHAR 100, NOT NULL)
+  - email (VARCHAR 100, UNIQUE, NOT NULL)
+  - phone (VARCHAR 20)
+  - password_hash (VARCHAR 255, NOT NULL)
+  - role (ENUM: member, admin - DEFAULT member)
+  - status (ENUM: active, inactive, pending, deleted - DEFAULT pending)
+  - avatar_url (VARCHAR 255)
+  - last_active (DATETIME)
+  - deleted_at (DATETIME)
+  - deleted_by (INT, FK to users)
+  - delete_reason (TEXT)
+  - created_at (TIMESTAMP, DEFAULT CURRENT_TIMESTAMP)
+
+TABLE: stokvels
+  - id (INT, AUTO_INCREMENT, PRIMARY KEY)
+  - name (VARCHAR 100, UNIQUE, NOT NULL)
+  - type (ENUM: traditional, flexible - DEFAULT traditional)
+  - description (TEXT)
+  - target_amount (DECIMAL 12,2, DEFAULT 0)
+  - max_members (INT, DEFAULT 20)
+  - interest_rate (DECIMAL 5,2, DEFAULT 30.00)
+  - cycle (ENUM: weekly, monthly, quarterly - DEFAULT monthly)
+  - meeting_day (VARCHAR 20)
+  - next_payout (DATE)
+  - status (ENUM: active, inactive, upcoming - DEFAULT active)
+  - icon (VARCHAR 10)
+  - color (VARCHAR 20)
+  - created_by (INT, FK to users)
+  - created_at (TIMESTAMP)
+
+TABLE: profiles (membership link between users and stokvels)
+  - id (INT, AUTO_INCREMENT, PRIMARY KEY)
+  - user_id (INT, FK to users)
+  - stokvel_id (INT, FK to stokvels)
+  - role (ENUM: member, admin, treasurer - DEFAULT member)
+  - target_amount (DECIMAL 12,2, DEFAULT 0)
+  - saved_amount (DECIMAL 12,2, DEFAULT 0)
+  - status (ENUM: active, pending, inactive - DEFAULT active)
+  - joined_date (DATE, DEFAULT CURRENT_DATE)
+  - UNIQUE KEY on (user_id, stokvel_id)
+
+TABLE: contributions
+  - id (INT, AUTO_INCREMENT, PRIMARY KEY)
+  - user_id (INT, FK to users)
+  - profile_id (INT, FK to profiles)
+  - stokvel_id (INT, FK to stokvels)
+  - amount (DECIMAL 12,2, NOT NULL)
+  - payment_method (ENUM: card, bank, cash, paystack, loan_repayment)
+  - reference (VARCHAR 100)
+  - status (ENUM: confirmed, pending, deleted, failed - DEFAULT pending)
+  - confirmed_by (INT, FK to users)
+  - confirmed_at (DATETIME)
+  - card_id (INT, FK to cards)
+  - created_at (TIMESTAMP)
+
+TABLE: loans
+  - id (INT, AUTO_INCREMENT, PRIMARY KEY)
+  - user_id (INT, FK to users)
+  - profile_id (INT, FK to profiles)
+  - stokvel_id (INT, FK to stokvels)
+  - amount (DECIMAL 12,2, NOT NULL)
+  - interest_rate (DECIMAL 5,2, DEFAULT 30.00)
+  - interest (DECIMAL 12,2, DEFAULT 0)
+  - total_repayable (DECIMAL 12,2, DEFAULT 0)
+  - status (ENUM: active, repaid, overdue, pending - DEFAULT pending)
+  - purpose (VARCHAR 255)
+  - borrowed_date (DATE)
+  - due_date (DATE)
+  - repaid_date (DATE)
+  - card_id (INT, FK to cards)
+  - created_at (TIMESTAMP)
+
+TABLE: cards
+  - id (INT, AUTO_INCREMENT, PRIMARY KEY)
+  - user_id (INT, FK to users)
+  - card_type (ENUM: visa, mastercard, amex - DEFAULT visa)
+  - last4 (VARCHAR 4, NOT NULL)
+  - expiry_month (INT, NOT NULL)
+  - expiry_year (INT, NOT NULL)
+  - cardholder_name (VARCHAR 100)
+  - is_default (BOOLEAN, DEFAULT FALSE)
+  - created_at (TIMESTAMP)
+
+TABLE: notifications
+  - id (INT, AUTO_INCREMENT, PRIMARY KEY)
+  - user_id (INT, FK to users)
+  - type (ENUM: contribution, loan, approval, payment, reminder,
+          success, error, warning, info - DEFAULT info)
+  - title (VARCHAR 200)
+  - message (TEXT)
+  - is_read (BOOLEAN, DEFAULT FALSE)
+  - actionable (BOOLEAN, DEFAULT FALSE)
+  - action_link (VARCHAR 255)
+  - action_text (VARCHAR 100)
+  - created_at (TIMESTAMP)
+
+TABLE: password_reset_tokens
+  - id (INT, AUTO_INCREMENT, PRIMARY KEY)
+  - user_id (INT, FK to users)
+  - token (VARCHAR 6, NOT NULL)
+  - expires_at (DATETIME, NOT NULL)
+  - used (BOOLEAN, DEFAULT FALSE)
+  - created_at (TIMESTAMP)
+
+TABLE: user_settings
+  - id (INT, AUTO_INCREMENT, PRIMARY KEY)
+  - user_id (INT, FK to users, UNIQUE)
+  - email_notifications (BOOLEAN, DEFAULT TRUE)
+  - push_notifications (BOOLEAN, DEFAULT TRUE)
+  - sms_notifications (BOOLEAN, DEFAULT FALSE)
+  - contribution_reminders (BOOLEAN, DEFAULT TRUE)
+  - loan_alerts (BOOLEAN, DEFAULT TRUE)
+  - two_factor_auth (BOOLEAN, DEFAULT FALSE)
+  - login_alerts (BOOLEAN, DEFAULT TRUE)
+  - language (VARCHAR 10, DEFAULT 'en')
+
+TABLE: site_settings
+  - id (INT, AUTO_INCREMENT, PRIMARY KEY)
+  - setting_key (VARCHAR 100, UNIQUE, NOT NULL)
+  - setting_value (TEXT)
+  - updated_at (TIMESTAMP)
+
+TABLE: faqs
+  - id (INT, AUTO_INCREMENT, PRIMARY KEY)
+  - category (VARCHAR 50)
+  - question (TEXT)
+  - answer (TEXT)
+  - sort_order (INT, DEFAULT 0)
+
+TABLE: contact_messages
+  - id (INT, AUTO_INCREMENT, PRIMARY KEY)
+  - name (VARCHAR 100)
+  - email (VARCHAR 100)
+  - message (TEXT)
+  - created_at (TIMESTAMP)
+
+TABLE: join_requests
+  - id (INT, AUTO_INCREMENT, PRIMARY KEY)
+  - user_id (INT, FK to users)
+  - stokvel_id (INT, FK to stokvels)
+  - status (ENUM: pending, approved, rejected - DEFAULT pending)
+  - created_at (TIMESTAMP)
+  - updated_at (TIMESTAMP)
+  - UNIQUE KEY on (user_id, stokvel_id)
+
+
+================================================================================
+4. SEED DATA
+================================================================================
+
+USERS (4):
+  1. System Admin     - admin role, active status
+  2. Naledi Dlamini   - member role, active status
+  3. Lerato Molefe    - member role, active status
+  4. Sipho Nkosi      - member role, pending status
+
+STOKVELS (3):
+  1. Kasi Savings Club  - R50,000 target, monthly cycle, 2 members
+  2. Collective Pot      - R7,000 target, weekly cycle, 2 members
+  3. Ubuntu Circle       - R25,000 target, weekly cycle, 1 member
+
+MEMBERSHIPS:
+  - Naledi -> Kasi Savings Club (admin role, R8,500 saved)
+  - Naledi -> Collective Pot (member role, R5,000 saved)
+  - Lerato -> Collective Pot (admin role, R2,000 saved)
+
+CONTRIBUTIONS: 9 records (mix of confirmed and pending)
+LOANS: 2 for Naledi (1 active R100, 1 repaid R100)
+CARDS: 2 for Naledi (Visa + Mastercard)
+NOTIFICATIONS: 6 sample notifications
+USER SETTINGS: Created for 3 users
+SITE SETTINGS: 9 key-value pairs
+FAQs: 12 questions across 4 categories
+
+
+================================================================================
+5. MIDDLEWARE
+================================================================================
+
+AUTHENTICATE (auth.js)
+  - Extracts JWT from Authorization: Bearer <token> header
+  - Verifies token using JWT_SECRET
+  - Attaches { id, email, role } to req.user
+  - Returns 401 if token is missing or invalid
+
+REQUIRE ADMIN (auth.js)
+  - Checks if req.user.role === 'admin'
+  - Returns 403 Forbidden if not an admin
+
+OPTIONAL AUTH (auth.js)
+  - Same as authenticate but does not fail
+  - Silently attaches user if token is valid
+  - Continues without error if no token
+
+UPDATE LAST ACTIVE (auth.js)
+  - Updates users.last_active = NOW() for authenticated user
+  - Non-blocking (errors are swallowed)
+
+VALIDATE (validate.js)
+  - Checks express-validator validation results
+  - Returns 400 with field-level error details if validation fails
+
+
+================================================================================
+6. API ENDPOINTS
+================================================================================
+
+Base URL: /api
+All authenticated routes require: Authorization: Bearer <jwt_token>
+
+--------------------------------------------------------------------------------
+6.1 AUTH ROUTES - /api/auth
+--------------------------------------------------------------------------------
+
+POST /api/auth/register
+  - Registers a new user with status = 'pending'
+  - Accepts: fullName, email, phone, password, selectedStokvel (optional)
+  - If selectedStokvel provided, creates a join_request with status 'pending'
+  - Notifies all admin users about new registration
+  - Returns: { message, userId }
+
+POST /api/auth/login
+  - Authenticates user with email + password
+  - Rejects deleted, pending, and inactive accounts with specific messages
+  - Returns JWT token (24h default, 30d if rememberMe=true)
+  - Returns: { token, user: { id, name, email, role, status } }
+
+POST /api/auth/forgot-password
+  - Generates 6-digit reset code with 15-minute expiry
+  - Stores code in password_reset_tokens table
+  - Sends code via email using sendPasswordResetEmail()
+  - Never reveals whether email exists (security)
+  - Returns: { message }
+
+POST /api/auth/verify-code
+  - Validates the 6-digit reset code against the database
+  - Does not consume the code (can be verified multiple times)
+  - Returns: { valid: true/false }
+
+POST /api/auth/reset-password
+  - Consumes the reset code and updates the user's password
+  - Marks the token as used
+  - Returns: { message }
+
+GET /api/auth/me
+  - Returns current authenticated user profile
+  - Includes all active stokvel memberships with progress percentages
+  - Returns: { id, name, email, role, profiles: [...] }
+
+--------------------------------------------------------------------------------
+6.2 USER ROUTES - /api/users (all authenticated)
+--------------------------------------------------------------------------------
+
+GET /api/users/me
+  - Full user profile with active profiles and pending join requests
+  - Returns progress percentages per stokvel
+  - Returns: { id, name, email, profiles, pendingJoinRequests }
+
+PUT /api/users/me
+  - Update own name, email, and/or phone
+  - Validates email uniqueness
+  - Returns: { message }
+
+PUT /api/users/me/password
+  - Change password (requires current password verification)
+  - New password minimum 8 characters
+  - Returns: { message }
+
+GET /api/users/me/profiles
+  - List all stokvel memberships with icons, colors, interest rates
+  - Includes progress percentage per membership
+  - Returns: [{ id, stokvelId, stokvelName, role, savedAmount, ... }]
+
+GET /api/users/me/dashboard
+  - Aggregated dashboard statistics
+  - Total savings, active loans, monthly contributions
+  - Unread notification count
+  - Returns: { totalSaved, activeLoans, monthlyContributions, ... }
+
+DELETE /api/users/me
+  - Self-delete account (requires password confirmation)
+  - Blocked if user is admin or has outstanding loans
+  - Soft-deletes user and anonymizes personal data
+  - Transaction-safe (rollback on failure)
+  - Returns: { message }
+
+--------------------------------------------------------------------------------
+6.3 STOKVEL ROUTES - /api/stokvels
+--------------------------------------------------------------------------------
+
+GET /api/stokvels
+  - Public listing of all non-inactive stokvels
+  - Uses optionalAuth (works with or without token)
+  - Returns member count per stokvel
+  - Returns: [{ id, name, type, targetAmount, currentMembers, cycle, ... }]
+
+GET /api/stokvels/:id (authenticated)
+  - Full stokvel details for a specific stokvel
+  - Includes: members list, total pool, active loans, recent contributions
+  - Includes: interest pot stats (total earned, repaid loans, pending interest)
+  - Returns: { stokvel, members, totalPool, activeLoans, interestPot }
+
+POST /api/stokvels/:id/join-request (authenticated)
+  - Submit a request to join a stokvel
+  - Admin users cannot join stokvels (403)
+  - Checks for existing membership (409 if already member)
+  - Checks for existing pending request (409 if already pending)
+  - If previously rejected, updates existing row back to 'pending'
+  - Notifies stokvel admins via in-app notification
+  - Returns: { message }
+
+--------------------------------------------------------------------------------
+6.4 CONTRIBUTION ROUTES - /api/contributions (all authenticated)
+--------------------------------------------------------------------------------
+
+GET /api/contributions
+  - List own contributions with pagination
+  - Filters: stokvelId, status, profileId
+  - Query params: page, limit, stokvelId, status, profileId
+  - Returns: { data: [...], pagination: { page, limit, total, pages } }
+
+GET /api/contributions/download
+  - Download contribution history as PDF, Excel, or CSV
+  - Query params: profileId, format (pdf/excel/csv)
+  - Returns: binary file with appropriate Content-Type header
+
+GET /api/contributions/stats
+  - Contribution statistics for current user
+  - Returns: total amount, this month's amount, average contribution
+  - Includes 6-month monthly breakdown
+  - Returns: { total, thisMonth, average, monthly: [...] }
+
+POST /api/contributions
+  - Make a new contribution
+  - Validates: amount >= R100, amount <= remaining target
+  - Requires a saved card for card payments
+  - Creates a pending contribution record
+  - Creates a notification for the user
+  - Business logic: saved_amount + contribution cannot exceed target_amount
+  - Returns: { message, contributionId }
+
+--------------------------------------------------------------------------------
+6.5 LOAN ROUTES - /api/loans (all authenticated)
+--------------------------------------------------------------------------------
+
+GET /api/loans
+  - List own loans with pagination and filtering
+  - Includes daysRemaining and maxLoanable per loan
+  - Filters: stokvelId, status, profileId
+  - Returns: { data: [...], pagination: { ... } }
+
+GET /api/loans/download
+  - Download loan history as PDF, Excel, or CSV
+  - Query params: profileId, format (pdf/excel/csv)
+  - Returns: binary file
+
+GET /api/loans/stats
+  - Loan statistics for current user
+  - Active loans count and total principal amount
+  - Repaid loans count and amount
+  - Total amount ever borrowed
+  - Returns: { activeCount, activeAmount, repaidCount, repaidAmount, totalBorrowed }
+
+POST /api/loans/request
+  - Request a new loan
+  - BUSINESS LOGIC:
+    * Loan limit = 50% of total contributions
+    * Total contributions = current saved_amount + active loan principal
+    * Only one active loan per stokvel allowed
+    * Minimum loan amount: R1 (step: R0.01)
+    * Auto-approved (status = active immediately)
+    * 30-day repayment term
+    * 30% flat interest rate
+    * Principal deducted from saved_amount on borrow
+  - Requires a saved card
+  - Creates notification for user
+  - Returns: { message, loanId }
+
+POST /api/loans/:id/repay
+  - Repay an active or overdue loan
+  - BUSINESS LOGIC:
+    * Principal returned to saved_amount (capped at target_amount)
+    * Interest recorded as a loan_repayment contribution to the stokvel pool
+    * Loan status set to 'repaid', repaid_date = now
+    * User and stokvel admins notified
+  - Returns: { message }
+
+--------------------------------------------------------------------------------
+6.6 PAYMENT ROUTES - /api/payments
+--------------------------------------------------------------------------------
+
+POST /api/payments/webhook (UNAUTHENTICATED)
+  - Paystack webhook handler
+  - Verifies HMAC-SHA512 signature using PAYSTACK_SECRET_KEY
+  - Handles 'charge.success' events
+  - Confirms matching pending contributions
+  - Updates saved_amount (capped at target)
+  - Returns: 200 OK
+
+POST /api/payments/initialize (authenticated)
+  - Initialize a Paystack payment
+  - Creates a pending contribution record
+  - Calls Paystack API to get authorization URL
+  - Amount sent to Paystack in kobo (cents, amount x 100)
+  - Returns: { authorizationUrl, reference }
+
+GET /api/payments/verify/:reference (authenticated)
+  - Verify a Paystack payment by reference number
+  - Confirms or fails the contribution based on Paystack response
+  - Updates saved_amount on success (capped at target)
+  - Idempotent (safe to call multiple times)
+  - Returns: { status, amount, reference }
+
+--------------------------------------------------------------------------------
+6.7 NOTIFICATION ROUTES - /api/notifications (all authenticated)
+--------------------------------------------------------------------------------
+
+GET /api/notifications
+  - List notifications with pagination
+  - Supports unreadOnly filter
+  - Returns total unread count alongside data
+  - Returns: { data: [...], unreadCount, pagination: { ... } }
+
+PUT /api/notifications/:id/read
+  - Mark a single notification as read
+  - Returns: { message }
+
+PUT /api/notifications/read-all
+  - Mark all unread notifications as read for the user
+  - Returns: { message }
+
+DELETE /api/notifications/read
+  - Delete all read notifications for the user
+  - Returns: { message }
+
+--------------------------------------------------------------------------------
+6.8 CARD ROUTES - /api/cards (all authenticated)
+--------------------------------------------------------------------------------
+
+GET /api/cards
+  - List user's saved cards (default card listed first)
+  - Returns: [{ id, cardType, last4, expiryMonth, expiryYear, isDefault }]
+
+POST /api/cards
+  - Add a new card
+  - VALIDATION:
+    * Luhn algorithm validation on full card number
+    * Card type auto-detection from BIN ranges (Visa/Mastercard/Amex)
+    * Expiry date validation (not expired)
+    * 2-digit year normalization (e.g., 26 -> 2026)
+  - Only stores last 4 digits (PCI compliance)
+  - First card automatically set as default
+  - Returns: { message, cardId }
+
+PUT /api/cards/:id/default
+  - Set a card as the default payment method
+  - Unsets all other cards for the user
+  - Returns: { message }
+
+DELETE /api/cards/:id
+  - Delete a saved card
+  - If deleted card was default, promotes next card to default
+  - Returns: { message }
+
+--------------------------------------------------------------------------------
+6.9 SETTINGS ROUTES - /api/settings (all authenticated)
+--------------------------------------------------------------------------------
+
+GET /api/settings
+  - Get user notification and security preferences
+  - Creates default settings if none exist
+  - Returns: { emailNotifications, pushNotifications, smsNotifications,
+               contributionReminders, loanAlerts, twoFactorAuth,
+               loginAlerts, language }
+
+PUT /api/settings
+  - Update any combination of user settings
+  - Accepts partial updates (only send fields to change)
+  - Returns: { message }
+
+--------------------------------------------------------------------------------
+6.10 HELP ROUTES - /api/help
+--------------------------------------------------------------------------------
+
+GET /api/help/faq (public)
+  - Returns all FAQs grouped by category
+  - Ordered by sort_order within each category
+  - Returns: { categories: [{ name, questions: [...] }] }
+
+POST /api/help/contact (optionalAuth)
+  - Submit a contact/support message
+  - Stores in contact_messages table
+  - Notifies all admin users via in-app notification
+  - Returns: { message }
+
+--------------------------------------------------------------------------------
+6.11 ADMIN ROUTES - /api/admin (all require admin role)
+--------------------------------------------------------------------------------
+
+GET /api/admin/stats
+  - Dashboard overview statistics
+  - Member count, pending approvals, total contributions
+  - Active/overdue loans, stokvel counts
+  - Deleted users count
+  - 6-month contribution and growth charts data
+  - Returns: { totalUsers, activeUsers, pendingUsers, ... }
+
+GET /api/admin/users
+  - List all users with search, stokvel filter, status filter
+  - Pagination support
+  - Includes stokvel memberships per user
+  - Returns: { data: [...], pagination: { ... } }
+
+POST /api/admin/users
+  - Create a new user with a temporary password
+  - Optionally assign to one or more stokvels
+  - Returns: { message, userId }
+
+PUT /api/admin/users/:id
+  - Update user fields (name, email, phone, role, status)
+  - Manage stokvel assignments (add/reactivate/deactivate memberships)
+  - Sends email notifications on approval, assignment, or unassignment
+  - Returns: { message }
+
+GET /api/admin/users/:id/join-requests
+  - Get all join requests for a specific user
+  - Returns: [{ id, stokvelId, stokvelName, status, createdAt }]
+
+POST /api/admin/users/:id/approve
+  - Approve a pending user registration
+  - Assign to specified stokvels (creates profiles)
+  - Marks matching join_requests as approved
+  - Sends approval email
+  - Returns: { message }
+
+POST /api/admin/users/:id/reject
+  - Reject a pending user
+  - Sets user status to 'deleted'
+  - Rejects all pending join requests for the user
+  - Returns: { message }
+
+DELETE /api/admin/users/:id
+  - Soft-delete a user
+  - Sets status to 'deleted', records reason and who deleted
+  - Deactivates all stokvel profiles
+  - Sends account deletion email
+  - Returns: { message }
+
+POST /api/admin/users/:id/restore
+  - Restore a previously deleted user
+  - Reactivates profiles if they existed
+  - Otherwise sets status to 'pending' for re-approval
+  - Returns: { message }
+
+DELETE /api/admin/users/:id/permanent
+  - Permanently delete a user from the database
+  - Cascading delete via foreign key constraints
+  - Cannot be undone
+  - Returns: { message }
+
+GET /api/admin/deleted-users
+  - List all archived/deleted users
+  - Includes delete reason, deleted-by info
+  - Includes join requests and profile history
+  - Returns: [{ id, name, email, deleteReason, deletedBy, ... }]
+
+GET /api/admin/stokvels
+  - Admin stokvel listing with pool totals and creator info
+  - Returns: [{ id, name, targetAmount, totalPool, createdBy, ... }]
+
+POST /api/admin/stokvels
+  - Create a new stokvel
+  - Accepts: name, type, description, targetAmount, maxMembers,
+             interestRate, cycle, meetingDay, nextPayout
+  - Returns: { message, stokvelId }
+
+PUT /api/admin/stokvels/:id
+  - Update any stokvel field
+  - Returns: { message }
+
+DELETE /api/admin/stokvels/:id
+  - Delete a stokvel
+  - Blocked if the stokvel has active members
+  - Returns: { message }
+
+GET /api/admin/contributions
+  - List all contributions system-wide
+  - Search, filter by stokvel/status, pagination
+  - Returns: { data: [...], pagination: { ... } }
+
+POST /api/admin/contributions/:id/confirm
+  - Confirm a pending contribution
+  - Updates the member's saved_amount (capped at target_amount)
+  - Sends notification to the contributing user
+  - Returns: { message }
+
+GET /api/admin/settings
+  - Get all site-level settings (key-value pairs)
+  - Returns: { settings: { key: value, ... } }
+
+PUT /api/admin/settings
+  - Update site settings (upsert - insert or update)
+  - Returns: { message }
+
+POST /api/admin/reports
+  - Generate downloadable reports
+  - REPORT TYPES: contributions, loans, users/members, stokvels,
+                  payments, financial, deleted
+  - FORMATS: pdf, excel, csv, json
+  - DATE RANGE: { start, end } for filtering
+  - PDF: Branded landscape A4 with table, auto-pagination
+  - Excel: Styled workbook with header, alternating rows, auto-fit columns
+  - CSV: Comma-separated with proper quoting
+  - Returns: binary file with Content-Type and Content-Disposition headers
+
+GET /api/admin/join-requests
+  - List all pending join requests
+  - Includes user name, email, and stokvel name
+  - Returns: [{ id, userId, userName, userEmail, stokvelName, createdAt }]
+
+POST /api/admin/join-requests/:id/approve
+  - Approve a join request
+  - Creates a profile (membership) for the user in the stokvel
+  - Sets target_amount from the stokvel's target
+  - Sends in-app notification to user
+  - Sends join request approved email
+  - Returns: { message }
+
+POST /api/admin/join-requests/:id/reject
+  - Reject a join request
+  - Sets join_request status to 'rejected'
+  - Sends warning notification to user
+  - If user is still 'pending' and has no remaining pending join requests,
+    auto-sets user status to 'deleted'
+  - Returns: { message }
+
+
+================================================================================
+7. UTILITY FUNCTIONS
+================================================================================
+
+--------------------------------------------------------------------------------
+7.1 EMAIL UTILITIES (utils/email.js) - 6 Functions
+--------------------------------------------------------------------------------
+
+sendApprovalEmail(email, fullName, stokvelNames)
+  - HTML email notifying user their account was approved
+  - Lists all assigned stokvels
+  - Green-themed branded template
+
+sendJoinRequestApprovedEmail(email, fullName, stokvelName)
+  - HTML email welcoming user to a specific stokvel they requested to join
+  - Includes stokvel name and login link
+
+sendStokvelAssignmentEmail(email, fullName, stokvelNames)
+  - HTML email notifying user they were assigned to new stokvel(s) by admin
+  - Lists all newly assigned stokvels
+
+sendStokvelUnassignmentEmail(email, fullName, stokvelNames)
+  - HTML email notifying user they were removed from stokvel(s)
+  - Lists removed stokvels
+
+sendAccountDeletionEmail(email, fullName, reason)
+  - HTML email notifying user their account was removed
+  - Includes the deletion reason
+
+sendPasswordResetEmail(email, code)
+  - HTML email with 6-digit verification code
+  - Code expires in 15 minutes
+  - Includes security warning
+
+All email functions:
+  - Use Nodemailer with Gmail SMTP transport
+  - Sender: aubreymlangeni01@gmail.com
+  - Failures are logged but never throw (non-blocking)
+  - All templates are branded "Hennessy Social Club"
+
+--------------------------------------------------------------------------------
+7.2 REPORT UTILITIES (utils/reports.js) - 5 Exports
+--------------------------------------------------------------------------------
+
+generatePDF(title, columns, rows, dateRange)
+  - Generates a branded landscape A4 PDF document
+  - Green header bar with "Hennessy Social Club" branding
+  - Subtitle with report title, date range, and generation timestamp
+  - Table with alternating row colors (white/light gray)
+  - Bold header row with dark green background
+  - Auto-pagination with repeated headers on each page
+  - Total records count
+  - Returns: Buffer
+
+generateExcel(title, columns, rows, dateRange)
+  - Generates a styled .xlsx workbook
+  - Branded header row with "Hennessy Social Club"
+  - Report title and date range in subtitle rows
+  - Styled header row with green background and white text
+  - Alternating row colors for readability
+  - Auto-fit column widths based on content
+  - Summary row at bottom with total records
+  - Returns: Buffer
+
+generateCSV(columns, rows)
+  - Generates a CSV string
+  - Proper quoting and escaping for values containing commas or quotes
+  - Header row from column names
+  - Returns: String
+
+REPORT_COLUMNS
+  - Predefined column definitions for 7 report types:
+    * contributions: ID, Member, Stokvel, Amount, Method, Reference, Status, Date, Confirmed
+    * loans: ID, Member, Stokvel, Amount, Interest, Total Repayable, Status, Borrowed, Due, Repaid
+    * users: ID, Name, Email, Phone, Role, Status, Joined, Last Active
+    * stokvels: ID, Name, Type, Target, Members, Interest Rate, Cycle, Meeting Day, Status
+    * payments: ID, Member, Stokvel, Amount, Method, Reference, Status, Date
+    * financial: Metric, Value
+    * deleted: ID, Name, Email, Phone, Deleted Date, Deleted By, Reason
+
+formatRowData(rows, reportType)
+  - Formats dates to en-ZA locale (e.g., "27 Feb 2026")
+  - Formats monetary amounts to 2 decimal places with "R" prefix
+  - Returns: formatted rows array
+
+
+================================================================================
+8. SERVER CONFIGURATION (server.js)
+================================================================================
+
+PORT: Environment variable PORT or 5000
+CORS: Configured for localhost:5173 (dev) and FRONTEND_URL (production)
+       Allows credentials, all standard methods and headers
+
+STARTUP SEQUENCE:
+  1. Run database migrations (create tables if not exist)
+  2. Run database seeding (insert sample data if tables empty)
+  3. Mount all route handlers
+  4. Start listening on configured port
+
+ROUTE MOUNTING:
+  /api/auth           -> auth routes
+  /api/users          -> user routes (with authenticate + updateLastActive)
+  /api/stokvels       -> stokvel routes
+  /api/contributions  -> contribution routes (with authenticate + updateLastActive)
+  /api/loans          -> loan routes (with authenticate + updateLastActive)
+  /api/payments       -> payment routes
+  /api/notifications  -> notification routes (with authenticate + updateLastActive)
+  /api/admin          -> admin routes (with authenticate + requireAdmin)
+  /api/settings       -> settings routes (with authenticate)
+  /api/help           -> help routes
+  /api/cards          -> card routes (with authenticate)
+
+HEALTH CHECK:
+  GET /api/health     -> Tests database connection, returns { status: 'ok' }
+
+PRODUCTION:
+  Serves static frontend from ../../dist directory
+  Catches all non-API routes and serves index.html (SPA support)
+
+ERROR HANDLING:
+  404 handler for unmatched API routes
+  Global error handler with stack trace in development mode
+  Request logging in development mode
+
+
+================================================================================
+9. BUSINESS LOGIC SUMMARY
+================================================================================
+
+REGISTRATION FLOW:
+  1. User registers -> status = 'pending'
+  2. Optional: selects a stokvel -> join_request created
+  3. All admins notified
+  4. Admin reviews and approves -> user status = 'active', profiles created
+  5. Approval email sent to user
+
+JOIN STOKVEL FLOW:
+  1. Existing user browses stokvels from dashboard
+  2. Clicks "Request to Join" -> join_request created
+  3. Stokvel admins notified
+  4. Admin approves -> profile created, email sent
+  5. Or admin rejects -> user notified
+
+CONTRIBUTION FLOW:
+  1. Member selects stokvel profile and amount
+  2. Amount validated: >= R100, <= remaining target
+  3. Payment via card (local) or Paystack
+  4. Contribution created with status = 'pending'
+  5. Admin confirms -> saved_amount updated (capped at target)
+  6. Or Paystack webhook/verify confirms automatically
+
+LOAN FLOW:
+  1. Member requests loan from a stokvel
+  2. Validation: max 50% of total contributions, one active loan per stokvel
+  3. Total contributions = saved_amount + any active loan principal
+  4. Loan auto-approved, principal deducted from saved_amount
+  5. 30-day term, 30% interest
+  6. On repayment: principal returns to saved_amount, interest goes to pool
+  7. Interest tracked in "Interest Pot" on stokvel dashboard
+
+PAYMENT PROCESSING (Paystack):
+  1. Frontend calls /payments/initialize
+  2. Backend creates pending contribution, calls Paystack API
+  3. User redirected to Paystack payment page
+  4. On success: webhook or /verify confirms the contribution
+  5. saved_amount updated, notifications sent
+
+ACCOUNT DELETION:
+  - Admin can soft-delete (reversible) or permanently delete
+  - Self-delete requires password, blocked for admins/users with active loans
+  - Soft-delete: status='deleted', data anonymized, profiles deactivated
+  - Restore: reactivates user and profiles
+  - Permanent delete: cascading removal from database
+
+
+================================================================================
+10. ENVIRONMENT VARIABLES
+================================================================================
+
+DB_HOST         - MySQL host (default: localhost)
+DB_USER         - MySQL username (default: root)
+DB_PASSWORD     - MySQL password
+DB_NAME         - Database name (default: stokvel_db)
+DB_PORT         - MySQL port (default: 3306)
+JWT_SECRET      - Secret key for JWT signing
+PORT            - Server port (default: 5000)
+PAYSTACK_SECRET_KEY - Paystack secret key for payment processing
+SMTP_HOST       - Email SMTP host (default: smtp.gmail.com)
+SMTP_PORT       - Email SMTP port (default: 587)
+SMTP_USER       - Email sender address
+SMTP_PASS       - Email app password
+FRONTEND_URL    - Frontend URL for CORS and email links
+
+
+================================================================================
+END OF DOCUMENTATION
+================================================================================
