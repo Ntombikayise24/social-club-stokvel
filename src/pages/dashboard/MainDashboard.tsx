@@ -235,10 +235,13 @@ export default function MainDashboard() {
         // Limit is 50% of TOTAL contributions (current savings + what's currently borrowed)
         const totalContributions = activeProfile.savedAmount + borrowed;
         const maxBorrowable = Math.floor(totalContributions * 0.5);
+        // If user has an active loan, they must repay it first — remaining is 0
+        const hasActiveLoan = activeLoans.length > 0;
+        const remaining = hasActiveLoan ? 0 : maxBorrowable;
         setLoanStats({
           available: maxBorrowable,
           borrowed,
-          remaining: Math.max(0, maxBorrowable - borrowed),
+          remaining,
           progress: maxBorrowable > 0 ? Math.min(100, Math.floor((borrowed / maxBorrowable) * 100)) : 0,
         });
       })
