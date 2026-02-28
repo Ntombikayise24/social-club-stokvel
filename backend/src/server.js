@@ -67,6 +67,46 @@ app.get('/api/health', async (_req, res) => {
   }
 });
 
+// ── Public stats for landing page (no auth required) ──
+app.get('/api/public/stats', async (_req, res) => {
+  try {
+    const [totalSaved] = await pool.query(
+      "SELECT COALESCE(SUM(amount), 0) as total FROM contributions WHERE status = 'confirmed'"
+    );
+    const [activeMembers] = await pool.query(
+      "SELECT COUNT(*) as count FROM users WHERE status = 'active' AND role = 'member'"
+    );
+    const [totalStokvels] = await pool.query(
+      "SELECT COUNT(*) as count FROM stokvels WHERE status = 'active'"
+    );
+
+    const total = parseFloat(totalSaved[0].total);
+    let formattedTotal;
+    if (total >= 1000000) {
+      formattedTotal = `R${(total / 1000000).toFixed(1)}M+`;
+    } else if (total >= 1000) {
+      formattedTotal = `R${(total / 1000).toFixed(0)}K+`;
+    } else {
+      formattedTotal = `R${total.toFixed(0)}`;
+    }
+
+    res.json({
+      totalSaved: formattedTotal,
+      totalSavedRaw: total,
+      activeMembers: parseInt(activeMembers[0].count),
+      activeStokvels: parseInt(totalStokvels[0].count),
+    });
+  } catch (err) {
+    console.error('Public stats error:', err);
+    res.json({
+      totalSaved: 'R0',
+      totalSavedRaw: 0,
+      activeMembers: 0,
+      activeStokvels: 0,
+    });
+  }
+});
+
 // ── Serve frontend in production ──
 if (process.env.NODE_ENV === 'production') {
   const frontendPath = path.join(__dirname, '../../dist');

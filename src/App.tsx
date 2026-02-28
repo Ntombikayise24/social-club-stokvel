@@ -7,6 +7,9 @@ import {
   Menu, Phone, MapPin, DollarSign, Bell
 } from 'lucide-react';
 import { authApi } from './api';
+import axios from 'axios';
+
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 function App() {
   const navigate = useNavigate();
@@ -18,6 +21,14 @@ function App() {
   const [showPassword, setShowPassword] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [liveStats, setLiveStats] = useState({ totalSaved: 'R0', activeMembers: 0, activeStokvels: 0 });
+
+  // Fetch live stats from database
+  useEffect(() => {
+    axios.get(`${API_BASE.replace('/api', '')}/api/public/stats`)
+      .then(res => setLiveStats(res.data))
+      .catch(() => {});
+  }, []);
 
   // Admin credentials handled by backend API
 
@@ -131,8 +142,8 @@ function App() {
   ];
 
   const stats = [
-    { value: "R126K+", label: "Total Saved", icon: <DollarSign className="w-4 h-4" />, trend: "+15%" },
-    { value: "18", label: "Active Members", icon: <Users className="w-4 h-4" />, trend: "+3" },
+    { value: liveStats.totalSaved, label: "Total Saved", icon: <DollarSign className="w-4 h-4" />, trend: "live" },
+    { value: String(liveStats.activeMembers), label: "Active Members", icon: <Users className="w-4 h-4" />, trend: "live" },
     { value: "30%", label: "Interest Rate", icon: <TrendingUp className="w-4 h-4" />, trend: "fixed" },
     { value: "24/7", label: "Support", icon: <Clock className="w-4 h-4" />, trend: "always" }
   ];
