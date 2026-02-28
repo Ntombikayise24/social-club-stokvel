@@ -10,22 +10,39 @@ dotenv.config({ path: path.join(__dirname, '../../.env') });
 const DB_NAME = process.env.DB_NAME || 'stokvel_db';
 
 async function migrate() {
-  // Connect without specifying database first
-  const connection = await mysql.createConnection({
-    host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT || '3306'),
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
-    multipleStatements: true,
-    ...(process.env.DB_SSL === 'true' ? { ssl: { rejectUnauthorized: false } } : {}),
-  });
-
   console.log('🔄 Running database migration...\n');
 
-  // Create database
-  await connection.query(`CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\``);
-  await connection.query(`USE \`${DB_NAME}\``);
-  console.log(`✅ Database "${DB_NAME}" ready`);
+  let connection;
+
+  // In production (cloud DB like Aiven), connect directly to the existing database
+  // In development, create the database if it doesn't exist
+  if (process.env.NODE_ENV === 'production') {
+    connection = await mysql.createConnection({
+      host: process.env.DB_HOST || 'localhost',
+      port: parseInt(process.env.DB_PORT || '3306'),
+      user: process.env.DB_USER || 'root',
+      password: process.env.DB_PASSWORD || '',
+      database: DB_NAME,
+      multipleStatements: true,
+      ...(process.env.DB_SSL === 'true' ? { ssl: { rejectUnauthorized: false } } : {}),
+    });
+    console.log(`✅ Connected to database "${DB_NAME}"`);
+  } else {
+    // Connect without specifying database first
+    connection = await mysql.createConnection({
+      host: process.env.DB_HOST || 'localhost',
+      port: parseInt(process.env.DB_PORT || '3306'),
+      user: process.env.DB_USER || 'root',
+      password: process.env.DB_PASSWORD || '',
+      multipleStatements: true,
+      ...(process.env.DB_SSL === 'true' ? { ssl: { rejectUnauthorized: false } } : {}),
+    });
+
+    // Create database
+    await connection.query(`CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\``);
+    await connection.query(`USE \`${DB_NAME}\``);
+    console.log(`✅ Database "${DB_NAME}" ready`);
+  }
 
   // ───────────────── USERS TABLE ─────────────────
   await connection.query(`
