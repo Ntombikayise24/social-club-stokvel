@@ -17,6 +17,14 @@ async function seed() {
     ...(process.env.DB_SSL === 'true' ? { ssl: { rejectUnauthorized: false } } : {}),
   });
 
+  // Skip seeding if data already exists (prevents duplicates on redeploy)
+  const [existingContributions] = await connection.query('SELECT COUNT(*) as count FROM contributions');
+  if (existingContributions[0].count > 0) {
+    console.log('⏭️  Database already has data — skipping seed to prevent duplicates');
+    await connection.end();
+    return;
+  }
+
   console.log('🌱 Seeding database...\n');
 
   // ── Admin user ──
