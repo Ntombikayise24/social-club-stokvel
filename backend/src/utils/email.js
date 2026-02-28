@@ -9,16 +9,51 @@ dotenv.config({ path: path.join(__dirname, '../../.env') });
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
-// Create reusable transporter
+// Log SMTP config at startup (mask password)
+const smtpUser = process.env.SMTP_USER;
+const smtpPass = process.env.SMTP_PASS;
+console.log(`📧 SMTP config: host=${process.env.SMTP_HOST || 'smtp.gmail.com'}, port=${process.env.SMTP_PORT || '587'}, user=${smtpUser || '(NOT SET)'}, pass=${smtpPass ? '****' + smtpPass.slice(-4) : '(NOT SET)'}`);
+
+// Create reusable transporter with timeouts to prevent hanging
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'smtp.gmail.com',
   port: parseInt(process.env.SMTP_PORT || '587'),
   secure: false,
+  connectionTimeout: 10000,  // 10s to establish connection
+  greetingTimeout: 10000,    // 10s for server greeting
+  socketTimeout: 15000,      // 15s for socket inactivity
   auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
+    user: smtpUser,
+    pass: smtpPass,
+  },
+  pool: false,  // Don't pool connections — create fresh for each send
+  tls: {
+    rejectUnauthorized: false, // Accept self-signed certs
   },
 });
+
+// Verify SMTP connection at startup
+transporter.verify()
+  .then(() => console.log('✅ SMTP connection verified — emails will work'))
+  .catch(err => console.error('❌ SMTP verification failed:', err.message, '— emails will NOT be sent'));
+
+/**
+ * Helper: safely send an email with pre-checks and logging.
+ */
+async function safeSendMail(mailOptions, label) {
+  if (!smtpUser || !smtpPass) {
+    console.error(`⚠️  SMTP not configured (SMTP_USER or SMTP_PASS missing) — skipping ${label} to ${mailOptions.to}`);
+    return false;
+  }
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`📧 ${label} sent to ${mailOptions.to} (messageId: ${info.messageId})`);
+    return true;
+  } catch (err) {
+    console.error(`❌ Failed to send ${label} to ${mailOptions.to}:`, err.code || '', err.message);
+    return false;
+  }
+}
 
 /**
  * Send an approval email to a user after admin approves their account.
@@ -87,13 +122,7 @@ export async function sendApprovalEmail(email, fullName, stokvelNames = []) {
     html,
   };
 
-  try {
-    await transporter.sendMail(mailOptions);
-    console.log(`📧 Approval email sent to ${email}`);
-  } catch (err) {
-    // Log but don't throw — email failure shouldn't block the approval flow
-    console.error(`⚠️  Failed to send approval email to ${email}:`, err.message);
-  }
+  await safeSendMail(mailOptions, 'Approval email');
 }
 
 /**
@@ -154,12 +183,7 @@ export async function sendJoinRequestApprovedEmail(email, fullName, stokvelName)
     html,
   };
 
-  try {
-    await transporter.sendMail(mailOptions);
-    console.log(`📧 Join-approved email sent to ${email}`);
-  } catch (err) {
-    console.error(`⚠️  Failed to send join-approved email to ${email}:`, err.message);
-  }
+  await safeSendMail(mailOptions, 'Join-approved email');
 }
 
 /**
@@ -227,12 +251,7 @@ export async function sendStokvelAssignmentEmail(email, fullName, stokvelNames =
     html,
   };
 
-  try {
-    await transporter.sendMail(mailOptions);
-    console.log(`📧 Stokvel assignment email sent to ${email}`);
-  } catch (err) {
-    console.error(`⚠️  Failed to send stokvel assignment email to ${email}:`, err.message);
-  }
+  await safeSendMail(mailOptions, 'Stokvel assignment email');
 }
 
 /**
@@ -298,12 +317,7 @@ export async function sendStokvelUnassignmentEmail(email, fullName, stokvelNames
     html,
   };
 
-  try {
-    await transporter.sendMail(mailOptions);
-    console.log(`📧 Stokvel unassignment email sent to ${email}`);
-  } catch (err) {
-    console.error(`⚠️  Failed to send stokvel unassignment email to ${email}:`, err.message);
-  }
+  await safeSendMail(mailOptions, 'Stokvel unassignment email');
 }
 
 /**
@@ -361,12 +375,7 @@ export async function sendAccountDeletionEmail(email, fullName, reason = 'Remove
     html,
   };
 
-  try {
-    await transporter.sendMail(mailOptions);
-    console.log(`📧 Account deletion email sent to ${email}`);
-  } catch (err) {
-    console.error(`⚠️  Failed to send account deletion email to ${email}:`, err.message);
-  }
+  await safeSendMail(mailOptions, 'Account deletion email');
 }
 
 /**
@@ -420,10 +429,5 @@ export async function sendPasswordResetEmail(email, code) {
     html,
   };
 
-  try {
-    await transporter.sendMail(mailOptions);
-    console.log(`📧 Password reset email sent to ${email}`);
-  } catch (err) {
-    console.error(`⚠️  Failed to send password reset email to ${email}:`, err.message);
-  }
+  await safeSendMail(mailOptions, 'Password reset email');
 }
