@@ -203,7 +203,7 @@ export default function MainDashboard() {
           target: (s.currentMembers || 0) * (activeProfile.targetAmount || 0),
           progress: 0,
           memberCount: s.currentMembers || 0,
-          cycle: s.cycle ? `${s.cycle}${s.meetingDay ? ' (' + s.meetingDay + ')' : ''}` : 'Monthly',
+          cycle: s.cycle ? s.cycle.charAt(0).toUpperCase() + s.cycle.slice(1) : 'Monthly',
           meetingDay: s.meetingDay || 'Sunday',
           nextPayout: s.nextPayout ? new Date(s.nextPayout).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' }) : 'TBD',
           individualTarget: activeProfile.targetAmount,
