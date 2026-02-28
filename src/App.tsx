@@ -25,8 +25,12 @@ function App() {
 
   // Fetch live stats from database
   useEffect(() => {
-    axios.get(`${API_BASE.replace('/api', '')}/api/public/stats`)
-      .then(res => setLiveStats(res.data))
+    axios.get('/api/public/stats')
+      .then(res => {
+        if (res.data && res.data.totalSaved) {
+          setLiveStats(res.data);
+        }
+      })
       .catch(() => {});
   }, []);
 

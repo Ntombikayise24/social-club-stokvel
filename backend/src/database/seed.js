@@ -14,6 +14,7 @@ async function seed() {
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME || 'stokvel_db',
+    ...(process.env.DB_SSL === 'true' ? { ssl: { rejectUnauthorized: false } } : {}),
   });
 
   console.log('🌱 Seeding database...\n');
