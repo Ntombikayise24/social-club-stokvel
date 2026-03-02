@@ -29,38 +29,6 @@ async function seed() {
   const adminId = adminResult.insertId;
   console.log('✅ Admin user created (admin@stokvel.co.za / Admin@123)');
 
-  // ── Demo member ──
-  const memberPassword = await bcrypt.hash('Member@123', 12);
-  const [memberResult] = await connection.query(
-    `INSERT INTO users (full_name, email, phone, password_hash, role, status)
-     VALUES (?, ?, ?, ?, 'member', 'active')
-     ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)`,
-    ['Naledi Dlamini', 'naledi@example.com', '+27629876543', memberPassword]
-  );
-  const memberId = memberResult.insertId;
-  console.log('✅ Demo member created (naledi@example.com / Member@123)');
-
-  // ── Demo member 2 ──
-  const member2Password = await bcrypt.hash('Member@123', 12);
-  const [member2Result] = await connection.query(
-    `INSERT INTO users (full_name, email, phone, password_hash, role, status)
-     VALUES (?, ?, ?, ?, 'member', 'active')
-     ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)`,
-    ['Lerato Molefe', 'lerato@example.com', '+27641234567', member2Password]
-  );
-  const member2Id = member2Result.insertId;
-  console.log('✅ Demo member 2 created (lerato@example.com / Member@123)');
-
-  // ── Pending member ──
-  const pendingPassword = await bcrypt.hash('Member@123', 12);
-  await connection.query(
-    `INSERT INTO users (full_name, email, phone, password_hash, role, status)
-     VALUES (?, ?, ?, ?, 'member', 'pending')
-     ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)`,
-    ['Sipho Nkosi', 'sipho@example.com', '+27631112233', pendingPassword]
-  );
-  console.log('✅ Pending member created (sipho@example.com / Member@123)');
-
   // ── Stokvels ──
   const [s1] = await connection.query(
     `INSERT INTO stokvels (name, type, description, target_amount, max_members, interest_rate, cycle, meeting_day, next_payout, status, icon, color, created_by)
@@ -87,116 +55,11 @@ async function seed() {
   const stokvel3Id = s3.insertId;
   console.log('✅ 3 stokvels created');
 
-  // ── Profiles (memberships) ──
-  // NOTE: Admin does NOT get stokvel profiles — admin is a system-level user only
-  const today = new Date().toISOString().split('T')[0];
-
-  const [p2] = await connection.query(
-    `INSERT INTO profiles (user_id, stokvel_id, role, target_amount, saved_amount, status, joined_date)
-     VALUES (?, ?, 'member', 50000, 8500, 'active', ?)
-     ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id), saved_amount=VALUES(saved_amount)`,
-    [memberId, stokvel1Id, today]
-  );
-  const profile2Id = p2.insertId;
-
-  const [p3] = await connection.query(
-    `INSERT INTO profiles (user_id, stokvel_id, role, target_amount, saved_amount, status, joined_date)
-     VALUES (?, ?, 'member', 7000, 5000, 'active', ?)
-     ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id), saved_amount=VALUES(saved_amount), target_amount=VALUES(target_amount)`,
-    [memberId, stokvel2Id, today]
-  );
-  const profile3Id = p3.insertId;
-
-  const [p4] = await connection.query(
-    `INSERT INTO profiles (user_id, stokvel_id, role, target_amount, saved_amount, status, joined_date)
-     VALUES (?, ?, 'member', 25000, 5000, 'active', ?)
-     ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id), saved_amount=VALUES(saved_amount)`,
-    [member2Id, stokvel3Id, today]
-  );
-  console.log('✅ Profiles/memberships created');
-
-  // ── Contributions ──
-  const contributions = [
-    [memberId, profile2Id, stokvel1Id, 2500, 'card', 'REF-001', 'confirmed'],
-    [memberId, profile2Id, stokvel1Id, 2500, 'card', 'REF-002', 'confirmed'],
-    [memberId, profile2Id, stokvel1Id, 2000, 'bank', 'REF-003', 'confirmed'],
-    [memberId, profile2Id, stokvel1Id, 1500, 'card', 'REF-004', 'pending'],
-    [memberId, profile3Id, stokvel2Id, 2500, 'card', 'REF-005', 'confirmed'],
-    [memberId, profile3Id, stokvel2Id, 2500, 'card', 'REF-006', 'confirmed'],
-    [memberId, profile3Id, stokvel2Id, 1500, 'card', 'REF-007', 'pending'],
-    [member2Id, p4.insertId, stokvel3Id, 2500, 'card', 'REF-010', 'confirmed'],
-    [member2Id, p4.insertId, stokvel3Id, 2500, 'cash', 'REF-011', 'confirmed'],
-  ];
-
-  for (const c of contributions) {
-    await connection.query(
-      `INSERT INTO contributions (user_id, profile_id, stokvel_id, amount, payment_method, reference, status, confirmed_by, confirmed_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [...c, c[6] === 'confirmed' ? adminId : null, c[6] === 'confirmed' ? new Date() : null]
-    );
-  }
-  console.log('✅ Sample contributions created');
-
-  // ── Loans ──
-  // Only seed one small active loan for Naledi in Kasi Savings Club (stokvel1)
-  const dueDate = new Date();
-  dueDate.setDate(dueDate.getDate() + 30);
-  await connection.query(
-    `INSERT INTO loans (user_id, profile_id, stokvel_id, amount, interest_rate, interest, total_repayable, status, purpose, borrowed_date, due_date)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)`,
-    [memberId, profile2Id, stokvel1Id, 100, 30, 30, 130, 'Personal expenses', today, dueDate.toISOString().split('T')[0]]
-  );
-
-  // One repaid loan for Naledi in Kasi Savings Club
-  const pastDate = new Date();
-  pastDate.setDate(pastDate.getDate() - 45);
-  const pastDue = new Date();
-  pastDue.setDate(pastDue.getDate() - 15);
-  const repaidDate = new Date();
-  repaidDate.setDate(repaidDate.getDate() - 20);
-  await connection.query(
-    `INSERT INTO loans (user_id, profile_id, stokvel_id, amount, interest_rate, interest, total_repayable, status, purpose, borrowed_date, due_date, repaid_date)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 'repaid', ?, ?, ?, ?)`,
-    [memberId, profile2Id, stokvel1Id, 100, 30, 30, 130, 'Groceries', pastDate.toISOString().split('T')[0], pastDue.toISOString().split('T')[0], repaidDate.toISOString().split('T')[0]]
-  );
-  console.log('✅ Sample loans created');
-
-  // ── Cards ──
-  await connection.query(
-    `INSERT INTO cards (user_id, card_type, last4, expiry_month, expiry_year, cardholder_name, is_default)
-     VALUES (?, 'visa', '4532', 12, 2027, 'NALEDI DLAMINI', TRUE)`,
-    [memberId]
-  );
-  await connection.query(
-    `INSERT INTO cards (user_id, card_type, last4, expiry_month, expiry_year, cardholder_name, is_default)
-     VALUES (?, 'mastercard', '8901', 6, 2028, 'NALEDI DLAMINI', FALSE)`,
-    [memberId]
-  );
-  console.log('✅ Sample cards created');
-
-  // ── Notifications ──
-  const notifications = [
-    [memberId, 'contribution', 'Contribution Confirmed', 'Your R2,500 contribution to Kasi Savings Club has been confirmed.', false],
-    [memberId, 'loan', 'Loan Approved', 'Your loan of R100 from Kasi Savings Club has been approved.', false],
-    [memberId, 'reminder', 'Contribution Reminder', 'Your monthly contribution to Collective Pot is due in 3 days.', false],
-    [memberId, 'payment', 'Payment Received', 'You received a payout of R5,000 from Kasi Savings Club.', true],
-    [memberId, 'info', 'Welcome!', 'Welcome to the Stokvel Management System. Get started by exploring your dashboard.', true],
-    [member2Id, 'contribution', 'Contribution Confirmed', 'Your R2,500 contribution to Ubuntu Circle has been confirmed.', false],
-  ];
-
-  for (const n of notifications) {
-    await connection.query(
-      `INSERT INTO notifications (user_id, type, title, message, is_read) VALUES (?, ?, ?, ?, ?)`,
-      n
-    );
-  }
-  console.log('✅ Sample notifications created');
-
   // ── User Settings ──
   await connection.query(
-    `INSERT INTO user_settings (user_id) VALUES (?), (?), (?)
+    `INSERT INTO user_settings (user_id) VALUES (?)
      ON DUPLICATE KEY UPDATE user_id=user_id`,
-    [adminId, memberId, member2Id]
+    [adminId]
   );
   console.log('✅ User settings initialized');
 
@@ -247,9 +110,6 @@ async function seed() {
   console.log('\n🎉 Seeding completed successfully!');
   console.log('\n📋 Login credentials:');
   console.log('   Admin:  admin@stokvel.co.za / Admin@123');
-  console.log('   Member: naledi@example.com / Member@123');
-  console.log('   Member: lerato@example.com / Member@123');
-  console.log('   Pending: sipho@example.com / Member@123');
 
   await connection.end();
 }
