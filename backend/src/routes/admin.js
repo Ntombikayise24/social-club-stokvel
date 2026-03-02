@@ -894,9 +894,9 @@ router.post('/contributions/:id/confirm', async (req, res) => {
       ['confirmed', req.user.id, contributionId]
     );
 
-    // Update profile saved amount (capped at target)
+    // Update profile saved amount
     await pool.query(
-      'UPDATE profiles SET saved_amount = LEAST(saved_amount + ?, target_amount) WHERE id = ?',
+      'UPDATE profiles SET saved_amount = saved_amount + ? WHERE id = ?',
       [contribution.amount, contribution.profile_id]
     );
 
@@ -1016,13 +1016,10 @@ router.post('/reports', async (req, res) => {
       case 'stokvels': {
         const [rows] = await pool.query(
           `SELECT s.id, s.name, s.type, s.target_amount, s.max_members, s.cycle, s.status, s.created_at,
-                  COUNT(DISTINCT p.user_id) AS member_count,
-                  COALESCE(SUM(CASE WHEN c.status = 'confirmed' THEN c.amount ELSE 0 END), 0) AS total_contributions
+                  (SELECT COUNT(DISTINCT p.user_id) FROM profiles p WHERE p.stokvel_id = s.id AND p.status = 'active') AS member_count,
+                  (SELECT COALESCE(SUM(c.amount), 0) FROM contributions c WHERE c.stokvel_id = s.id AND c.status = 'confirmed') AS total_contributions
            FROM stokvels s
-           LEFT JOIN profiles p ON p.stokvel_id = s.id AND p.status = 'active'
-           LEFT JOIN contributions c ON c.stokvel_id = s.id
            WHERE s.created_at BETWEEN ? AND ?
-           GROUP BY s.id
            ORDER BY s.created_at DESC`,
           [startDate, endDate]
         );

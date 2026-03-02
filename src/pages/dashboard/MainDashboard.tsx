@@ -316,6 +316,7 @@ export default function MainDashboard() {
       const res = await paymentApi.initialize({
         amount: parseInt(contributionData.amount),
         profileId: Number(activeProfile.id),
+        stokvelId: Number(activeProfile.stokvelId),
       });
 
       const { authorizationUrl, reference } = res.data.data;

@@ -172,22 +172,33 @@ router.post(
   [
     body('amount').isFloat({ min: 1 }).withMessage('Amount must be at least R1'),
     body('profileId').isInt().withMessage('Profile is required'),
+    body('stokvelId').optional().isInt(),
     body('purpose').optional().trim(),
     body('cardId').optional().isInt(),
     validate,
   ],
   async (req, res) => {
     try {
-      const { amount, profileId, purpose, cardId } = req.body;
+      const { amount, profileId, stokvelId, purpose, cardId } = req.body;
 
       // Verify profile
-      const [profiles] = await pool.query(
+      let [profiles] = await pool.query(
         'SELECT id, stokvel_id, saved_amount FROM profiles WHERE id = ? AND user_id = ?',
         [profileId, req.user.id]
       );
 
+      // Fallback: if not found by profile ID, try by stokvelId + userId
+      if (profiles.length === 0 && stokvelId) {
+        console.warn(`Loan: Profile not found by id=${profileId} for user=${req.user.id}, trying stokvelId=${stokvelId} fallback`);
+        [profiles] = await pool.query(
+          "SELECT id, stokvel_id, saved_amount FROM profiles WHERE stokvel_id = ? AND user_id = ? AND status = 'active'",
+          [stokvelId, req.user.id]
+        );
+      }
+
       if (profiles.length === 0) {
-        return res.status(404).json({ error: 'Profile not found' });
+        console.error(`No profile found for loan request. user=${req.user.id}, profileId=${profileId}, stokvelId=${stokvelId}`);
+        return res.status(404).json({ error: 'Profile not found. Please ensure you are assigned to a stokvel.' });
       }
 
       const profile = profiles[0];

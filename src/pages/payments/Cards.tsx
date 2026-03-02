@@ -294,6 +294,7 @@ export default function Cards() {
         <AddCardModal
           onClose={() => setShowAddCard(false)}
           onAdd={handleAddCard}
+          existingCards={cards}
         />
       )}
 
@@ -332,7 +333,7 @@ export default function Cards() {
 }
 
 // Add Card Modal Component
-function AddCardModal({ onClose, onAdd }: { onClose: () => void; onAdd: (card: Card) => void }) {
+function AddCardModal({ onClose, onAdd, existingCards }: { onClose: () => void; onAdd: (card: Card) => void; existingCards: Card[] }) {
   const [formData, setFormData] = useState({
     cardNumber: '',
     cardholderName: '',
@@ -401,6 +402,17 @@ function AddCardModal({ onClose, onAdd }: { onClose: () => void; onAdd: (card: C
 
     if (!formData.cvv.match(/^\d{3}$/)) {
       newErrors.cvv = 'CVV must be 3 digits';
+    }
+
+    // Check for duplicate card against existing cards
+    if (!newErrors.cardNumber) {
+      const last4 = cleanNumber.slice(-4);
+      const isDuplicate = existingCards.some(c => c.last4 === last4 && 
+        String(c.expiryMonth) === formData.expiryMonth && 
+        String(c.expiryYear).slice(-2) === formData.expiryYear);
+      if (isDuplicate) {
+        newErrors.cardNumber = 'This card has already been added to your account';
+      }
     }
 
     setErrors(newErrors);

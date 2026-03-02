@@ -80,6 +80,7 @@ export const contributionApi = {
   create: (data: {
     amount: number;
     profileId: number;
+    stokvelId?: number;
     cardId?: number;
     paymentMethod?: string;
   }) => api.post('/contributions', data),
@@ -270,7 +271,7 @@ export const adminApi = {
 // ══════════════════════════════════════════
 
 export const paymentApi = {
-  initialize: (data: { amount: number; profileId: number }) =>
+  initialize: (data: { amount: number; profileId: number; stokvelId?: number }) =>
     api.post('/payments/initialize', data),
 
   verify: (reference: string) =>

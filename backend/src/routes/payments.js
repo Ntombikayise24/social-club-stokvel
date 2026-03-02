@@ -43,7 +43,7 @@ router.post('/webhook', async (req, res) => {
           [contrib.id]
         );
         await pool.query(
-          'UPDATE profiles SET saved_amount = LEAST(saved_amount + ?, target_amount) WHERE id = ?',
+          'UPDATE profiles SET saved_amount = saved_amount + ? WHERE id = ?',
           [contrib.amount, contrib.profile_id]
         );
 
@@ -77,19 +77,40 @@ router.post(
   [
     body('amount').isFloat({ min: 100 }).withMessage('Minimum contribution is R100'),
     body('profileId').isInt().withMessage('Profile is required'),
+    body('stokvelId').optional().isInt(),
     validate,
   ],
   async (req, res) => {
     try {
-      const { amount, profileId } = req.body;
+      const { amount, profileId, stokvelId } = req.body;
 
       // Verify profile belongs to user
-      const [profiles] = await pool.query(
+      let [profiles] = await pool.query(
         'SELECT id, stokvel_id, user_id, target_amount, saved_amount FROM profiles WHERE id = ? AND user_id = ?',
         [profileId, req.user.id]
       );
+
+      // Fallback: if not found by profile ID, try by stokvelId + userId
+      if (profiles.length === 0 && stokvelId) {
+        console.warn(`Profile not found by id=${profileId} for user=${req.user.id}, trying stokvelId=${stokvelId} fallback`);
+        [profiles] = await pool.query(
+          "SELECT id, stokvel_id, user_id, target_amount, saved_amount FROM profiles WHERE stokvel_id = ? AND user_id = ? AND status = 'active'",
+          [stokvelId, req.user.id]
+        );
+      }
+
+      // Fallback: try finding ANY active profile for this user
       if (profiles.length === 0) {
-        return res.status(404).json({ error: 'Profile not found' });
+        console.warn(`Profile not found for user=${req.user.id}, profileId=${profileId}, stokvelId=${stokvelId}. Trying any active profile...`);
+        [profiles] = await pool.query(
+          "SELECT id, stokvel_id, user_id, target_amount, saved_amount FROM profiles WHERE user_id = ? AND status = 'active' LIMIT 1",
+          [req.user.id]
+        );
+      }
+
+      if (profiles.length === 0) {
+        console.error(`No profile found at all for user=${req.user.id}. profileId=${profileId}, stokvelId=${stokvelId}`);
+        return res.status(404).json({ error: 'Profile not found. Please ensure you are assigned to a stokvel.' });
       }
 
       // Check contribution does not exceed target

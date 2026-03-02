@@ -88,6 +88,15 @@ router.post(
 
       const last4 = cleanNumber.slice(-4);
 
+      // Check for duplicate card (same last4, card type, and expiry)
+      const [duplicates] = await pool.query(
+        'SELECT id FROM cards WHERE user_id = ? AND last4 = ? AND card_type = ? AND expiry_month = ? AND expiry_year = ?',
+        [req.user.id, last4, cardType, expiryMonth, normalizedYear]
+      );
+      if (duplicates.length > 0) {
+        return res.status(409).json({ error: 'This card has already been added to your account.' });
+      }
+
       // Check if first card — make it default
       const [existing] = await pool.query('SELECT id FROM cards WHERE user_id = ?', [req.user.id]);
       const isDefault = existing.length === 0;
