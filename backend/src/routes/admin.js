@@ -475,9 +475,19 @@ router.delete('/users/:id', async (req, res) => {
     const userId = req.params.id;
     const { reason } = req.body;
 
-    const [users] = await pool.query("SELECT id, full_name, email FROM users WHERE id = ? AND status != 'deleted'", [userId]);
+    // Prevent admin from deleting themselves
+    if (parseInt(userId) === req.user.id) {
+      return res.status(400).json({ error: 'You cannot delete your own admin account' });
+    }
+
+    const [users] = await pool.query("SELECT id, full_name, email, role FROM users WHERE id = ? AND status != 'deleted'", [userId]);
     if (users.length === 0) {
       return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Prevent deleting other admin accounts
+    if (users[0].role === 'admin') {
+      return res.status(400).json({ error: 'Admin accounts cannot be deleted' });
     }
 
     const deleteReason = reason || 'Removed by admin';
@@ -490,8 +500,12 @@ router.delete('/users/:id', async (req, res) => {
     // Deactivate all profiles
     await pool.query("UPDATE profiles SET status = 'inactive' WHERE user_id = ?", [userId]);
 
-    // Send deletion notification email
-    await sendAccountDeletionEmail(users[0].email, users[0].full_name, deleteReason);
+    // Send deletion notification email (don't let email failure block the response)
+    try {
+      await sendAccountDeletionEmail(users[0].email, users[0].full_name, deleteReason);
+    } catch (emailErr) {
+      console.error('Email notification failed (user still deleted):', emailErr.message);
+    }
 
     res.json({ message: `${users[0].full_name} has been archived` });
   } catch (err) {
@@ -937,6 +951,10 @@ router.put('/settings', async (req, res) => {
 router.post('/reports', async (req, res) => {
   try {
     const { reportType, dateRange, format = 'json' } = req.body;
+
+    if (!reportType) {
+      return res.status(400).json({ error: 'Report type is required' });
+    }
 
     let data;
     const startDate = dateRange?.start || '2020-01-01';

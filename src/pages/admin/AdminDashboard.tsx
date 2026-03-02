@@ -2196,11 +2196,13 @@ export default function AdminDashboard() {
   const pendingContributions = contributions.filter(c => c.status === 'pending');
 
   const showSuccess = (msg: string) => {
+    setShowErrorMessage('');  // Clear any existing error
     setShowSuccessMessage(msg);
     setTimeout(() => setShowSuccessMessage(''), 3000);
   };
 
   const showError = (msg: string) => {
+    setShowSuccessMessage('');  // Clear any existing success
     setShowErrorMessage(msg);
     setTimeout(() => setShowErrorMessage(''), 4000);
   };
@@ -2271,8 +2273,9 @@ export default function AdminDashboard() {
       await adminApi.deleteUser(userId, 'User deleted by admin');
       setShowDeleteUserConfirm(null);
       showSuccess(`User ${user.name} has been archived. They can be restored from the archive.`);
-      fetchData();
+      await fetchData();
     } catch (err: any) {
+      setShowDeleteUserConfirm(null);
       const msg = err.response?.data?.error || 'Failed to delete user';
       showError(msg);
     }
@@ -2355,8 +2358,9 @@ export default function AdminDashboard() {
       await adminApi.deleteStokvel(stokvelId);
       setShowDeleteStokvelConfirm(null);
       showSuccess(`Stokvel ${stokvel?.name} deleted successfully!`);
-      fetchData();
+      await fetchData();
     } catch (err: any) {
+      setShowDeleteStokvelConfirm(null);
       const msg = err.response?.data?.error || 'Failed to delete stokvel';
       showError(msg);
     }
@@ -2367,8 +2371,9 @@ export default function AdminDashboard() {
       await adminApi.approveUser(userId, selectedStokvels);
       setShowApproveUserModal(null);
       showSuccess(`User approved successfully!`);
-      fetchData();
+      await fetchData();
     } catch (err: any) {
+      setShowApproveUserModal(null);
       const msg = err.response?.data?.error || 'Failed to approve user';
       showError(msg);
     }
@@ -2379,8 +2384,9 @@ export default function AdminDashboard() {
       await adminApi.rejectUser(userId);
       setShowApproveUserModal(null);
       showSuccess('User has been rejected and removed from pending.');
-      fetchData();
+      await fetchData();
     } catch (err: any) {
+      setShowApproveUserModal(null);
       const msg = err.response?.data?.error || 'Failed to reject user';
       showError(msg);
     }
@@ -2391,8 +2397,9 @@ export default function AdminDashboard() {
       await adminApi.confirmContribution(contributionId);
       setShowConfirmContributionModal(null);
       showSuccess(`Payment confirmed successfully!`);
-      fetchData();
+      await fetchData();
     } catch (err: any) {
+      setShowConfirmContributionModal(null);
       const msg = err.response?.data?.error || 'Failed to confirm payment';
       showError(msg);
     }
@@ -2449,8 +2456,19 @@ export default function AdminDashboard() {
       window.URL.revokeObjectURL(url);
 
       showSuccess(`${reportType} report downloaded as ${ext.toUpperCase()}!`);
-    } catch {
-      showError('Failed to generate report. Please try again.');
+    } catch (err: any) {
+      // When responseType is 'blob', error response data is a Blob — try to parse it
+      let msg = 'Failed to generate report. Please try again.';
+      if (err.response?.data instanceof Blob) {
+        try {
+          const text = await err.response.data.text();
+          const parsed = JSON.parse(text);
+          if (parsed.error) msg = parsed.error;
+        } catch { /* use default message */ }
+      } else if (err.response?.data?.error) {
+        msg = err.response.data.error;
+      }
+      showError(msg);
     }
   };
 
@@ -2866,12 +2884,14 @@ export default function AdminDashboard() {
                           >
                             <Edit2 className="w-4 h-4" />
                           </button>
+                          {user.email !== 'admin@stokvel.co.za' && (
                           <button
                             onClick={() => setShowDeleteUserConfirm(user.id)}
                             className="text-red-600 hover:text-red-800 p-1"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
+                          )}
                           <button
                             onClick={() => setExpandedUser(expandedUser === user.id ? null : user.id)}
                             className="text-gray-600 hover:text-gray-800 p-1"
