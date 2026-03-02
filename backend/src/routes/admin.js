@@ -351,7 +351,11 @@ router.put(
         if (newlyAssignedStokvelNames.length > 0) {
           const [assignedUser] = await pool.query('SELECT full_name, email FROM users WHERE id = ?', [userId]);
           if (assignedUser.length > 0) {
-            await sendStokvelAssignmentEmail(assignedUser[0].email, assignedUser[0].full_name, newlyAssignedStokvelNames);
+            try {
+              await sendStokvelAssignmentEmail(assignedUser[0].email, assignedUser[0].full_name, newlyAssignedStokvelNames);
+            } catch (emailErr) {
+              console.error('Stokvel assignment email failed:', emailErr.message);
+            }
           }
         }
 
@@ -359,7 +363,11 @@ router.put(
         if (removedStokvelNames.length > 0) {
           const [removedUser] = await pool.query('SELECT full_name, email FROM users WHERE id = ?', [userId]);
           if (removedUser.length > 0) {
-            await sendStokvelUnassignmentEmail(removedUser[0].email, removedUser[0].full_name, removedStokvelNames);
+            try {
+              await sendStokvelUnassignmentEmail(removedUser[0].email, removedUser[0].full_name, removedStokvelNames);
+            } catch (emailErr) {
+              console.error('Stokvel unassignment email failed:', emailErr.message);
+            }
           }
         }
       }
@@ -373,7 +381,11 @@ router.put(
             [userId]
           );
           const stokvelNames = userProfiles.map(p => p.name);
-          await sendApprovalEmail(activatedUser[0].email, activatedUser[0].full_name, stokvelNames);
+          try {
+            await sendApprovalEmail(activatedUser[0].email, activatedUser[0].full_name, stokvelNames);
+          } catch (emailErr) {
+            console.error('Approval email failed:', emailErr.message);
+          }
         }
       }
 
@@ -1191,7 +1203,11 @@ router.post('/join-requests/:id/approve', async (req, res) => {
     // Send email to user
     const [userInfo] = await pool.query('SELECT email, full_name FROM users WHERE id = ?', [request.user_id]);
     if (userInfo.length > 0) {
-      await sendJoinRequestApprovedEmail(userInfo[0].email, userInfo[0].full_name, stokvelInfo[0].name);
+      try {
+        await sendJoinRequestApprovedEmail(userInfo[0].email, userInfo[0].full_name, stokvelInfo[0].name);
+      } catch (emailErr) {
+        console.error('Join request approval email failed:', emailErr.message);
+      }
     }
 
     res.json({ message: 'Join request approved' });

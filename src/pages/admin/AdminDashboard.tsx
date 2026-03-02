@@ -2049,7 +2049,7 @@ export default function AdminDashboard() {
   // ── Load all data from backend ──
   const fetchData = useCallback(async () => {
     try {
-      const [statsRes, usersRes, stokvelsRes, contributionsRes, deletedRes, joinReqRes] = await Promise.all([
+      const results = await Promise.allSettled([
         adminApi.getStats(),
         adminApi.listUsers({ limit: 100 }),
         adminApi.listStokvels(),
@@ -2058,8 +2058,16 @@ export default function AdminDashboard() {
         adminApi.listJoinRequests(),
       ]);
 
-      setApiStats(statsRes.data);
+      const statsRes = results[0].status === 'fulfilled' ? results[0].value : null;
+      const usersRes = results[1].status === 'fulfilled' ? results[1].value : null;
+      const stokvelsRes = results[2].status === 'fulfilled' ? results[2].value : null;
+      const contributionsRes = results[3].status === 'fulfilled' ? results[3].value : null;
+      const deletedRes = results[4].status === 'fulfilled' ? results[4].value : null;
+      const joinReqRes = results[5].status === 'fulfilled' ? results[5].value : null;
 
+      if (statsRes) setApiStats(statsRes.data);
+
+      if (usersRes) {
       setUsers(
         (usersRes.data.data || []).map((u: any) => ({
           id: u.id,
@@ -2082,7 +2090,9 @@ export default function AdminDashboard() {
           })),
         }))
       );
+      }
 
+      if (stokvelsRes) {
       setStokvels(
         (stokvelsRes.data || []).map((s: any) => ({
           id: s.id,
@@ -2105,7 +2115,9 @@ export default function AdminDashboard() {
           createdBy: s.createdBy || 'Admin',
         }))
       );
+      }
 
+      if (contributionsRes) {
       setContributions(
         (contributionsRes.data.data || []).map((c: any) => ({
           id: c.id,
@@ -2125,7 +2137,9 @@ export default function AdminDashboard() {
           reference: c.reference,
         }))
       );
+      }
 
+      if (deletedRes) {
       setDeletedUsers(
         (deletedRes.data || []).map((d: any) => ({
           id: d.id,
@@ -2142,8 +2156,9 @@ export default function AdminDashboard() {
           originalData: d,
         }))
       );
+      }
 
-      setJoinRequests(joinReqRes.data || []);
+      if (joinReqRes) setJoinRequests(joinReqRes.data || []);
     } catch (err) {
       console.error('Failed to load admin data:', err);
     } finally {
