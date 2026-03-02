@@ -970,7 +970,9 @@ router.post('/reports', async (req, res) => {
 
     let data;
     const startDate = dateRange?.start || '2020-01-01';
-    const endDate = dateRange?.end || new Date().toISOString().split('T')[0];
+    const endDateRaw = dateRange?.end || new Date().toISOString().split('T')[0];
+    // Ensure end date covers the full day (datetime columns need 23:59:59)
+    const endDate = endDateRaw.includes(' ') ? endDateRaw : `${endDateRaw} 23:59:59`;
 
     switch (reportType) {
       case 'contributions': {
