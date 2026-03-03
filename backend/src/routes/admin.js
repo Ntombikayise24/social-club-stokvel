@@ -4,7 +4,7 @@ import { body } from 'express-validator';
 import { validate } from '../middleware/validate.js';
 import { authenticate, requireAdmin } from '../middleware/auth.js';
 import pool from '../database/connection.js';
-import { sendApprovalEmail, sendJoinRequestApprovedEmail, sendStokvelAssignmentEmail, sendStokvelUnassignmentEmail, sendAccountDeletionEmail } from '../utils/email.js';
+import { sendApprovalEmail, sendJoinRequestApprovedEmail, sendStokvelAssignmentEmail, sendStokvelUnassignmentEmail, sendAccountDeletionEmail, sendWelcomeEmail } from '../utils/email.js';
 import { generatePDF, generateExcel, generateCSV, REPORT_COLUMNS, formatRowData } from '../utils/reports.js';
 
 const router = Router();
@@ -235,10 +235,27 @@ router.post(
         [userId, 'info', 'Welcome!', 'Your account has been created. Welcome to the Stokvel Management System!']
       );
 
+      // Get stokvel names for email
+      let stokvelNames = [];
+      if (stokvelIds.length > 0) {
+        const [stokvels] = await pool.query(
+          'SELECT name FROM stokvels WHERE id IN (?)',
+          [stokvelIds]
+        );
+        stokvelNames = stokvels.map(s => s.name);
+      }
+
+      // Send welcome email with credentials and stokvel assignments
+      try {
+        await sendWelcomeEmail(email, fullName, tempPassword, stokvelNames);
+      } catch (emailErr) {
+        console.error('Welcome email failed:', emailErr.message);
+      }
+
       res.status(201).json({
         message: 'User created successfully',
         userId,
-        tempPassword, // In production, send via email instead
+        tempPassword, // Also sent via email
       });
     } catch (err) {
       console.error('Create user error:', err);

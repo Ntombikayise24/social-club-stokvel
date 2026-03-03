@@ -370,6 +370,188 @@ export async function sendAccountDeletionEmail(email, fullName, reason = 'Remove
 }
 
 /**
+ * Send a welcome email to a new user created by an admin.
+ */
+export async function sendWelcomeEmail(email, fullName, tempPassword, stokvelNames = []) {
+  const loginUrl = `${FRONTEND_URL}/login`;
+
+  const stokvelList = stokvelNames.length > 0
+    ? `<p style="margin:0 0 8px;font-weight:600;color:#374151;">You've been assigned to:</p>
+       <ul style="margin:0 0 24px;padding-left:20px;color:#374151;font-size:15px;">
+         ${stokvelNames.map(n => `<li style="margin-bottom:4px;">${n}</li>`).join('')}
+       </ul>`
+    : '';
+
+  const html = `
+  <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
+    <!-- Header -->
+    <div style="background:linear-gradient(135deg,#16a34a,#15803d);padding:32px 24px;text-align:center;">
+      <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;">Welcome to Stokvel Management! 🎉</h1>
+    </div>
+
+    <!-- Body -->
+    <div style="padding:32px 24px;">
+      <p style="margin:0 0 16px;color:#374151;font-size:16px;">
+        Hi <strong>${fullName}</strong>,
+      </p>
+      <p style="margin:0 0 16px;color:#374151;font-size:16px;">
+        Your account has been created by an administrator. You can now log in and start using the system.
+      </p>
+
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px;margin:0 0 24px;">
+        <p style="margin:0 0 4px;font-weight:600;color:#166534;font-size:14px;">Your Login Credentials:</p>
+        <p style="margin:0 0 4px;color:#374151;font-size:15px;">Email: <strong>${email}</strong></p>
+        <p style="margin:0;color:#374151;font-size:15px;">Temporary Password: <strong>${tempPassword}</strong></p>
+      </div>
+
+      <p style="margin:0 0 16px;color:#dc2626;font-size:14px;font-weight:500;">
+        ⚠️ Please change your password after your first login for security.
+      </p>
+
+      ${stokvelList}
+
+      <!-- CTA Button -->
+      <div style="text-align:center;margin:32px 0;">
+        <a href="${loginUrl}" style="display:inline-block;background:#16a34a;color:#ffffff;text-decoration:none;padding:14px 40px;border-radius:8px;font-size:16px;font-weight:600;letter-spacing:0.5px;">
+          Log In Now
+        </a>
+      </div>
+
+      <p style="margin:0 0 8px;color:#6b7280;font-size:14px;">
+        Or copy and paste this link into your browser:
+      </p>
+      <p style="margin:0 0 24px;word-break:break-all;">
+        <a href="${loginUrl}" style="color:#16a34a;font-size:14px;">${loginUrl}</a>
+      </p>
+
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;" />
+
+      <p style="margin:0;color:#9ca3af;font-size:13px;text-align:center;">
+        If you did not expect this email, please contact your administrator.
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <div style="background:#f9fafb;padding:16px 24px;text-align:center;">
+      <p style="margin:0;color:#9ca3af;font-size:12px;">
+        &copy; ${new Date().getFullYear()} Stokvel Management System. All rights reserved.
+      </p>
+    </div>
+  </div>`;
+
+  const mailOptions = {
+    from: `"Stokvel Management" <${process.env.SMTP_USER || 'noreply@stokvel.co.za'}>`,
+    to: email,
+    subject: '🎉 Welcome to Stokvel Management — Your Account is Ready!',
+    html,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`📧 Welcome email sent to ${email}`);
+  } catch (err) {
+    console.error(`⚠️  Failed to send welcome email to ${email}:`, err.message);
+  }
+}
+
+/**
+ * Send a loan approval email to a user.
+ */
+export async function sendLoanApprovalEmail(email, fullName, loanDetails = {}) {
+  const { amount, interestRate, interest, totalRepayable, stokvelName, borrowedDate, dueDate } = loanDetails;
+  const dashboardUrl = `${FRONTEND_URL}/loans`;
+
+  const formattedBorrowedDate = new Date(borrowedDate).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' });
+  const formattedDueDate = new Date(dueDate).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' });
+
+  const html = `
+  <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
+    <!-- Header -->
+    <div style="background:linear-gradient(135deg,#16a34a,#15803d);padding:32px 24px;text-align:center;">
+      <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;">Loan Approved! ✅</h1>
+    </div>
+
+    <!-- Body -->
+    <div style="padding:32px 24px;">
+      <p style="margin:0 0 16px;color:#374151;font-size:16px;">
+        Hi <strong>${fullName}</strong>,
+      </p>
+      <p style="margin:0 0 16px;color:#374151;font-size:16px;">
+        Your loan from <strong style="color:#16a34a;">${stokvelName}</strong> has been approved and processed successfully!
+      </p>
+
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:20px;margin:0 0 24px;">
+        <p style="margin:0 0 12px;font-weight:700;color:#166534;font-size:16px;text-align:center;">Loan Summary</p>
+        <table style="width:100%;border-collapse:collapse;">
+          <tr>
+            <td style="padding:8px 0;color:#374151;font-size:14px;">Loan Amount:</td>
+            <td style="padding:8px 0;color:#374151;font-size:14px;font-weight:700;text-align:right;">R ${parseFloat(amount).toFixed(2)}</td>
+          </tr>
+          <tr>
+            <td style="padding:8px 0;color:#374151;font-size:14px;">Interest Rate:</td>
+            <td style="padding:8px 0;color:#374151;font-size:14px;font-weight:700;text-align:right;">${interestRate}%</td>
+          </tr>
+          <tr>
+            <td style="padding:8px 0;color:#374151;font-size:14px;">Interest Amount:</td>
+            <td style="padding:8px 0;color:#374151;font-size:14px;font-weight:700;text-align:right;">R ${parseFloat(interest).toFixed(2)}</td>
+          </tr>
+          <tr style="border-top:2px solid #16a34a;">
+            <td style="padding:12px 0 8px;color:#166534;font-size:15px;font-weight:700;">Total Repayable:</td>
+            <td style="padding:12px 0 8px;color:#166534;font-size:15px;font-weight:700;text-align:right;">R ${parseFloat(totalRepayable).toFixed(2)}</td>
+          </tr>
+          <tr>
+            <td style="padding:8px 0;color:#374151;font-size:14px;">Borrowed Date:</td>
+            <td style="padding:8px 0;color:#374151;font-size:14px;text-align:right;">${formattedBorrowedDate}</td>
+          </tr>
+          <tr>
+            <td style="padding:8px 0;color:#374151;font-size:14px;">Due Date:</td>
+            <td style="padding:8px 0;color:#dc2626;font-size:14px;font-weight:700;text-align:right;">${formattedDueDate}</td>
+          </tr>
+        </table>
+      </div>
+
+      <p style="margin:0 0 16px;color:#374151;font-size:14px;">
+        Please ensure you repay the total amount of <strong>R ${parseFloat(totalRepayable).toFixed(2)}</strong> by <strong>${formattedDueDate}</strong> to avoid overdue penalties.
+      </p>
+
+      <!-- CTA Button -->
+      <div style="text-align:center;margin:32px 0;">
+        <a href="${dashboardUrl}" style="display:inline-block;background:#16a34a;color:#ffffff;text-decoration:none;padding:14px 40px;border-radius:8px;font-size:16px;font-weight:600;letter-spacing:0.5px;">
+          View Loan Details
+        </a>
+      </div>
+
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;" />
+
+      <p style="margin:0;color:#9ca3af;font-size:13px;text-align:center;">
+        If you did not request this loan, please contact your administrator immediately.
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <div style="background:#f9fafb;padding:16px 24px;text-align:center;">
+      <p style="margin:0;color:#9ca3af;font-size:12px;">
+        &copy; ${new Date().getFullYear()} Stokvel Management System. All rights reserved.
+      </p>
+    </div>
+  </div>`;
+
+  const mailOptions = {
+    from: `"Stokvel Management" <${process.env.SMTP_USER || 'noreply@stokvel.co.za'}>`,
+    to: email,
+    subject: `✅ Loan of R ${parseFloat(amount).toFixed(2)} Approved — ${stokvelName}`,
+    html,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`📧 Loan approval email sent to ${email}`);
+  } catch (err) {
+    console.error(`⚠️  Failed to send loan approval email to ${email}:`, err.message);
+  }
+}
+
+/**
  * Send a password reset code via email.
  */
 export async function sendPasswordResetEmail(email, code) {

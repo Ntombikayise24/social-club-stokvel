@@ -4,6 +4,7 @@ import { validate } from '../middleware/validate.js';
 import { authenticate, updateLastActive } from '../middleware/auth.js';
 import pool from '../database/connection.js';
 import { generatePDF, generateExcel, generateCSV, formatRowData } from '../utils/reports.js';
+import { sendLoanApprovalEmail } from '../utils/email.js';
 
 const router = Router();
 router.use(authenticate);
@@ -202,11 +203,12 @@ router.post(
       }
 
       const profile = profiles[0];
+      const actualProfileId = profile.id;
       
       // Get active loan principal to calculate total contributions
       const [activeLoanRows] = await pool.query(
         "SELECT COALESCE(SUM(amount), 0) as total FROM loans WHERE profile_id = ? AND status IN ('active', 'overdue')",
-        [profileId]
+        [actualProfileId]
       );
       const activeLoanPrincipal = parseFloat(activeLoanRows[0].total);
       // Limit is 50% of total contributions (current savings + any active loan principal already deducted)
@@ -232,14 +234,17 @@ router.post(
         });
       }
 
-      // Check for existing active loan in this stokvel
-      const [existingLoan] = await pool.query(
-        "SELECT id FROM loans WHERE user_id = ? AND stokvel_id = ? AND status IN ('active', 'overdue', 'pending')",
-        [req.user.id, profile.stokvel_id]
-      );
+      // Check remaining borrowable amount (allow multiple loans up to 50% of total contributions)
+      const remainingToBorrow = maxLoanable - activeLoanPrincipal;
 
-      if (existingLoan.length > 0) {
-        return res.status(400).json({ error: 'You already have an active loan in this stokvel. Repay it first.' });
+      if (remainingToBorrow <= 0) {
+        return res.status(400).json({ error: 'You have already borrowed the maximum allowed amount. Repay existing loans first.' });
+      }
+
+      if (amount > remainingToBorrow) {
+        return res.status(400).json({
+          error: `You can only borrow up to R${remainingToBorrow.toFixed(2)} more. You already have R${activeLoanPrincipal.toFixed(2)} in active loans.`,
+        });
       }
 
       // Get interest rate from stokvel
@@ -255,13 +260,13 @@ router.post(
       const [result] = await pool.query(
         `INSERT INTO loans (user_id, profile_id, stokvel_id, amount, interest_rate, interest, total_repayable, status, purpose, borrowed_date, due_date, card_id)
          VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)`,
-        [req.user.id, profileId, profile.stokvel_id, amount, interestRate, interest, totalRepayable, purpose || null, borrowedDate, dueDate, cardId || null]
+        [req.user.id, actualProfileId, profile.stokvel_id, amount, interestRate, interest, totalRepayable, purpose || null, borrowedDate, dueDate, cardId || null]
       );
 
       // Deduct the principal from saved_amount (user is borrowing from their savings)
       await pool.query(
         'UPDATE profiles SET saved_amount = GREATEST(saved_amount - ?, 0) WHERE id = ?',
-        [amount, profileId]
+        [amount, actualProfileId]
       );
 
       // Notification
@@ -270,6 +275,24 @@ router.post(
         [req.user.id, 'loan', 'Loan Approved',
           `Your loan of R${amount.toLocaleString()} from ${stokvel[0].name} has been approved. Repayment of R${totalRepayable.toLocaleString()} due by ${dueDate.toLocaleDateString()}.`]
       );
+
+      // Send loan approval email
+      try {
+        const [user] = await pool.query('SELECT full_name, email FROM users WHERE id = ?', [req.user.id]);
+        if (user.length > 0) {
+          await sendLoanApprovalEmail(user[0].email, user[0].full_name, {
+            amount,
+            interestRate,
+            interest,
+            totalRepayable,
+            stokvelName: stokvel[0].name,
+            borrowedDate,
+            dueDate,
+          });
+        }
+      } catch (emailErr) {
+        console.error('Loan approval email failed:', emailErr.message);
+      }
 
       res.status(201).json({
         message: 'Loan approved',

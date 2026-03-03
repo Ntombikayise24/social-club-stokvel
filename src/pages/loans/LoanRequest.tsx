@@ -105,7 +105,7 @@ export default function LoanRequest() {
   const totalContributions = currentProfile.savedAmount + activeLoanAmount;
   const maxLoanAmount = Math.floor(totalContributions * 0.5);
   const previouslyBorrowed = activeLoanAmount;
-  const remainingToBorrow = hasActiveLoan ? 0 : maxLoanAmount;
+  const remainingToBorrow = Math.max(0, maxLoanAmount - activeLoanAmount);
   
   const requestedAmount = parseFloat(loanAmount) || 0;
   const interestRate = currentProfile.interestRate || 30;
@@ -120,7 +120,7 @@ export default function LoanRequest() {
     year: 'numeric'
   });
   
-  const isValidAmount = requestedAmount >= 1 && requestedAmount <= remainingToBorrow && !hasActiveLoan;
+  const isValidAmount = requestedAmount >= 1 && requestedAmount <= remainingToBorrow;
   const isFormValid = isValidAmount && acceptTerms && selectedCard !== 'new';
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -286,13 +286,19 @@ export default function LoanRequest() {
                   step="0.01"
                 />
               </div>
-              {hasActiveLoan && (
-                <p className="mt-1 text-sm text-red-600 flex items-center">
+              {hasActiveLoan && remainingToBorrow > 0 && (
+                <p className="mt-1 text-sm text-yellow-600 flex items-center">
                   <AlertCircle className="w-4 h-4 mr-1" />
-                  You already have an active loan of {formatCurrency(activeLoanAmount)} in this stokvel. Repay it first.
+                  You have an active loan of {formatCurrency(activeLoanAmount)}. You can still borrow up to {formatCurrency(remainingToBorrow)} more.
                 </p>
               )}
-              {loanAmount && !isValidAmount && !hasActiveLoan && (
+              {hasActiveLoan && remainingToBorrow <= 0 && (
+                <p className="mt-1 text-sm text-red-600 flex items-center">
+                  <AlertCircle className="w-4 h-4 mr-1" />
+                  You have reached your maximum borrowing limit. Repay existing loans first.
+                </p>
+              )}
+              {loanAmount && !isValidAmount && remainingToBorrow > 0 && (
                 <p className="mt-1 text-sm text-red-600 flex items-center">
                   <AlertCircle className="w-4 h-4 mr-1" />
                   {requestedAmount > remainingToBorrow 
