@@ -12,7 +12,7 @@ import {
   AlertTriangle,
   CreditCard
 } from 'lucide-react';
-import { userApi, loanApi, cardApi } from '../../api';
+import { userApi, loanApi, cardApi, contributionApi } from '../../api';
 import { showToast } from '../../utils/toast';
 
 export default function LoanRequest() {
@@ -23,6 +23,7 @@ export default function LoanRequest() {
   const [loanAmount, setLoanAmount] = useState('');
   const [purpose, setPurpose] = useState('');
   const [selectedCard, setSelectedCard] = useState('');
+  const [loanTarget, setLoanTarget] = useState<'your-target' | 'madala-side'>('your-target');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
@@ -43,17 +44,18 @@ export default function LoanRequest() {
   });
 
   const [cards, setCards] = useState<any[]>([]);
-  const [activeLoanAmount, setActiveLoanAmount] = useState(0);
-  const [hasActiveLoan, setHasActiveLoan] = useState(false);
+  const [allActiveLoans, setAllActiveLoans] = useState<any[]>([]);
+  const [madalaSideSavings, setMadalaSideSavings] = useState(0);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [profilesRes, cardsRes, loansRes] = await Promise.all([
+        const [profilesRes, cardsRes, loansRes, contributionsRes] = await Promise.all([
           userApi.getProfiles(),
           cardApi.list(),
-          loanApi.list({ profileId: Number(profileId), status: 'active' })
+          loanApi.list({ profileId: Number(profileId), status: 'active' }),
+          contributionApi.list({ profileId: Number(profileId), status: 'confirmed' })
         ]);
 
         const colors = ['primary', 'secondary', 'blue', 'green', 'purple'];
@@ -86,11 +88,16 @@ export default function LoanRequest() {
         const defaultCard = cardsList.find((c: any) => c.isDefault) || cardsList[0];
         if (defaultCard) setSelectedCard(defaultCard.id);
 
-        // Calculate actual active loan amount for this profile
+        // Store all active/overdue loans with their target info
         const activeLoans = (loansRes.data?.data || []).filter((l: any) => l.status === 'active' || l.status === 'overdue');
-        const totalActive = activeLoans.reduce((sum: number, l: any) => sum + (l.amount || 0), 0);
-        setActiveLoanAmount(totalActive);
-        setHasActiveLoan(activeLoans.length > 0);
+        setAllActiveLoans(activeLoans);
+
+        // Calculate madala-side confirmed contributions total
+        const allContributions = contributionsRes.data?.data || contributionsRes.data || [];
+        const madalaSideTotal = allContributions
+          .filter((c: any) => c.contributionType === 'madala-side' && c.status === 'confirmed')
+          .reduce((sum: number, c: any) => sum + (parseFloat(c.amount) || 0), 0);
+        setMadalaSideSavings(madalaSideTotal);
       } catch (err) {
         console.error('Failed to load data', err);
       } finally {
@@ -101,8 +108,18 @@ export default function LoanRequest() {
   }, [profileId]);
   
   // Calculate loan amounts using actual data
-  // Limit is 50% of TOTAL contributions (current savings + what's currently borrowed)
-  const totalContributions = currentProfile.savedAmount + activeLoanAmount;
+  // Filter active loans by the selected loan target
+  const activeLoanAmount = allActiveLoans
+    .filter((l: any) => (l.loanTarget || 'your-target') === loanTarget)
+    .reduce((sum: number, l: any) => sum + (l.amount || 0), 0);
+  const hasActiveLoan = activeLoanAmount > 0;
+  // Total outstanding interest across ALL active/overdue loans (not filtered by target)
+  const totalOutstandingInterest = allActiveLoans
+    .reduce((sum: number, l: any) => sum + (l.interest || 0), 0);
+  const interestCapReached = totalOutstandingInterest >= 2000;
+  // Use madala-side savings when borrowing against madala-side, otherwise use profile savedAmount
+  const currentSavings = loanTarget === 'madala-side' ? madalaSideSavings : currentProfile.savedAmount;
+  const totalContributions = currentSavings + activeLoanAmount;
   const maxLoanAmount = Math.floor(totalContributions * 0.5);
   const previouslyBorrowed = activeLoanAmount;
   const remainingToBorrow = Math.max(0, maxLoanAmount - activeLoanAmount);
@@ -121,7 +138,7 @@ export default function LoanRequest() {
   });
   
   const isValidAmount = requestedAmount >= 1 && requestedAmount <= remainingToBorrow;
-  const isFormValid = isValidAmount && acceptTerms && selectedCard !== 'new';
+  const isFormValid = isValidAmount && acceptTerms && selectedCard !== 'new' && !interestCapReached;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -137,17 +154,18 @@ export default function LoanRequest() {
         amount: requestedAmount,
         profileId: Number(profileId),
         purpose: purpose || undefined,
-        cardId: selectedCard ? Number(selectedCard) : undefined
+        cardId: selectedCard ? Number(selectedCard) : undefined,
+        loanTarget
       });
 
       setShowConfirmation(false);
       
-      showToast.success(`Loan of R ${requestedAmount} approved! Funds will be sent to your card.`);
+      showToast.success(`Loan request of R ${requestedAmount} submitted! Awaiting admin approval.`);
       
       navigate(`/loans?profile=${profileId}`, { 
         state: { 
           success: true, 
-          message: `Loan of R ${requestedAmount} from ${currentProfile.stokvelName} successfully processed!` 
+          message: `Loan request of R ${requestedAmount} from ${currentProfile.stokvelName} submitted for approval!` 
         } 
       });
     } catch (err: any) {
@@ -175,7 +193,7 @@ export default function LoanRequest() {
               <Link to={`/dashboard?profile=${profileId}`} className="text-gray-600 hover:text-primary-600">
                 <ArrowLeft className="w-5 h-5" />
               </Link>
-              <h1 className="text-2xl font-bold text-primary-800">HENNESSY SOCIAL CLUB</h1>
+              <h1 className="text-2xl font-bold text-primary-800">FUND MATE</h1>
             </div>
           </div>
         </div>
@@ -189,41 +207,41 @@ export default function LoanRequest() {
         ) : (<>
         {/* Page Title */}
         <div className="mb-6">
-          <h2 className="text-2xl font-semibold text-gray-800">Instant Loan Request</h2>
+          <h2 className="text-2xl font-semibold text-gray-800">Loan Request</h2>
           <p className="text-gray-500">
             Borrowing from <span className="font-medium text-primary-600">{currentProfile.stokvelName}</span>
           </p>
         </div>
 
-        {/* Instant Approval Banner */}
-        <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6 flex items-start space-x-3">
-          <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+        {/* Admin Approval Banner */}
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 flex items-start space-x-3">
+          <Clock className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
           <div>
-            <p className="text-sm font-medium text-green-800">Instant Approval - No Waiting!</p>
-            <p className="text-xs text-green-600 mt-1">
-              As long as you have savings in {currentProfile.stokvelName}, you can borrow immediately.
+            <p className="text-sm font-medium text-blue-800">Admin Approval Required</p>
+            <p className="text-xs text-blue-600 mt-1">
+              Your loan request will be reviewed by an admin. You will be notified once approved or rejected.
             </p>
           </div>
         </div>
 
         {/* Profile Info Card */}
-        <div className={`bg-gradient-to-r from-${currentProfile.color}-50 to-${currentProfile.color}-100 rounded-xl p-6 mb-6 border border-${currentProfile.color}-200`}>
+        <div className={`bg-gradient-to-r ${loanTarget === 'madala-side' ? 'from-green-50 to-green-100 border-green-200' : `from-${currentProfile.color}-50 to-${currentProfile.color}-100 border-${currentProfile.color}-200`} rounded-xl p-6 mb-6 border`}>
           <div className="flex items-start space-x-4">
-            <div className={`w-12 h-12 bg-${currentProfile.color}-600 rounded-xl flex items-center justify-center flex-shrink-0`}>
-              <span className="text-2xl">{currentProfile.icon}</span>
+            <div className={`w-12 h-12 ${loanTarget === 'madala-side' ? 'bg-green-600' : `bg-${currentProfile.color}-600`} rounded-xl flex items-center justify-center flex-shrink-0`}>
+              <span className="text-2xl">{loanTarget === 'madala-side' ? '🌱' : currentProfile.icon}</span>
             </div>
             <div className="flex-1">
-              <h3 className={`font-semibold text-${currentProfile.color}-800 mb-2`}>
-                Your {currentProfile.stokvelName} Savings
+              <h3 className={`font-semibold ${loanTarget === 'madala-side' ? 'text-green-800' : `text-${currentProfile.color}-800`} mb-2`}>
+                {loanTarget === 'madala-side' ? 'Madala Side Savings' : `Your ${currentProfile.stokvelName} Savings`}
               </h3>
               <p className="text-sm text-gray-600 mb-3">
-                You can borrow up to <span className={`font-bold text-${currentProfile.color}-700`}>50%</span> of your savings
+                You can borrow up to <span className={`font-bold ${loanTarget === 'madala-side' ? 'text-green-700' : `text-${currentProfile.color}-700`}`}>50%</span> of your savings
               </p>
               
               <div className="grid grid-cols-2 gap-3 mb-3">
                 <div className="bg-white rounded-lg p-3">
                   <p className="text-xs text-gray-500 mb-1">Current Savings</p>
-                  <p className="font-bold text-gray-800">{formatCurrency(currentProfile.savedAmount)}</p>
+                  <p className="font-bold text-gray-800">{formatCurrency(currentSavings)}</p>
                 </div>
                 <div className="bg-white rounded-lg p-3">
                   <p className="text-xs text-gray-500 mb-1">Max Available (50%)</p>
@@ -247,18 +265,45 @@ export default function LoanRequest() {
 
         {/* Loan Request Form */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          {interestCapReached && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start space-x-3">
+              <AlertTriangle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-semibold text-red-800">Loan Interest Cap Reached</p>
+                <p className="text-sm text-red-600 mt-1">
+                  Your outstanding loan interest is R {totalOutstandingInterest.toLocaleString('en-ZA', { minimumFractionDigits: 2 })} which has reached the R 2,000 limit. 
+                  You cannot take out new loans until your interest drops below R 2,000. Please repay existing loans first.
+                </p>
+              </div>
+            </div>
+          )}
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Target Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Borrowing Against *
+              </label>
+              <select
+                value={loanTarget}
+                onChange={(e) => setLoanTarget(e.target.value as 'your-target' | 'madala-side')}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+              >
+                <option value="your-target">🎯 Your Target (Collective Pot)</option>
+                <option value="madala-side">🌱 Madala Side</option>
+              </select>
+            </div>
+
             {/* Profile Info */}
-            <div className={`bg-${currentProfile.color}-50 rounded-lg p-4 flex items-center justify-between`}>
+            <div className={`${loanTarget === 'madala-side' ? 'bg-green-50' : `bg-${currentProfile.color}-50`} rounded-lg p-4 flex items-center justify-between`}>
               <div className="flex items-center space-x-3">
-                <Users className={`w-5 h-5 text-${currentProfile.color}-600`} />
+                <Users className={`w-5 h-5 ${loanTarget === 'madala-side' ? 'text-green-600' : `text-${currentProfile.color}-600`}`} />
                 <div>
                   <p className="text-sm text-gray-500">Borrowing from</p>
-                  <p className="font-medium text-gray-800">{currentProfile.icon} {currentProfile.stokvelName}</p>
+                  <p className="font-medium text-gray-800">{loanTarget === 'madala-side' ? '🌱' : currentProfile.icon} {currentProfile.stokvelName}</p>
                 </div>
               </div>
               <div className="flex items-center space-x-3">
-                <Calendar className={`w-5 h-5 text-${currentProfile.color}-600`} />
+                <Calendar className={`w-5 h-5 ${loanTarget === 'madala-side' ? 'text-green-600' : `text-${currentProfile.color}-600`}`} />
                 <div>
                   <p className="text-sm text-gray-500">Member Since</p>
                   <p className="font-medium text-gray-800">{currentProfile.memberSince}</p>
@@ -435,7 +480,7 @@ export default function LoanRequest() {
               disabled={!isFormValid}
               className="w-full bg-primary-600 text-white py-3 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
             >
-              Request Loan from {currentProfile.stokvelName}
+              Submit Loan Request
             </button>
           </form>
         </div>
@@ -444,12 +489,12 @@ export default function LoanRequest() {
         <div className="mt-6 bg-white rounded-xl shadow-sm border border-gray-100 p-4">
           <h4 className="font-medium text-gray-700 mb-3 flex items-center">
             <Info className="w-4 h-4 mr-2 text-gray-400" />
-            Instant Loan Rules
+            Loan Rules
           </h4>
           <ul className="space-y-2 text-sm text-gray-600">
             <li className="flex items-start">
-              <CheckCircle className="w-4 h-4 text-green-600 mr-2 flex-shrink-0 mt-0.5" />
-              <span><span className="font-bold">No approval needed</span> - Instant access to funds</span>
+              <Clock className="w-4 h-4 text-blue-600 mr-2 flex-shrink-0 mt-0.5" />
+              <span><span className="font-bold">Admin approval required</span> - Loan requests are reviewed by admin</span>
             </li>
             <li className="flex items-start">
               <Percent className="w-4 h-4 text-secondary-600 mr-2 flex-shrink-0 mt-0.5" />
@@ -457,7 +502,7 @@ export default function LoanRequest() {
             </li>
             <li className="flex items-start">
               <Clock className="w-4 h-4 text-blue-600 mr-2 flex-shrink-0 mt-0.5" />
-              <span><span className="font-bold">30 days</span> to repay</span>
+              <span><span className="font-bold">30 days</span> to repay once approved</span>
             </li>
             <li className="flex items-start">
               <AlertTriangle className="w-4 h-4 text-yellow-600 mr-2 flex-shrink-0 mt-0.5" />
@@ -476,9 +521,9 @@ export default function LoanRequest() {
               <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <CheckCircle className="w-8 h-8 text-primary-600" />
               </div>
-              <h3 className="text-xl font-semibold text-gray-800 mb-2">Confirm Instant Loan</h3>
+              <h3 className="text-xl font-semibold text-gray-800 mb-2">Confirm Loan Request</h3>
               <p className="text-gray-500 text-sm">
-                You are about to borrow from {currentProfile.stokvelName}
+                Your request will be sent to admin for approval
               </p>
             </div>
 
@@ -523,7 +568,7 @@ export default function LoanRequest() {
                 disabled={isSubmitting}
                 className="flex-1 bg-primary-600 text-white py-2 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
               >
-                {isSubmitting ? 'Processing...' : 'Confirm & Get Loan'}
+                {isSubmitting ? 'Submitting...' : 'Submit Request'}
               </button>
             </div>
           </div>

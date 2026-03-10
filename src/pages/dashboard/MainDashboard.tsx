@@ -24,7 +24,7 @@ import {
   Loader2
 } from 'lucide-react';
 import ProfileSwitcher from './ProfileSwitcher';
-import { userApi, stokvelApi, loanApi, contributionApi, notificationApi, paymentApi } from '../../api';
+import { userApi, stokvelApi, loanApi, contributionApi, notificationApi, paymentApi, finesApi, cardApi } from '../../api';
 import { showToast } from '../../utils/toast';
 import { logout } from '../../utils/auth';
 
@@ -81,7 +81,15 @@ export default function MainDashboard() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loanStats, setLoanStats] = useState({ available: 0, borrowed: 0, remaining: 0, progress: 0 });
   const [stokvelDetails, setStokvelDetails] = useState<StokvelData | null>(null);
-  const [interestPot, setInterestPot] = useState({ totalEarned: 0, repaidLoans: 0, pendingInterest: 0 });
+  const [interestPot, setInterestPot] = useState({ totalInterest: 0, activeLoans: 0, paidInterest: 0 });
+  const [madalaSideTotal, setMadalaSideTotal] = useState(0);
+  const [userFines, setUserFines] = useState<any[]>([]);
+  const [finesSummary, setFinesSummary] = useState({ unpaidTotal: 0, paidTotal: 0, unpaidCount: 0 });
+  const [payingFineId, setPayingFineId] = useState<number | null>(null);
+  const [showFinePayModal, setShowFinePayModal] = useState<any | null>(null);
+  const [finePayMethod, setFinePayMethod] = useState<'card' | 'cash'>('card');
+  const [fineSelectedCard, setFineSelectedCard] = useState('');
+  const [fineCards, setFineCards] = useState<any[]>([]);
   
   // Fetch data from backend
   const fetchData = useCallback(async () => {
@@ -119,7 +127,7 @@ export default function MainDashboard() {
         description: s.description || '',
         memberCount: s.currentMembers || 0,
         targetAmount: s.targetAmount || 0,
-        cycle: s.cycle || 'Monthly',
+        cycle: s.cycle || 'weekly',
         category: s.type || 'General',
         status: userStokvelIds.includes(String(s.id)) 
           ? 'active' as const 
@@ -203,13 +211,13 @@ export default function MainDashboard() {
           target: (s.currentMembers || 0) * (activeProfile.targetAmount || 0),
           progress: 0,
           memberCount: s.currentMembers || 0,
-          cycle: s.cycle ? `${s.cycle}${s.meetingDay ? ' (' + s.meetingDay + ')' : ''}` : 'Monthly',
+          cycle: s.cycle || 'weekly',
           meetingDay: s.meetingDay || 'Sunday',
           nextPayout: s.nextPayout ? new Date(s.nextPayout).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' }) : 'TBD',
           individualTarget: activeProfile.targetAmount,
         });
         if (s.interestPot) {
-          setInterestPot(s.interestPot);
+          // Interest pot data is now calculated per-user from loans
         }
       })
       .catch(() => {
@@ -219,7 +227,7 @@ export default function MainDashboard() {
           target: 0,
           progress: 0,
           memberCount: 0,
-          cycle: 'Monthly',
+          cycle: 'weekly',
           meetingDay: 'Sunday',
           nextPayout: 'TBD',
           individualTarget: activeProfile.targetAmount,
@@ -241,10 +249,43 @@ export default function MainDashboard() {
           remaining: Math.max(0, maxBorrowable - borrowed),
           progress: maxBorrowable > 0 ? Math.min(100, Math.floor((borrowed / maxBorrowable) * 100)) : 0,
         });
+
+        // Per-user interest data
+        const pendingInterest = activeLoans.reduce((sum: number, l: any) => sum + (l.interest || 0), 0);
+        const repaidLoans = loans.filter((l: any) => l.status === 'repaid');
+        const paidInterest = repaidLoans.reduce((sum: number, l: any) => sum + (l.interest || 0), 0);
+        setInterestPot({
+          totalInterest: pendingInterest,
+          activeLoans: activeLoans.length,
+          paidInterest,
+        });
       })
       .catch(() => {
         const maxBorrowable = Math.floor(activeProfile.savedAmount * 0.5);
         setLoanStats({ available: maxBorrowable, borrowed: 0, remaining: maxBorrowable, progress: 0 });
+        setInterestPot({ totalInterest: 0, activeLoans: 0, paidInterest: 0 });
+      });
+
+    // Fetch Madala Side contribution total
+    contributionApi.list({ profileId: Number(activeProfile.id), limit: 1000 })
+      .then(res => {
+        const contributions = res.data?.data || [];
+        const madalaSideConfirmed = contributions
+          .filter((c: any) => c.contributionType === 'madala-side' && c.status === 'confirmed')
+          .reduce((sum: number, c: any) => sum + (c.amount || 0), 0);
+        setMadalaSideTotal(madalaSideConfirmed);
+      })
+      .catch(() => setMadalaSideTotal(0));
+
+    // Fetch user's fines
+    finesApi.list()
+      .then(res => {
+        setUserFines(res.data.data || []);
+        setFinesSummary(res.data.summary || { unpaidTotal: 0, paidTotal: 0, unpaidCount: 0 });
+      })
+      .catch(() => {
+        setUserFines([]);
+        setFinesSummary({ unpaidTotal: 0, paidTotal: 0, unpaidCount: 0 });
       });
   }, [activeProfile]);
 
@@ -255,13 +296,65 @@ export default function MainDashboard() {
     localStorage.setItem('activeProfileId', profile.id);
   };
 
+  const handlePayFine = async (fine: any) => {
+    // Open payment modal instead of paying directly
+    setShowFinePayModal(fine);
+    setFinePayMethod('card');
+    // Load cards
+    try {
+      const cardsRes = await cardApi.list();
+      const cardsList = (cardsRes.data || []).map((c: any) => ({
+        id: String(c.id),
+        type: c.cardType || 'visa',
+        last4: c.last4 || '****',
+        label: `${c.cardType === 'visa' ? 'Visa' : c.cardType === 'mastercard' ? 'Mastercard' : c.cardType} •••• ${c.last4}`,
+        isDefault: c.isDefault
+      }));
+      setFineCards(cardsList);
+      const defaultCard = cardsList.find((c: any) => c.isDefault) || cardsList[0];
+      if (defaultCard) setFineSelectedCard(defaultCard.id);
+    } catch { 
+      setFineCards([]);
+    }
+  };
+
+  const confirmFinePay = async () => {
+    if (!showFinePayModal) return;
+    try {
+      setPayingFineId(showFinePayModal.id);
+      await finesApi.pay(showFinePayModal.id, { 
+        paymentMethod: finePayMethod, 
+        cardId: finePayMethod === 'card' && fineSelectedCard ? Number(fineSelectedCard) : undefined 
+      });
+      showToast.success(finePayMethod === 'cash' ? 'Cash payment submitted! Pending admin confirmation.' : 'Fine paid successfully!');
+      setShowFinePayModal(null);
+      // Refresh fines
+      const res = await finesApi.list();
+      setUserFines(res.data.data || []);
+      setFinesSummary(res.data.summary || { unpaidTotal: 0, paidTotal: 0, unpaidCount: 0 });
+    } catch (err: any) {
+      showToast.error(err.response?.data?.error || 'Failed to pay fine');
+    } finally {
+      setPayingFineId(null);
+    }
+  };
+
   // Contribution form state
   const [contributionData, setContributionData] = useState({
     amount: ''
   });
+  const [contributionTarget, setContributionTarget] = useState<'your-target' | 'madala-side'>('your-target');
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'cash'>('card');
 
-  // Calculate remaining amount for this profile
-  const remainingAmount = activeProfile ? Math.max(0, activeProfile.targetAmount - activeProfile.savedAmount) : 0;
+  // Calculate remaining amount based on selected target
+  const MADALA_SIDE_TARGET = 2200;
+  const MADALA_SIDE_MIN = 200;
+  const remainingAmount = activeProfile
+    ? contributionTarget === 'madala-side'
+      ? MADALA_SIDE_TARGET
+      : Math.max(0, activeProfile.targetAmount - activeProfile.savedAmount)
+    : 0;
+  const minContribution = contributionTarget === 'madala-side' ? MADALA_SIDE_MIN : 100;
   const progressPercentage = activeProfile ? (activeProfile.targetAmount > 0 ? Math.min(100, (activeProfile.savedAmount / activeProfile.targetAmount) * 100) : 0) : 0;
 
   // Use loan stats from backend
@@ -274,7 +367,7 @@ export default function MainDashboard() {
     target: 0,
     progress: 0,
     memberCount: 0,
-    cycle: 'Monthly',
+    cycle: 'weekly',
     meetingDay: 'Sunday',
     nextPayout: 'TBD',
     individualTarget: activeProfile?.targetAmount || 0,
@@ -304,19 +397,37 @@ export default function MainDashboard() {
 
   const handleAddContribution = async () => {
     if (!activeProfile) return;
-    // Check if amount is valid
-    if (!contributionData.amount || parseInt(contributionData.amount) < 100 || parseInt(contributionData.amount) > remainingAmount) {
-      return;
-    }
+    const amount = parseInt(contributionData.amount);
+    if (!amount || amount < minContribution || amount > remainingAmount) return;
 
     setIsProcessingPayment(true);
 
     try {
-      // Initialize Paystack payment via backend
+      if (paymentMethod === 'cash') {
+        // Cash contribution — goes to pending until admin confirms
+        await paymentApi.cash({
+          amount,
+          profileId: Number(activeProfile.id),
+          stokvelId: Number(activeProfile.stokvelId),
+          contributionType: contributionTarget,
+        });
+
+        setShowAddContribution(false);
+        setIsProcessingPayment(false);
+        setContributionData({ amount: '' });
+        setContributionTarget('your-target');
+        setPaymentMethod('card');
+        showToast.success('Cash contribution submitted! Admin will confirm at the next Sunday meeting.');
+        fetchData();
+        return;
+      }
+
+      // Card payment — existing Paystack flow
       const res = await paymentApi.initialize({
-        amount: parseInt(contributionData.amount),
+        amount,
         profileId: Number(activeProfile.id),
         stokvelId: Number(activeProfile.stokvelId),
+        contributionType: contributionTarget,
       });
 
       const { authorizationUrl, reference } = res.data.data;
@@ -324,9 +435,24 @@ export default function MainDashboard() {
       // Open Paystack payment page
       const paymentWindow = window.open(authorizationUrl, '_blank');
 
-      // Poll for payment completion
+      // Poll for payment completion + detect window close
       const checkPayment = setInterval(async () => {
         try {
+          // If user closed the payment window without completing, cancel
+          if (paymentWindow && paymentWindow.closed) {
+            clearInterval(checkPayment);
+            clearTimeout(pollTimeout);
+            setShowAddContribution(false);
+            setIsProcessingPayment(false);
+            setContributionData({ amount: '' });
+            setContributionTarget('your-target');
+            setPaymentMethod('card');
+            showToast.error('Payment was cancelled. You can try again anytime.');
+            fetchData();
+            navigate('/dashboard');
+            return;
+          }
+
           const verifyRes = await paymentApi.verify(reference);
           if (verifyRes.data.data?.status === 'success') {
             clearInterval(checkPayment);
@@ -334,13 +460,28 @@ export default function MainDashboard() {
             setShowAddContribution(false);
             setIsProcessingPayment(false);
             setContributionData({ amount: '' });
+            setContributionTarget('your-target');
+            setPaymentMethod('card');
             showToast.success(`Payment of R ${contributionData.amount} confirmed! Your contribution has been recorded.`);
             fetchData();
+          } else if (verifyRes.data.status === false) {
+            // Payment was declined or failed
+            clearInterval(checkPayment);
+            clearTimeout(pollTimeout);
+            if (paymentWindow && !paymentWindow.closed) paymentWindow.close();
+            setShowAddContribution(false);
+            setIsProcessingPayment(false);
+            setContributionData({ amount: '' });
+            setContributionTarget('your-target');
+            setPaymentMethod('card');
+            showToast.error('Payment was declined. Please try again or use a different payment method.');
+            fetchData();
+            navigate('/dashboard');
           }
         } catch {
           // Still pending, keep polling
         }
-      }, 5000);
+      }, 3000);
 
       // Stop polling after 5 minutes
       const pollTimeout = setTimeout(() => {
@@ -348,7 +489,6 @@ export default function MainDashboard() {
         setIsProcessingPayment(false);
       }, 300000);
 
-      // Store cleanup refs so component unmount can clear them
       return () => {
         clearInterval(checkPayment);
         clearTimeout(pollTimeout);
@@ -357,11 +497,10 @@ export default function MainDashboard() {
     } catch (err: any) {
       setIsProcessingPayment(false);
       const errorCode = err.response?.data?.code;
-      const errorMsg = err.response?.data?.error || 'Failed to initialize payment. Please try again.';
+      const errorMsg = err.response?.data?.error || 'Failed to process contribution. Please try again.';
       
       if (errorCode === 'NO_CARD') {
         showToast.error(errorMsg);
-        // Navigate to cards page
         setTimeout(() => navigate('/cards'), 1500);
       } else {
         showToast.error(errorMsg);
@@ -418,7 +557,7 @@ export default function MainDashboard() {
                 <Users className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-primary-800">{currentStokvel.name || 'STOKVEL CLUB'}</h1>
+                <h1 className="text-xl font-bold text-primary-800">FUND MATE</h1>
                 <p className="text-xs text-gray-500">Member Dashboard</p>
               </div>
             </div>
@@ -489,7 +628,7 @@ export default function MainDashboard() {
                                       setShowDiscoverStokvels(true);
                                     }}
                                   >
-                                    Browse other stokvels →
+                                    Browse other groups →
                                   </button>
                                 </div>
                               </div>
@@ -582,10 +721,10 @@ export default function MainDashboard() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Welcome Section */}
-        <div className="mb-8">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Welcome + Quick Stats Row */}
+        <div className="mb-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
             <div>
               <h2 className="text-2xl font-semibold text-gray-800">
                 Welcome back, <span className="text-primary-700">{activeProfile.name.split(' ')[0]}</span>! 👋
@@ -609,260 +748,351 @@ export default function MainDashboard() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left Column - Personal Stats */}
-          <div className="space-y-6">
-            {/* YOUR TARGET - Personal Contribution Summary */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-2">
-                  <div className="p-2 bg-primary-100 rounded-lg">
-                    <Target className="w-5 h-5 text-primary-600" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-700">Your Target</h3>
-                    <p className="text-xs text-gray-500">Personal contribution summary</p>
-                  </div>
-                </div>
+        {/* Top Row - 3 Column Overview Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mb-5">
+          {/* YOUR TARGET */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-all">
+            <div className="flex items-center space-x-2 mb-4">
+              <div className="p-2 bg-primary-100 rounded-xl">
+                <Target className="w-5 h-5 text-primary-600" />
               </div>
-              
-              <div className="mb-4">
-                <span className="text-3xl font-bold text-primary-800">
-                  R {activeProfile.savedAmount.toLocaleString()}
-                </span>
-                <span className="text-gray-600 text-lg ml-2">
-                  of R {activeProfile.targetAmount.toLocaleString()}
-                </span>
+              <div>
+                <h3 className="font-semibold text-gray-700">Your Target</h3>
+                <p className="text-xs text-gray-400">Personal savings</p>
               </div>
+            </div>
+            
+            <div className="mb-4">
+              <span className="text-3xl font-bold text-primary-800">
+                R {activeProfile.savedAmount.toLocaleString()}
+              </span>
+              <span className="text-gray-500 text-sm ml-1">
+                / R {activeProfile.targetAmount.toLocaleString()}
+              </span>
+            </div>
 
-              {/* Progress Bar */}
-              <div className="mb-3">
-                <div className="flex justify-between text-sm mb-2">
-                  <span className="text-gray-600">Progress</span>
-                  <span className="font-semibold text-primary-700">{progressPercentage.toFixed(0)}%</span>
-                </div>
-                <div className="w-full bg-gray-100 rounded-full h-3">
-                  <div 
-                    className="bg-gradient-to-r from-primary-500 to-primary-600 h-3 rounded-full transition-all duration-500" 
-                    style={{ width: `${progressPercentage}%` }}
-                  ></div>
-                </div>
+            <div className="mb-3">
+              <div className="flex justify-between text-xs mb-1.5">
+                <span className="text-gray-500">Progress</span>
+                <span className="font-semibold text-primary-600">{progressPercentage.toFixed(0)}%</span>
               </div>
-
-              <div className="flex items-center justify-between text-sm bg-gray-50 p-3 rounded-lg">
-                <div className="flex items-center text-gray-600">
-                  <ArrowUpRight className="w-4 h-4 mr-1 text-primary-600" />
-                  <span>R {remainingAmount.toLocaleString()} to go</span>
-                </div>
-                <span className="text-gray-400">|</span>
-                <span className="text-gray-500">Due {TARGET_DATE}</span>
+              <div className="w-full bg-gray-100 rounded-full h-2.5">
+                <div 
+                  className="bg-gradient-to-r from-primary-400 to-primary-600 h-2.5 rounded-full transition-all duration-500" 
+                  style={{ width: `${progressPercentage}%` }}
+                ></div>
               </div>
             </div>
 
-            {/* LOAN CARD */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-2">
-                  <div className="p-2 bg-primary-100 rounded-lg">
-                    <Wallet className="w-5 h-5 text-primary-600" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-700">Loan Status</h3>
-                    <p className="text-xs text-gray-500">Borrow against your savings</p>
-                  </div>
-                </div>
-                <span className="text-sm bg-primary-100 text-primary-700 px-3 py-1 rounded-full">
-                  50% max
-                </span>
+            <div className="flex items-center justify-between text-xs bg-gray-50 p-2.5 rounded-lg">
+              <div className="flex items-center text-gray-600">
+                <ArrowUpRight className="w-3.5 h-3.5 mr-1 text-primary-500" />
+                <span>R {remainingAmount.toLocaleString()} to go</span>
               </div>
-
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div className="bg-gray-50 p-3 rounded-lg">
-                  <p className="text-xs text-gray-500 mb-1">Available to borrow</p>
-                  <span className="text-xl font-bold text-green-600">
-                    R {loanData.remaining.toLocaleString()}
-                  </span>
-                </div>
-                <div className="bg-gray-50 p-3 rounded-lg">
-                  <p className="text-xs text-gray-500 mb-1">Already borrowed</p>
-                  <span className="text-xl font-bold text-primary-800">
-                    R {loanData.borrowed.toLocaleString()}
-                  </span>
-                </div>
-              </div>
-
-              {/* Loan Progress Bar */}
-              {loanData.available > 0 && (
-                <div className="mb-4">
-                  <div className="flex justify-between text-xs mb-1">
-                    <span className="text-gray-500">Borrowed R {loanData.borrowed.toLocaleString()} of R {loanData.available.toLocaleString()} limit</span>
-                    <span className="text-gray-500">R {loanData.remaining.toLocaleString()} left</span>
-                  </div>
-                  <div className="w-full bg-gray-100 rounded-full h-2.5">
-                    <div 
-                      className="bg-gradient-to-r from-primary-500 to-primary-600 h-2.5 rounded-full" 
-                      style={{ width: `${loanData.progress}%` }}
-                    ></div>
-                  </div>
-                </div>
-              )}
-
-              {/* REQUEST LOAN BUTTON */}
-              <div className="mt-4">
-                <Link 
-                  to={`/loans/request?profile=${activeProfile.id}`}
-                  className="block w-full bg-primary-600 hover:bg-primary-700 text-white text-center font-medium py-3 px-4 rounded-lg transition-colors shadow-sm"
-                >
-                  Request Loan (30% interest)
-                </Link>
-              </div>
-
-              <div className="mt-3 text-center">
-                <Link to={`/loans?profile=${activeProfile.id}`} className="text-sm text-primary-600 hover:text-primary-700">
-                  View loan history →
-                </Link>
-              </div>
+              <span className="text-gray-400">Due {TARGET_DATE}</span>
             </div>
           </div>
 
-          {/* Right Column - Current Stokvel */}
-          <div className="space-y-6">
-            {/* Stokvel Card */}
-            <div className="bg-gradient-to-br from-primary-50 to-white rounded-xl shadow-sm border border-primary-100 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-2">
-                  <div className="p-2 bg-primary-200 rounded-lg">
-                    <Users className="w-5 h-5 text-primary-700" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-800">{currentStokvel.name}</h3>
-                    <p className="text-xs text-gray-600">{currentStokvel.memberCount} members · R{currentStokvel.individualTarget} target each</p>
-                  </div>
+          {/* COLLECTIVE POT */}
+          <div className="bg-gradient-to-br from-primary-50 to-white rounded-2xl shadow-sm border border-primary-100 p-5 hover:shadow-md transition-all">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center space-x-2">
+                <div className="p-2 bg-primary-200 rounded-xl">
+                  <Users className="w-5 h-5 text-primary-700" />
                 </div>
-                <span className="text-sm bg-primary-200 text-primary-800 px-3 py-1 rounded-full font-medium">
-                  {currentStokvel.memberCount} members
+                <div>
+                  <h3 className="font-semibold text-gray-800">Collective Pot</h3>
+                  <p className="text-xs text-gray-500">{currentStokvel.memberCount} members</p>
+                </div>
+              </div>
+              <span className="text-xs bg-primary-200/70 text-primary-800 px-2.5 py-1 rounded-full font-medium">
+                R{currentStokvel.individualTarget} each
+              </span>
+            </div>
+
+            <div className="mb-4">
+              <span className="text-3xl font-bold text-primary-800">
+                R {currentStokvel.total.toLocaleString()}
+              </span>
+              <span className="text-gray-500 text-sm ml-1">
+                / R {currentStokvel.target.toLocaleString()}
+              </span>
+            </div>
+
+            <div className="mb-3">
+              <div className="flex justify-between text-xs mb-1.5">
+                <span className="text-gray-500">Group Progress</span>
+                <span className="font-semibold text-primary-600">{currentStokvel.progress}%</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2.5">
+                <div 
+                  className="bg-gradient-to-r from-primary-400 to-primary-600 h-2.5 rounded-full" 
+                  style={{ width: `${currentStokvel.progress}%` }}
+                ></div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+              <div className="bg-white/60 p-2 rounded-lg text-center">
+                <p className="text-gray-400">Cycle</p>
+                <p className="font-semibold text-gray-700">{currentStokvel.cycle}</p>
+              </div>
+              <div className="bg-white/60 p-2 rounded-lg text-center">
+                <p className="text-gray-400">Meeting</p>
+                <p className="font-semibold text-primary-700">{currentStokvel.meetingDay || 'Sunday'}</p>
+              </div>
+            </div>
+
+            <Link 
+              to={`/group/${activeProfile.stokvelId}?profile=${activeProfile.id}`}
+              className="block text-center text-primary-700 hover:text-primary-800 text-sm font-medium py-2 hover:bg-primary-100/50 rounded-lg transition-colors"
+            >
+              View Group Details →
+            </Link>
+          </div>
+
+          {/* MADALA SIDE */}
+          <div className="bg-gradient-to-br from-green-50 to-white rounded-2xl shadow-sm border border-green-200 p-5 hover:shadow-md transition-all md:col-span-2 lg:col-span-1">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center space-x-2">
+                <div className="p-2 bg-green-200 rounded-xl">
+                  <span className="text-lg">🌱</span>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-800">Madala Side</h3>
+                  <p className="text-xs text-gray-500">R200/month</p>
+                </div>
+              </div>
+              <span className="text-xs bg-green-200/70 text-green-800 px-2.5 py-1 rounded-full font-medium">
+                R2,200 target
+              </span>
+            </div>
+
+            <div className="mb-4">
+              <span className="text-3xl font-bold text-green-800">
+                R {madalaSideTotal.toLocaleString()}
+              </span>
+              <span className="text-gray-500 text-sm ml-1">
+                / R 2,200
+              </span>
+            </div>
+
+            <div className="mb-3">
+              <div className="flex justify-between text-xs mb-1.5">
+                <span className="text-gray-500">Progress</span>
+                <span className="font-semibold text-green-600">{Math.min(100, Math.round((madalaSideTotal / MADALA_SIDE_TARGET) * 100))}%</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2.5">
+                <div 
+                  className="bg-gradient-to-r from-green-400 to-green-600 h-2.5 rounded-full" 
+                  style={{ width: `${Math.min(100, Math.round((madalaSideTotal / MADALA_SIDE_TARGET) * 100))}%` }}
+                ></div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="bg-white/60 p-2 rounded-lg text-center">
+                <p className="text-gray-400">Min. Monthly</p>
+                <p className="font-semibold text-gray-700">R200</p>
+              </div>
+              <div className="bg-white/60 p-2 rounded-lg text-center">
+                <p className="text-gray-400">Period</p>
+                <p className="font-semibold text-green-700">Jan – Nov</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom Row - Loan Status (wider) + Interest Pot */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          {/* LOAN STATUS - Spans 2 columns */}
+          <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-all">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center space-x-2">
+                <div className="p-2 bg-primary-100 rounded-xl">
+                  <Wallet className="w-5 h-5 text-primary-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-700">Loan Status</h3>
+                  <p className="text-xs text-gray-400">Borrow against your savings</p>
+                </div>
+              </div>
+              <span className="text-xs bg-primary-100 text-primary-700 px-2.5 py-1 rounded-full font-medium">
+                50% max
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div className="bg-gray-50 p-3 rounded-xl">
+                <p className="text-xs text-gray-500 mb-1">Available to borrow</p>
+                <span className="text-xl font-bold text-green-600">
+                  R {loanData.remaining.toLocaleString()}
                 </span>
               </div>
-
-              <div className="mb-4">
-                <span className="text-3xl font-bold text-primary-800">
-                  R {currentStokvel.total.toLocaleString()}
-                </span>
-                <span className="text-gray-600 text-lg ml-2">
-                  of R {currentStokvel.target.toLocaleString()}
+              <div className="bg-gray-50 p-3 rounded-xl">
+                <p className="text-xs text-gray-500 mb-1">Already borrowed</p>
+                <span className="text-xl font-bold text-primary-800">
+                  R {loanData.borrowed.toLocaleString()}
                 </span>
               </div>
+            </div>
 
-              <p className="text-sm text-gray-600 mb-3">
-                <span className="font-medium">{currentStokvel.memberCount} × R{currentStokvel.individualTarget}</span> yearly target
-              </p>
-
-              {/* Group Progress Bar */}
+            {loanData.available > 0 && (
               <div className="mb-4">
-                <div className="flex justify-between text-sm mb-2">
-                  <span className="text-gray-600">Group Progress</span>
-                  <span className="font-semibold text-primary-700">{currentStokvel.progress}%</span>
+                <div className="flex justify-between text-xs mb-1">
+                  <span className="text-gray-500">Borrowed R {loanData.borrowed.toLocaleString()} of R {loanData.available.toLocaleString()} limit</span>
+                  <span className="text-gray-500">R {loanData.remaining.toLocaleString()} left</span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-3">
+                <div className="w-full bg-gray-100 rounded-full h-2.5">
                   <div 
-                    className="bg-gradient-to-r from-primary-500 to-primary-600 h-3 rounded-full" 
-                    style={{ width: `${currentStokvel.progress}%` }}
+                    className="bg-gradient-to-r from-primary-400 to-primary-600 h-2.5 rounded-full" 
+                    style={{ width: `${loanData.progress}%` }}
                   ></div>
                 </div>
               </div>
+            )}
 
-              <div className="grid grid-cols-2 gap-4 py-4 border-t border-primary-200">
-                <div className="bg-white/60 p-3 rounded-lg">
-                  <p className="text-xs text-gray-500 mb-1">Cycle</p>
-                  <p className="font-semibold text-gray-800">{currentStokvel.cycle}</p>
-                </div>
-                <div className="bg-white/60 p-3 rounded-lg">
-                  <p className="text-xs text-gray-500 mb-1">Meeting Day</p>
-                  <p className="font-semibold text-primary-700">{currentStokvel.meetingDay || 'Sunday'}</p>
-                </div>
-              </div>
-
+            <div className="flex flex-col sm:flex-row gap-3 mt-4">
               <Link 
-                to={`/group/${activeProfile.stokvelId}?profile=${activeProfile.id}`}
-                className="block text-center text-primary-700 hover:text-primary-800 font-medium py-3 hover:bg-primary-100/50 rounded-lg transition-colors"
+                to={`/loans/request?profile=${activeProfile.id}`}
+                className="flex-1 bg-primary-600 hover:bg-primary-700 text-white text-center font-medium py-2.5 px-4 rounded-xl transition-colors shadow-sm text-sm"
               >
-                View Group Details →
+                Apply for Loan (30% interest)
+              </Link>
+              <Link 
+                to={`/loans?profile=${activeProfile.id}`} 
+                className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-center font-medium py-2.5 px-4 rounded-xl transition-colors text-sm"
+              >
+                View Loan History →
               </Link>
             </div>
+          </div>
 
-            {/* Interest Pot Card */}
-            <div className="bg-gradient-to-br from-amber-50 to-white rounded-xl shadow-sm border border-amber-200 p-5">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center space-x-2">
-                  <div className="p-2 bg-amber-200 rounded-lg">
-                    <span className="text-lg">🏺</span>
-                  </div>
+          {/* INTEREST POT - Per User */}
+          <div className="bg-gradient-to-br from-amber-50 to-white rounded-2xl shadow-sm border border-amber-200 p-5 hover:shadow-md transition-all">
+            <div className="flex items-center space-x-2 mb-4">
+              <div className="p-2 bg-amber-200 rounded-xl">
+                <span className="text-lg">🏺</span>
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-800">Your Loan Interest</h3>
+                <p className="text-xs text-gray-400">Interest on active loans</p>
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <span className="text-3xl font-bold text-amber-700">
+                R {interestPot.totalInterest.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
+              </span>
+              <p className="text-xs text-gray-400 mt-1">Outstanding interest</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-white/70 p-3 rounded-xl text-center">
+                <p className="text-xs text-gray-400 mb-0.5">Active Loans</p>
+                <p className="text-lg font-bold text-amber-700">{interestPot.activeLoans}</p>
+              </div>
+              <div className="bg-white/70 p-3 rounded-xl text-center">
+                <p className="text-xs text-gray-400 mb-0.5">Interest Paid</p>
+                <p className="text-lg font-bold text-green-700">R {interestPot.paidInterest.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-gray-400 mt-3 text-center">30% interest charged on every loan</p>
+          </div>
+        </div>
+
+        {/* Fines Card */}
+        <div className="bg-gradient-to-br from-red-50 to-white rounded-2xl shadow-sm border border-red-200 p-5 mb-5 hover:shadow-md transition-all">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-2">
+              <div className="p-2 bg-red-100 rounded-xl">
+                <span className="text-lg">⚠️</span>
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-800">Fines</h3>
+                <p className="text-xs text-gray-400">Outstanding penalties</p>
+              </div>
+            </div>
+            {finesSummary.unpaidCount > 0 && (
+              <span className="bg-red-100 text-red-700 text-xs font-medium px-2.5 py-1 rounded-full">
+                {finesSummary.unpaidCount} unpaid
+              </span>
+            )}
+          </div>
+
+          <div className="mb-4">
+            <span className="text-3xl font-bold text-red-700">
+              R {finesSummary.unpaidTotal.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
+            </span>
+            <p className="text-xs text-gray-400 mt-1">Total outstanding fines</p>
+          </div>
+
+          {userFines.filter((f: any) => f.status === 'unpaid').length > 0 ? (
+            <div className="space-y-2">
+              {userFines.filter((f: any) => f.status === 'unpaid').map((fine: any) => (
+                <div key={fine.id} className="flex items-center justify-between bg-white/70 p-3 rounded-xl">
                   <div>
-                    <h3 className="font-semibold text-gray-800">Interest Pot</h3>
-                    <p className="text-xs text-gray-500">Earned from loan repayments</p>
+                    <p className="text-sm font-medium text-gray-700">{fine.fineLabel}</p>
+                    <p className="text-xs text-gray-400">
+                      {fine.createdAt ? new Date(fine.createdAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' }) : ''}
+                    </p>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <span className="font-bold text-red-600">R {fine.amount}</span>
+                    <button
+                      onClick={() => handlePayFine(fine)}
+                      disabled={payingFineId === fine.id}
+                      className="px-3 py-1 bg-primary-600 text-white text-xs rounded-lg hover:bg-primary-700 disabled:opacity-50 font-medium"
+                    >
+                      {payingFineId === fine.id ? 'Paying...' : 'Pay'}
+                    </button>
                   </div>
                 </div>
-              </div>
-
-              <div className="mb-3">
-                <span className="text-2xl font-bold text-amber-700">
-                  R {interestPot.totalEarned.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
-                </span>
-                <p className="text-xs text-gray-500 mt-1">Total interest collected</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-white/70 p-2.5 rounded-lg">
-                  <p className="text-xs text-gray-500">Repaid Loans</p>
-                  <p className="font-bold text-green-700">{interestPot.repaidLoans}</p>
-                </div>
-                <div className="bg-white/70 p-2.5 rounded-lg">
-                  <p className="text-xs text-gray-500">Pending Interest</p>
-                  <p className="font-bold text-amber-600">R {interestPot.pendingInterest.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}</p>
-                </div>
-              </div>
-
-              <p className="text-xs text-gray-400 mt-3 text-center">30% interest charged on every loan goes here</p>
+              ))}
             </div>
-
-            {/* Quick Actions - NOW WITH BOTH CARDS AND DISCOVER */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <h3 className="font-semibold text-gray-700 mb-4">Quick Actions</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <button 
-                  onClick={() => remainingAmount > 0 ? setShowAddContribution(true) : showToast.info('You have already reached your contribution target!')}
-                  className="flex flex-col items-center p-4 bg-primary-50 hover:bg-primary-100 rounded-xl transition-colors group"
-                >
-                  <PlusCircle className="w-6 h-6 text-primary-600 mb-2 group-hover:scale-110 transition-transform" />
-                  <span className="text-xs font-medium text-gray-700">Contribute</span>
-                </button>
-                
-                <Link to={`/contributions?profile=${activeProfile.id}`} className="flex flex-col items-center p-4 bg-blue-50 hover:bg-blue-100 rounded-xl transition-colors group">
-                  <History className="w-6 h-6 text-blue-600 mb-2 group-hover:scale-110 transition-transform" />
-                  <span className="text-xs font-medium text-gray-700">History</span>
-                </Link>
-                
-                <Link to="/profile" className="flex flex-col items-center p-4 bg-purple-50 hover:bg-purple-100 rounded-xl transition-colors group">
-                  <User className="w-6 h-6 text-purple-600 mb-2 group-hover:scale-110 transition-transform" />
-                  <span className="text-xs font-medium text-gray-700">Profile</span>
-                </Link>
-
-                {/* CARDS BUTTON */}
-                <Link to="/cards" className="flex flex-col items-center p-4 bg-green-50 hover:bg-green-100 rounded-xl transition-colors group">
-                  <CreditCard className="w-6 h-6 text-green-600 mb-2 group-hover:scale-110 transition-transform" />
-                  <span className="text-xs font-medium text-gray-700">Cards</span>
-                </Link>
-
-                {/* DISCOVER BUTTON - ADDED AS EXTRA */}
-                <button 
-                  onClick={() => setShowDiscoverStokvels(true)}
-                  className="flex flex-col items-center p-4 bg-amber-50 hover:bg-amber-100 rounded-xl transition-colors group md:col-span-1"
-                >
-                  <Search className="w-6 h-6 text-amber-600 mb-2 group-hover:scale-110 transition-transform" />
-                  <span className="text-xs font-medium text-gray-700">Discover</span>
-                </button>
-              </div>
+          ) : (
+            <div className="text-center py-3 bg-white/70 rounded-xl">
+              <p className="text-sm text-gray-500">No outstanding fines 🎉</p>
             </div>
+          )}
+
+          {finesSummary.paidTotal > 0 && (
+            <p className="text-xs text-gray-400 mt-3 text-center">
+              R {finesSummary.paidTotal.toLocaleString('en-ZA', { minimumFractionDigits: 2 })} in fines paid
+            </p>
+          )}
+        </div>
+
+        {/* Quick Actions Bar */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-6">
+          <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
+            <button 
+              onClick={() => remainingAmount > 0 ? setShowAddContribution(true) : showToast.info('You have already reached your contribution target!')}
+              className="flex flex-col items-center p-3 bg-primary-50 hover:bg-primary-100 rounded-xl transition-all group hover:shadow-sm"
+            >
+              <PlusCircle className="w-6 h-6 text-primary-600 mb-1.5 group-hover:scale-110 transition-transform" />
+              <span className="text-xs font-medium text-gray-700">Contribute</span>
+            </button>
+            <Link to={`/contributions?profile=${activeProfile.id}`} className="flex flex-col items-center p-3 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all group hover:shadow-sm">
+              <History className="w-6 h-6 text-blue-600 mb-1.5 group-hover:scale-110 transition-transform" />
+              <span className="text-xs font-medium text-gray-700">History</span>
+            </Link>
+            <Link to="/profile" className="flex flex-col items-center p-3 bg-purple-50 hover:bg-purple-100 rounded-xl transition-all group hover:shadow-sm">
+              <User className="w-6 h-6 text-purple-600 mb-1.5 group-hover:scale-110 transition-transform" />
+              <span className="text-xs font-medium text-gray-700">Profile</span>
+            </Link>
+            <Link to="/cards" className="flex flex-col items-center p-3 bg-green-50 hover:bg-green-100 rounded-xl transition-all group hover:shadow-sm">
+              <CreditCard className="w-6 h-6 text-green-600 mb-1.5 group-hover:scale-110 transition-transform" />
+              <span className="text-xs font-medium text-gray-700">Cards</span>
+            </Link>
+            <button 
+              onClick={() => setShowDiscoverStokvels(true)}
+              className="flex flex-col items-center p-3 bg-amber-50 hover:bg-amber-100 rounded-xl transition-all group hover:shadow-sm"
+            >
+              <Search className="w-6 h-6 text-amber-600 mb-1.5 group-hover:scale-110 transition-transform" />
+              <span className="text-xs font-medium text-gray-700">Discover</span>
+            </button>
           </div>
         </div>
 
@@ -873,8 +1103,8 @@ export default function MainDashboard() {
               <div className="p-6 border-b border-gray-200">
                 <div className="flex justify-between items-center">
                   <div>
-                    <h3 className="text-2xl font-semibold text-gray-800">Discover Stokvels</h3>
-                    <p className="text-sm text-gray-500 mt-1">Browse and join stokvels in the system</p>
+                    <h3 className="text-2xl font-semibold text-gray-800">Discover Groups</h3>
+                    <p className="text-sm text-gray-500 mt-1">Browse and join savings groups in the system</p>
                   </div>
                   <button 
                     onClick={() => setShowDiscoverStokvels(false)}
@@ -890,7 +1120,7 @@ export default function MainDashboard() {
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input
                       type="text"
-                      placeholder="Search stokvels by name or description..."
+                      placeholder="Search groups by name or description..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
@@ -979,14 +1209,14 @@ export default function MainDashboard() {
                 {filteredStokvels.length === 0 && (
                   <div className="text-center py-12">
                     <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                    <p className="text-gray-500">No stokvels found matching your criteria</p>
+                    <p className="text-gray-500">No groups found matching your criteria</p>
                   </div>
                 )}
               </div>
 
               <div className="p-6 border-t border-gray-200 bg-gray-50">
                 <div className="flex items-center justify-between text-sm text-gray-600">
-                  <span>Showing {filteredStokvels.length} stokvels</span>
+                  <span>Showing {filteredStokvels.length} groups</span>
                   <button
                     onClick={() => setShowDiscoverStokvels(false)}
                     className="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
@@ -999,38 +1229,208 @@ export default function MainDashboard() {
           </div>
         )}
 
+        {/* Fine Payment Modal */}
+        {showFinePayModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-semibold text-gray-800">Pay Fine</h3>
+                <button onClick={() => setShowFinePayModal(null)} className="text-gray-400 hover:text-gray-600">
+                  <XCircle className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Fine Details */}
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-sm text-gray-600">Fine Type:</span>
+                  <span className="font-semibold text-gray-800">{showFinePayModal.fineLabel}</span>
+                </div>
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-sm text-gray-600">Issued:</span>
+                  <span className="text-sm text-gray-700">
+                    {showFinePayModal.createdAt ? new Date(showFinePayModal.createdAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center pt-2 border-t border-red-200">
+                  <span className="font-medium text-gray-700">Amount to Pay:</span>
+                  <span className="font-bold text-red-700 text-lg">R {showFinePayModal.amount}</span>
+                </div>
+              </div>
+
+              {/* Payment Method Toggle */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Payment Method</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setFinePayMethod('card')}
+                    className={`flex items-center justify-center space-x-2 p-3 rounded-lg border-2 transition-all ${
+                      finePayMethod === 'card'
+                        ? 'border-green-500 bg-green-50 ring-2 ring-green-200'
+                        : 'border-gray-200 bg-white hover:border-gray-300'
+                    }`}
+                  >
+                    <CreditCard className={`w-5 h-5 ${finePayMethod === 'card' ? 'text-green-600' : 'text-gray-400'}`} />
+                    <span className={`text-sm font-medium ${finePayMethod === 'card' ? 'text-green-700' : 'text-gray-600'}`}>Card</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFinePayMethod('cash')}
+                    className={`flex items-center justify-center space-x-2 p-3 rounded-lg border-2 transition-all ${
+                      finePayMethod === 'cash'
+                        ? 'border-amber-500 bg-amber-50 ring-2 ring-amber-200'
+                        : 'border-gray-200 bg-white hover:border-gray-300'
+                    }`}
+                  >
+                    <Wallet className={`w-5 h-5 ${finePayMethod === 'cash' ? 'text-amber-600' : 'text-gray-400'}`} />
+                    <span className={`text-sm font-medium ${finePayMethod === 'cash' ? 'text-amber-700' : 'text-gray-600'}`}>Cash</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Card selector or cash info */}
+              {finePayMethod === 'card' ? (
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Pay From</label>
+                  {fineCards.length > 0 ? (
+                    <select
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      value={fineSelectedCard}
+                      onChange={(e) => {
+                        if (e.target.value === 'new') {
+                          window.location.href = '/cards';
+                        } else {
+                          setFineSelectedCard(e.target.value);
+                        }
+                      }}
+                    >
+                      {fineCards.map((card: any) => (
+                        <option key={card.id} value={card.id}>
+                          💳 {card.label} {card.isDefault ? '(Default)' : ''}
+                        </option>
+                      ))}
+                      <option value="new">➕ Add New Card</option>
+                    </select>
+                  ) : (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-center">
+                      <p className="text-sm text-yellow-800">No cards found.</p>
+                      <Link to="/cards" className="text-xs text-primary-600 hover:text-primary-700 font-medium">
+                        Add a card →
+                      </Link>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center mt-2">
+                    <Link to="/cards" className="text-xs text-primary-600 hover:text-primary-700">Manage Cards →</Link>
+                    <span className="text-xs text-gray-400">🔒 Secured payment</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="mb-6 bg-amber-50 border border-amber-200 rounded-lg p-4">
+                  <div className="flex items-start space-x-3">
+                    <Wallet className="w-5 h-5 text-amber-600 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-amber-800">Cash Payment</p>
+                      <p className="text-xs text-amber-700 mt-1">
+                        Cash payment will be submitted as <span className="font-semibold">pending</span> until admin confirms at the next Sunday meeting.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => setShowFinePayModal(null)}
+                  className="flex-1 border border-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                  disabled={payingFineId === showFinePayModal.id}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmFinePay}
+                  disabled={payingFineId === showFinePayModal.id || (finePayMethod === 'card' && fineCards.length === 0)}
+                  className={`flex-1 ${finePayMethod === 'cash' ? 'bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800' : 'bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800'} text-white py-3 rounded-lg transition-all font-medium shadow-sm hover:shadow disabled:opacity-50 flex items-center justify-center`}
+                >
+                  {payingFineId === showFinePayModal.id ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      Processing...
+                    </>
+                  ) : finePayMethod === 'cash' ? (
+                    <>
+                      <Wallet className="w-4 h-4 mr-2" />
+                      Submit Cash
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard className="w-4 h-4 mr-2" />
+                      Pay R {showFinePayModal.amount}
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Add Contribution Modal */}
         {showAddContribution && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-xl font-semibold text-gray-800">Add Contribution</h3>
-                <button onClick={() => setShowAddContribution(false)} className="text-gray-400 hover:text-gray-600">
+                <button onClick={() => { setShowAddContribution(false); setContributionTarget('your-target'); setPaymentMethod('card'); }} className="text-gray-400 hover:text-gray-600">
                   <XCircle className="w-5 h-5" />
                 </button>
               </div>
+
+              {/* Target Selection Dropdown */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Contributing to *</label>
+                <select
+                  value={contributionTarget}
+                  onChange={(e) => {
+                    setContributionTarget(e.target.value as 'your-target' | 'madala-side');
+                    setContributionData({ amount: '' });
+                  }}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                >
+                  <option value="your-target">🎯 Your Target (Collective Pot — R{activeProfile.targetAmount.toLocaleString()})</option>
+                  <option value="madala-side">🌱 Madala Side (R2,200 — R200/month)</option>
+                </select>
+              </div>
               
               {/* Stokvel Info */}
-              <div className="bg-primary-50 border border-primary-200 rounded-lg p-4 mb-6">
+              <div className={`${contributionTarget === 'madala-side' ? 'bg-green-50 border-green-200' : 'bg-primary-50 border-primary-200'} border rounded-lg p-4 mb-6`}>
                 <p className="text-xs text-gray-600 mb-1">Contributing to:</p>
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-semibold text-gray-800">{activeProfile.stokvelName}</p>
-                    <p className="text-xs text-gray-500">Target: R{activeProfile.targetAmount.toLocaleString()} by {TARGET_DATE}</p>
+                    <p className="font-semibold text-gray-800">
+                      {contributionTarget === 'madala-side' ? 'Madala Side' : activeProfile.stokvelName}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {contributionTarget === 'madala-side'
+                        ? 'Target: R2,200 (R200/month, Jan–Nov)'
+                        : `Target: R${activeProfile.targetAmount.toLocaleString()} by ${TARGET_DATE}`}
+                    </p>
                   </div>
-                  <span className="text-xs bg-primary-200 text-primary-800 px-2 py-1 rounded-full">
-                    {progressPercentage.toFixed(0)}% complete
-                  </span>
+                  {contributionTarget !== 'madala-side' && (
+                    <span className="text-xs bg-primary-200 text-primary-800 px-2 py-1 rounded-full">
+                      {progressPercentage.toFixed(0)}% complete
+                    </span>
+                  )}
                 </div>
               </div>
 
               {/* Amount Input */}
               <div className="mb-6">
-                {remainingAmount <= 0 ? (
+                {contributionTarget !== 'madala-side' && remainingAmount <= 0 ? (
                   <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
                     <CheckCircle className="w-8 h-8 text-green-600 mx-auto mb-2" />
                     <p className="text-sm font-medium text-green-800">Target Reached!</p>
-                    <p className="text-xs text-green-600 mt-1">You've already met your contribution target for this stokvel.</p>
+                    <p className="text-xs text-green-600 mt-1">You've already met your contribution target.</p>
                   </div>
                 ) : (
                   <>
@@ -1045,13 +1445,13 @@ export default function MainDashboard() {
                     value={contributionData.amount}
                     onChange={(e) => setContributionData({...contributionData, amount: e.target.value})}
                     className="w-full pl-8 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                    min="100"
+                    min={minContribution}
                     max={remainingAmount}
                     step="50"
                   />
                 </div>
                 <div className="flex justify-between mt-2">
-                  <p className="text-xs text-gray-500">Minimum: R100</p>
+                  <p className="text-xs text-gray-500">Minimum: R{minContribution}</p>
                   <p className="text-xs text-gray-500">
                     Remaining: R{remainingAmount.toLocaleString()}
                   </p>
@@ -1063,41 +1463,72 @@ export default function MainDashboard() {
                 )}
               </div>
 
-              {/* Payment Method - Paystack */}
+              {/* Payment Method Toggle */}
               <div className="mb-6">
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                      <CreditCard className="w-5 h-5 text-green-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-800">Pay securely with Paystack</p>
-                      <p className="text-xs text-gray-500">Card, Bank Transfer, or USSD</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center mt-3 space-x-2">
-                    <span className="text-xs bg-white border border-gray-200 px-2 py-1 rounded">Visa</span>
-                    <span className="text-xs bg-white border border-gray-200 px-2 py-1 rounded">Mastercard</span>
-                    <span className="text-xs bg-white border border-gray-200 px-2 py-1 rounded">Bank Transfer</span>
-                    <span className="text-xs text-gray-400 ml-auto">🔒 256-bit SSL</span>
-                  </div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Payment Method *</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod('card')}
+                    className={`flex items-center justify-center space-x-2 p-4 rounded-lg border-2 transition-all ${
+                      paymentMethod === 'card'
+                        ? 'border-green-500 bg-green-50 ring-2 ring-green-200'
+                        : 'border-gray-200 bg-white hover:border-gray-300'
+                    }`}
+                  >
+                    <CreditCard className={`w-5 h-5 ${paymentMethod === 'card' ? 'text-green-600' : 'text-gray-400'}`} />
+                    <span className={`text-sm font-medium ${paymentMethod === 'card' ? 'text-green-700' : 'text-gray-600'}`}>Card</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod('cash')}
+                    className={`flex items-center justify-center space-x-2 p-4 rounded-lg border-2 transition-all ${
+                      paymentMethod === 'cash'
+                        ? 'border-amber-500 bg-amber-50 ring-2 ring-amber-200'
+                        : 'border-gray-200 bg-white hover:border-gray-300'
+                    }`}
+                  >
+                    <Wallet className={`w-5 h-5 ${paymentMethod === 'cash' ? 'text-amber-600' : 'text-gray-400'}`} />
+                    <span className={`text-sm font-medium ${paymentMethod === 'cash' ? 'text-amber-700' : 'text-gray-600'}`}>Cash</span>
+                  </button>
                 </div>
+
+                {/* Payment Method Info */}
+                {paymentMethod === 'card' ? (
+                  <div className="mt-3 bg-green-50 border border-green-200 rounded-lg p-3">
+                    <div className="flex items-center space-x-2">
+                      <CreditCard className="w-4 h-4 text-green-600" />
+                      <p className="text-xs text-green-700">Pay securely via Paystack (Visa, Mastercard, Bank Transfer)</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                    <div className="flex items-center space-x-2">
+                      <Clock className="w-4 h-4 text-amber-600" />
+                      <p className="text-xs text-amber-700">Cash goes to <span className="font-semibold">pending</span> until admin confirms at the next Sunday meeting</p>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Summary */}
               <div className="bg-gray-50 rounded-lg p-4 mb-6">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Current saved:</span>
-                  <span className="font-medium text-gray-800">R {activeProfile.savedAmount.toLocaleString()}</span>
+                  <span className="text-sm text-gray-600">
+                    {contributionTarget === 'madala-side' ? 'Madala Side' : 'Current saved'}:
+                  </span>
+                  <span className="font-medium text-gray-800">
+                    {contributionTarget === 'madala-side' ? 'R 0' : `R ${activeProfile.savedAmount.toLocaleString()}`}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center mt-2">
                   <span className="text-sm text-gray-600">Adding:</span>
                   <span className="font-medium text-green-600">+ R {contributionData.amount ? parseInt(contributionData.amount).toLocaleString() : '0'}</span>
                 </div>
                 <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-200">
-                  <span className="text-sm font-medium text-gray-700">New total:</span>
-                  <span className="font-bold text-lg text-primary-700">
-                    R {(activeProfile.savedAmount + (parseInt(contributionData.amount) || 0)).toLocaleString()}
+                  <span className="text-sm font-medium text-gray-700">Payment method:</span>
+                  <span className={`font-bold text-sm ${paymentMethod === 'cash' ? 'text-amber-700' : 'text-green-700'}`}>
+                    {paymentMethod === 'card' ? '💳 Card (Paystack)' : '💵 Cash (Pending)'}
                   </span>
                 </div>
               </div>
@@ -1105,21 +1536,26 @@ export default function MainDashboard() {
               {/* Action Buttons */}
               <div className="flex space-x-3">
                 <button 
-                  onClick={() => { setShowAddContribution(false); setIsProcessingPayment(false); }}
+                  onClick={() => { setShowAddContribution(false); setIsProcessingPayment(false); setContributionTarget('your-target'); setPaymentMethod('card'); }}
                   className="flex-1 border border-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-50 transition-colors font-medium"
                   disabled={isProcessingPayment}
                 >
                   Cancel
                 </button>
                 <button 
-                  className="flex-1 bg-gradient-to-r from-green-600 to-green-700 text-white py-3 rounded-lg hover:from-green-700 hover:to-green-800 transition-all font-medium shadow-sm hover:shadow disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-                  disabled={!contributionData.amount || parseInt(contributionData.amount) < 100 || parseInt(contributionData.amount) > remainingAmount || isProcessingPayment}
+                  className={`flex-1 ${paymentMethod === 'cash' ? 'bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800' : 'bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800'} text-white py-3 rounded-lg transition-all font-medium shadow-sm hover:shadow disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center`}
+                  disabled={!contributionData.amount || parseInt(contributionData.amount) < minContribution || parseInt(contributionData.amount) > remainingAmount || isProcessingPayment}
                   onClick={handleAddContribution}
                 >
                   {isProcessingPayment ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin mr-2" />
                       Processing...
+                    </>
+                  ) : paymentMethod === 'cash' ? (
+                    <>
+                      <Wallet className="w-4 h-4 mr-2" />
+                      Submit Cash
                     </>
                   ) : (
                     <>
@@ -1129,7 +1565,7 @@ export default function MainDashboard() {
                   )}
                 </button>
               </div>
-              {isProcessingPayment && (
+              {isProcessingPayment && paymentMethod === 'card' && (
                 <p className="text-xs text-center text-gray-500 mt-3">
                   Complete payment in the Paystack window. This page will update automatically.
                 </p>

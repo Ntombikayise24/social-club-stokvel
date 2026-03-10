@@ -15,9 +15,12 @@ import {
   CreditCard,
   Download,
   Users,
+  Wallet,
+  Loader2,
 } from 'lucide-react';
 import { loanApi, cardApi, userApi } from '../../api';
 import { downloadBlob, getExtension } from '../../utils/download';
+import { showToast } from '../../utils/toast';
 
 interface Loan {
   id: number;
@@ -28,12 +31,14 @@ interface Loan {
   interest: number;
   interestRate: number;
   totalRepayable: number;
-  status: 'active' | 'repaid' | 'overdue';
+  status: 'active' | 'repaid' | 'overdue' | 'pending_repayment';
   borrowedDate: string;
   dueDate: string;
   repaidDate?: string;
   purpose?: string;
   daysRemaining?: number;
+  penaltyAmount?: number;
+  overdueMonths?: number;
 }
 
 interface Card {
@@ -54,6 +59,7 @@ export default function LoanHistory() {
   const [selectedCard, setSelectedCard] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [repaymentSuccess, setRepaymentSuccess] = useState(false);
+  const [repayMethod, setRepayMethod] = useState<'card' | 'cash'>('card');
   const [loading, setLoading] = useState(true);
 
   const [profiles, setProfiles] = useState<any[]>([]);
@@ -104,7 +110,9 @@ export default function LoanHistory() {
           dueDate: l.dueDate ? new Date(l.dueDate).toLocaleDateString('en-ZA', {day:'numeric', month:'short', year:'numeric'}) : '',
           repaidDate: l.repaidDate ? new Date(l.repaidDate).toLocaleDateString('en-ZA', {day:'numeric', month:'short', year:'numeric'}) : undefined,
           purpose: l.purpose,
-          daysRemaining: l.daysRemaining
+          daysRemaining: l.daysRemaining,
+          penaltyAmount: l.penaltyAmount || 0,
+          overdueMonths: l.overdueMonths || 0
         })));
       } catch (err) {
         console.error('Failed to load loan data', err);
@@ -141,6 +149,8 @@ export default function LoanHistory() {
         return <AlertCircle className="w-5 h-5 text-red-600" />;
       case 'active':
         return <Clock className="w-5 h-5 text-blue-600" />;
+      case 'pending_repayment':
+        return <Clock className="w-5 h-5 text-amber-600" />;
       default:
         return null;
     }
@@ -162,6 +172,8 @@ export default function LoanHistory() {
             {daysRemaining} days left
           </span>
         );
+      case 'pending_repayment':
+        return <span className="px-2 py-1 bg-amber-100 text-amber-700 text-xs rounded-full">Cash Pending</span>;
       default:
         return null;
     }
@@ -184,6 +196,7 @@ export default function LoanHistory() {
     const defaultCard = cards.find(c => c.isDefault) || cards[0];
     if (defaultCard) setSelectedCard(defaultCard.id);
     setRepaymentSuccess(false);
+    setRepayMethod('card');
   };
 
   const confirmRepayment = async () => {
@@ -192,7 +205,11 @@ export default function LoanHistory() {
     setIsProcessing(true);
     
     try {
-      await loanApi.repay(showRepayModal.id, selectedCard ? Number(selectedCard) : undefined);
+      await loanApi.repay(showRepayModal.id, repayMethod === 'card' && selectedCard ? Number(selectedCard) : undefined, repayMethod);
+      
+      if (repayMethod === 'cash') {
+        showToast.success('Cash repayment submitted! Pending admin confirmation.');
+      }
       
       // Update loan status locally
       setLoans(prevLoans => 
@@ -200,12 +217,12 @@ export default function LoanHistory() {
           loan.id === showRepayModal.id 
             ? { 
                 ...loan, 
-                status: 'repaid' as const, 
-                repaidDate: new Date().toLocaleDateString('en-ZA', { 
+                status: repayMethod === 'cash' ? ('active' as const) : ('repaid' as const), 
+                repaidDate: repayMethod === 'card' ? new Date().toLocaleDateString('en-ZA', { 
                   day: 'numeric', 
                   month: 'short', 
                   year: 'numeric' 
-                })
+                }) : undefined
               } 
             : loan
         )
@@ -263,7 +280,7 @@ export default function LoanHistory() {
               <Link to={`/dashboard?profile=${profileId}`} className="text-gray-600 hover:text-primary-600">
                 <ArrowLeft className="w-5 h-5" />
               </Link>
-              <h1 className="text-2xl font-bold text-primary-800">HENNESSY SOCIAL CLUB</h1>
+              <h1 className="text-2xl font-bold text-primary-800">FUND MATE</h1>
             </div>
             <div className="flex items-center space-x-2">
               <div className="flex items-center space-x-2 bg-primary-50 px-3 py-1 rounded-full">
@@ -518,6 +535,12 @@ export default function LoanHistory() {
                         <span className="text-gray-600">Interest ({loan.interestRate}%):</span>
                         <span className="font-medium text-secondary-600">{formatCurrency(loan.interest)}</span>
                       </div>
+                      {(loan.penaltyAmount || 0) > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-red-600">Overdue Penalty ({loan.overdueMonths} month{(loan.overdueMonths || 0) > 1 ? 's' : ''} × 30%):</span>
+                          <span className="font-medium text-red-600">{formatCurrency(loan.penaltyAmount || 0)}</span>
+                        </div>
+                      )}
                       <div className="flex justify-between pt-1 border-t border-gray-100">
                         <span className="font-medium">Total:</span>
                         <span className="font-bold text-primary-700">{formatCurrency(loan.totalRepayable)}</span>
@@ -614,45 +637,91 @@ export default function LoanHistory() {
               </div>
             </div>
 
-            {/* Card Selection - Where to take money from */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Pay From
-              </label>
-              <select 
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                value={selectedCard}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  if (value === 'new') {
-                    window.location.href = '/cards';
-                  } else {
-                    setSelectedCard(value);
-                  }
-                }}
-              >
-                {cards.map(card => (
-                  <option key={card.id} value={card.id}>
-                    💳 {card.label} {card.isDefault ? '(Default)' : ''}
-                  </option>
-                ))}
-                <option value="new">➕ Add New Card</option>
-              </select>
-              
-              <div className="flex justify-between items-center mt-2">
-                <Link to="/cards" className="text-xs text-primary-600 hover:text-primary-700">
-                  Manage Cards →
-                </Link>
-                <span className="text-xs text-gray-400">🔒 Secured payment</span>
+            {/* Payment Method Toggle */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Payment Method</label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setRepayMethod('card')}
+                  className={`flex items-center justify-center space-x-2 p-3 rounded-lg border-2 transition-all ${
+                    repayMethod === 'card'
+                      ? 'border-green-500 bg-green-50 ring-2 ring-green-200'
+                      : 'border-gray-200 bg-white hover:border-gray-300'
+                  }`}
+                >
+                  <CreditCard className={`w-5 h-5 ${repayMethod === 'card' ? 'text-green-600' : 'text-gray-400'}`} />
+                  <span className={`text-sm font-medium ${repayMethod === 'card' ? 'text-green-700' : 'text-gray-600'}`}>Card</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRepayMethod('cash')}
+                  className={`flex items-center justify-center space-x-2 p-3 rounded-lg border-2 transition-all ${
+                    repayMethod === 'cash'
+                      ? 'border-amber-500 bg-amber-50 ring-2 ring-amber-200'
+                      : 'border-gray-200 bg-white hover:border-gray-300'
+                  }`}
+                >
+                  <Wallet className={`w-5 h-5 ${repayMethod === 'cash' ? 'text-amber-600' : 'text-gray-400'}`} />
+                  <span className={`text-sm font-medium ${repayMethod === 'cash' ? 'text-amber-700' : 'text-gray-600'}`}>Cash</span>
+                </button>
               </div>
             </div>
 
+            {/* Card Selection - only for card method */}
+            {repayMethod === 'card' ? (
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Pay From</label>
+                <select 
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  value={selectedCard}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === 'new') {
+                      window.location.href = '/cards';
+                    } else {
+                      setSelectedCard(value);
+                    }
+                  }}
+                >
+                  {cards.map(card => (
+                    <option key={card.id} value={card.id}>
+                      💳 {card.label} {card.isDefault ? '(Default)' : ''}
+                    </option>
+                  ))}
+                  <option value="new">➕ Add New Card</option>
+                </select>
+                <div className="flex justify-between items-center mt-2">
+                  <Link to="/cards" className="text-xs text-primary-600 hover:text-primary-700">
+                    Manage Cards →
+                  </Link>
+                  <span className="text-xs text-gray-400">🔒 Secured payment</span>
+                </div>
+              </div>
+            ) : (
+              <div className="mb-6 bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <div className="flex items-start space-x-3">
+                  <Wallet className="w-5 h-5 text-amber-600 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-amber-800">Cash Repayment</p>
+                    <p className="text-xs text-amber-700 mt-1">
+                      Cash repayment will be submitted as <span className="font-semibold">pending</span> until admin confirms at the next Sunday meeting.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Success State */}
             {repaymentSuccess ? (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4 text-center">
-                <CheckCircle className="w-8 h-8 text-green-600 mx-auto mb-2" />
-                <p className="text-green-700 font-medium">Payment Successful!</p>
-                <p className="text-xs text-green-600 mt-1">Your loan has been repaid</p>
+              <div className={`${repayMethod === 'cash' ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200'} border rounded-lg p-4 mb-4 text-center`}>
+                <CheckCircle className={`w-8 h-8 ${repayMethod === 'cash' ? 'text-amber-600' : 'text-green-600'} mx-auto mb-2`} />
+                <p className={`${repayMethod === 'cash' ? 'text-amber-700' : 'text-green-700'} font-medium`}>
+                  {repayMethod === 'cash' ? 'Cash Submitted!' : 'Payment Successful!'}
+                </p>
+                <p className={`text-xs ${repayMethod === 'cash' ? 'text-amber-600' : 'text-green-600'} mt-1`}>
+                  {repayMethod === 'cash' ? 'Pending admin confirmation at next meeting' : 'Your loan has been repaid'}
+                </p>
               </div>
             ) : (
               <div className="flex space-x-3">
@@ -665,16 +734,24 @@ export default function LoanHistory() {
                 </button>
                 <button
                   onClick={confirmRepayment}
-                  disabled={isProcessing}
-                  className="flex-1 bg-primary-600 text-white py-2 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 flex items-center justify-center"
+                  disabled={isProcessing || (repayMethod === 'card' && cards.length === 0)}
+                  className={`flex-1 ${repayMethod === 'cash' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-primary-600 hover:bg-primary-700'} text-white py-2 rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center`}
                 >
                   {isProcessing ? (
                     <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
                       Processing...
                     </>
+                  ) : repayMethod === 'cash' ? (
+                    <>
+                      <Wallet className="w-4 h-4 mr-2" />
+                      Submit Cash
+                    </>
                   ) : (
-                    'Confirm Payment'
+                    <>
+                      <CreditCard className="w-4 h-4 mr-2" />
+                      Confirm Payment
+                    </>
                   )}
                 </button>
               </div>

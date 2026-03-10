@@ -140,7 +140,7 @@ export default function Cards() {
               <Link to="/dashboard" className="text-gray-600 hover:text-primary-600">
                 <ArrowLeft className="w-5 h-5" />
               </Link>
-              <h1 className="text-2xl font-bold text-primary-800">HENNESSY SOCIAL CLUB</h1>
+              <h1 className="text-2xl font-bold text-primary-800">FUND MATE</h1>
             </div>
           </div>
         </div>

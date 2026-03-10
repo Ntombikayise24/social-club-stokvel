@@ -149,6 +149,12 @@ async function migrate() {
     console.log('✅ Clamped saved_amount to target_amount for any over-contributed profiles');
   } catch (e) { /* ignore */ }
 
+  // Add contribution_type column for Your Target vs Madala Side
+  try {
+    await connection.query(`ALTER TABLE contributions ADD COLUMN contribution_type VARCHAR(50) DEFAULT 'your-target' AFTER card_id`);
+    console.log('✅ Added contribution_type column to contributions');
+  } catch (e) { /* column already exists */ }
+
   // ───────────────── LOANS TABLE ─────────────────
   await connection.query(`
     CREATE TABLE IF NOT EXISTS loans (
@@ -160,7 +166,7 @@ async function migrate() {
       interest_rate DECIMAL(5,2) DEFAULT 30.00,
       interest DECIMAL(15,2) NOT NULL,
       total_repayable DECIMAL(15,2) NOT NULL,
-      status ENUM('active', 'repaid', 'overdue', 'pending') DEFAULT 'pending',
+      status ENUM('active', 'repaid', 'overdue', 'pending', 'rejected') DEFAULT 'pending',
       purpose TEXT,
       borrowed_date DATE,
       due_date DATE,
@@ -177,6 +183,14 @@ async function migrate() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
   console.log('✅ loans table created');
+
+  // Update loans status enum for existing tables
+  try {
+    await connection.query(`ALTER TABLE loans MODIFY COLUMN status ENUM('active', 'repaid', 'overdue', 'pending', 'rejected') DEFAULT 'pending'`);
+  } catch (e) { /* column already correct */ }
+  try {
+    await connection.query(`ALTER TABLE loans ADD COLUMN loan_target VARCHAR(50) DEFAULT 'your-target' AFTER card_id`);
+  } catch (e) { /* column already exists */ }
 
   // ───────────────── CARDS TABLE ─────────────────
   await connection.query(`
@@ -305,6 +319,29 @@ async function migrate() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
   console.log('✅ join_requests table created');
+
+  // ───────────────── FINES TABLE ─────────────────
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS fines (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      stokvel_id INT NOT NULL,
+      fine_type ENUM('no_banking', 'no_attendance', 'sending', 'late_coming') NOT NULL,
+      amount DECIMAL(15,2) NOT NULL,
+      status ENUM('unpaid', 'paid') DEFAULT 'unpaid',
+      reason TEXT,
+      issued_by INT,
+      paid_date DATETIME,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (stokvel_id) REFERENCES stokvels(id) ON DELETE CASCADE,
+      FOREIGN KEY (issued_by) REFERENCES users(id) ON DELETE SET NULL,
+      INDEX idx_user (user_id),
+      INDEX idx_status (status)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+  console.log('✅ fines table created');
 
   console.log('\n✅ All migrations completed successfully!');
 

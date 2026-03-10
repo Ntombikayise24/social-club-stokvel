@@ -11,7 +11,7 @@ export default function Privacy() {
             <button onClick={() => navigate(-1)} className="text-gray-600 hover:text-primary-600">
               <ArrowLeft className="w-5 h-5" />
             </button>
-            <h1 className="text-2xl font-bold text-primary-800">HENNESSY SOCIAL CLUB</h1>
+            <h1 className="text-2xl font-bold text-primary-800">FUND MATE</h1>
           </div>
         </div>
       </header>
@@ -113,7 +113,7 @@ export default function Privacy() {
 
           <div className="mt-8 pt-6 border-t border-gray-200">
             <p className="text-sm text-gray-500">
-              By using HENNESSY SOCIAL CLUB, you consent to this Privacy Policy.
+              By using FUND MATE, you consent to this Privacy Policy.
             </p>
           </div>
         </div>

@@ -258,7 +258,7 @@ function App() {
                 <Users className="w-6 h-6 text-white" />
               </div>
               <span className="text-xl font-bold bg-gradient-to-r from-primary-800 to-primary-600 bg-clip-text text-transparent">
-                HENNESSY SOCIAL CLUB
+                FUND MATE
               </span>
             </Link>
 
@@ -329,8 +329,8 @@ function App() {
               
               <p className="text-lg text-gray-600 leading-relaxed">
                 Join a community of smart savers. Reach your financial goals faster with 
-                <span className="font-semibold text-primary-600"> SOCIAL CLUB </span> 
-                — the digital Stokvel management system that brings transparency and trust to group savings.
+                <span className="font-semibold text-primary-600"> FUND MATE </span> 
+                — the digital savings management system that brings transparency and trust to group savings.
               </p>
               
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -439,12 +439,12 @@ function App() {
                     <span className="text-2xl font-bold text-primary-600">{step}</span>
                   </div>
                   <h3 className="text-xl font-bold text-gray-800 mb-3">
-                    {step === 1 && "Join a Stokvel"}
+                    {step === 1 && "Join a Group"}
                     {step === 2 && "Save Together"}
                     {step === 3 && "Grow & Withdraw"}
                   </h3>
                   <p className="text-gray-600">
-                    {step === 1 && "Choose a stokvel that matches your savings goals and contribute regularly."}
+                    {step === 1 && "Choose a savings group that matches your goals and contribute regularly."}
                     {step === 2 && "Watch your savings grow with 30% annual interest. Borrow against your savings when needed."}
                     {step === 3 && "Receive your payout with interest at the end of the cycle. Withdraw anytime."}
                   </p>
@@ -496,7 +496,7 @@ function App() {
       <section className="py-20 bg-gradient-to-r from-primary-600 to-primary-500">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">Ready to Start Saving?</h2>
-          <p className="text-white/90 text-lg mb-8 max-w-2xl mx-auto">Join SOCIAL CLUB today and take control of your financial future with our trusted community</p>
+          <p className="text-white/90 text-lg mb-8 max-w-2xl mx-auto">Join FUND MATE today and take control of your financial future with our trusted community</p>
           <Link
             to="/register"
             className="inline-flex items-center space-x-2 bg-white text-primary-600 px-8 py-4 rounded-xl hover:bg-gray-100 transition-all shadow-xl font-bold text-lg"
@@ -516,7 +516,7 @@ function App() {
                 <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
                   <Users className="w-5 h-5 text-white" />
                 </div>
-                <span className="text-white font-bold">SOCIAL CLUB</span>
+                <span className="text-white font-bold">FUND MATE</span>
               </div>
               <p className="text-sm">Building wealth together through trusted community savings.</p>
               <div className="flex space-x-4 mt-4">
@@ -557,7 +557,7 @@ function App() {
           </div>
 
           <div className="border-t border-gray-800 pt-8 text-sm text-center">
-            <p>© 2026 SOCIAL CLUB. All rights reserved. Your trusted Stokvel partner.</p>
+            <p>© 2026 FUND MATE. All rights reserved. Your trusted savings partner.</p>
           </div>
         </div>
       </footer>

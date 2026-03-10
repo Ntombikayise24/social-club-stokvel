@@ -206,7 +206,7 @@ export default function GroupDetails() {
               <Link to={`/dashboard?profile=${profileId}`} className="text-gray-600 hover:text-primary-600">
                 <ArrowLeft className="w-5 h-5" />
               </Link>
-              <h1 className="text-2xl font-bold text-primary-800">HENNESSY SOCIAL CLUB</h1>
+              <h1 className="text-2xl font-bold text-primary-800">FUND MATE</h1>
             </div>
           </div>
         </div>
@@ -289,108 +289,39 @@ export default function GroupDetails() {
           </div>
         </div>
 
-        {/* Members Section */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-gray-800">Members</h3>
-            <span className="text-sm bg-primary-100 text-primary-700 px-3 py-1 rounded-full">
-              {groupData.memberCount} total
-            </span>
-          </div>
-
-          <div className="space-y-3">
-            {displayedMembers.map((member) => (
-              <div key={member.id} className="border border-gray-100 rounded-lg p-4 hover:bg-gray-50 transition-colors">
-                <div className="flex items-center justify-between">
+        {/* Members Section — name only, no financial data */}
+        {groupData.members.length > 0 && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">Members</h3>
+              <span className="text-xs bg-primary-100 text-primary-700 px-2.5 py-1 rounded-full font-medium">
+                {groupData.members.length} total
+              </span>
+            </div>
+            <div className="space-y-3">
+              {displayedMembers.map(member => (
+                <div key={member.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                   <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center">
-                      <span className="text-sm font-medium text-primary-700">{member.initials}</span>
+                    <div className={`w-10 h-10 bg-${groupData.color}-100 rounded-full flex items-center justify-center`}>
+                      <span className={`text-sm font-semibold text-${groupData.color}-700`}>{member.initials}</span>
                     </div>
                     <div>
-                      <div className="flex items-center space-x-2">
-                        <p className="font-medium text-gray-800">{member.name}</p>
-                        {getStatusBadge(member.status)}
-                      </div>
-                      <div className="flex items-center space-x-3 mt-1 text-xs text-gray-500">
-                        <span>Joined {member.joinedDate}</span>
-                        <span>•</span>
-                        <span>Last active {member.lastActive}</span>
-                      </div>
+                      <p className="font-medium text-gray-800">{member.name}</p>
+                      <p className="text-xs text-gray-400">Joined {member.joinedDate}</p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-gray-800">{formatCurrency(member.totalContributed)}</p>
-                    <p className="text-xs text-gray-500">of {formatCurrency(member.targetAmount)}</p>
-                  </div>
-                </div>
-                
-                {/* Progress Bar */}
-                <div className="mt-3">
-                  <div className="flex justify-between text-xs mb-1">
-                    <span className="text-gray-500">Progress</span>
-                    <span className={`font-medium text-${groupData.color}-600`}>{Math.min(100, member.progress)}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-1.5">
-                    <div 
-                      className={`bg-${groupData.color}-600 h-1.5 rounded-full`} 
-                      style={{ width: `${Math.min(100, member.progress)}%` }}
-                    ></div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {groupData.members.length > 6 && (
-            <button
-              onClick={() => setShowAllMembers(!showAllMembers)}
-              className="w-full mt-4 text-center text-primary-600 hover:text-primary-700 text-sm font-medium py-2"
-            >
-              {showAllMembers ? 'Show Less' : `View All ${groupData.members.length} Members`}
-            </button>
-          )}
-        </div>
-
-        {/* Active Loans Section */}
-        {groupData.activeLoans.length > 0 && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h3 className="text-lg font-semibold text-gray-800 mb-6">Active Loans</h3>
-            
-            <div className="space-y-4">
-              {groupData.activeLoans.map((loan) => (
-                <div key={loan.id} className="border border-gray-100 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-                        <span className="text-xs font-medium text-primary-700">{loan.memberInitials}</span>
-                      </div>
-                      <span className="font-medium text-gray-800">{loan.memberName}</span>
-                    </div>
-                    {getLoanStatusBadge(loan.status, loan.daysRemaining)}
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-4 mb-3">
-                    <div>
-                      <p className="text-xs text-gray-500 mb-1">Principal</p>
-                      <p className="font-semibold text-gray-800">{formatCurrency(loan.amount)}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500 mb-1">Interest (30%)</p>
-                      <p className="font-semibold text-secondary-600">{formatCurrency(loan.interest)}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500 mb-1">Total</p>
-                      <p className="font-semibold text-primary-700">{formatCurrency(loan.totalRepayable)}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between text-xs text-gray-500">
-                    <span>Borrowed: {loan.borrowedDate}</span>
-                    <span>Due: {loan.dueDate}</span>
-                  </div>
+                  {getStatusBadge(member.status)}
                 </div>
               ))}
             </div>
+            {groupData.members.length > 6 && (
+              <button
+                onClick={() => setShowAllMembers(!showAllMembers)}
+                className="mt-4 w-full text-center text-sm text-primary-600 hover:text-primary-700 font-medium py-2 bg-primary-50 rounded-lg"
+              >
+                {showAllMembers ? 'Show Less' : `View All ${groupData.members.length} Members`}
+              </button>
+            )}
           </div>
         )}
 

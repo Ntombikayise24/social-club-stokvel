@@ -15,7 +15,7 @@ export function generatePDF(title, columns, rows, dateRange) {
       doc.on('error', reject);
 
       // Header
-      doc.fontSize(20).font('Helvetica-Bold').text('Hennessy Social Club', { align: 'center' });
+      doc.fontSize(20).font('Helvetica-Bold').text('Fund Mate', { align: 'center' });
       doc.moveDown(0.3);
       doc.fontSize(14).font('Helvetica').text(title, { align: 'center' });
       doc.moveDown(0.3);
@@ -77,7 +77,7 @@ export function generatePDF(title, columns, rows, dateRange) {
       // Footer
       doc.moveDown(2);
       doc.fontSize(8).fillColor('#999999')
-        .text('This report was generated automatically by Hennessy Social Club System.', startX, doc.page.height - 40, { align: 'center' });
+        .text('This report was generated automatically by Fund Mate System.', startX, doc.page.height - 40, { align: 'center' });
 
       doc.end();
     } catch (err) {
@@ -91,7 +91,7 @@ export function generatePDF(title, columns, rows, dateRange) {
 // ══════════════════════════════════════════════════
 export async function generateExcel(title, columns, rows, dateRange) {
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = 'Hennessy Social Club';
+  workbook.creator = 'Fund Mate';
   workbook.created = new Date();
 
   const sheet = workbook.addWorksheet(title.substring(0, 31));
@@ -99,7 +99,7 @@ export async function generateExcel(title, columns, rows, dateRange) {
   // Title row
   sheet.mergeCells(1, 1, 1, columns.length);
   const titleCell = sheet.getCell('A1');
-  titleCell.value = `Hennessy Social Club - ${title}`;
+  titleCell.value = `Fund Mate - ${title}`;
   titleCell.font = { size: 14, bold: true, color: { argb: 'FF1a5632' } };
   titleCell.alignment = { horizontal: 'center' };
 

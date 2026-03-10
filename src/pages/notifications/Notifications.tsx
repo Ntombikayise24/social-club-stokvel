@@ -126,7 +126,7 @@ export default function Notifications() {
               <Link to="/dashboard" className="text-gray-600 hover:text-primary-600">
                 <ArrowLeft className="w-5 h-5" />
               </Link>
-              <h1 className="text-2xl font-bold text-primary-800">HENNESSY SOCIAL CLUB</h1>
+              <h1 className="text-2xl font-bold text-primary-800">FUND MATE</h1>
             </div>
             <div className="flex items-center space-x-4">
               <span className="text-sm bg-primary-100 text-primary-700 px-3 py-1 rounded-full">

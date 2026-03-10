@@ -151,7 +151,7 @@ export default function Register() {
           </div>
         </div>
 
-        <h2 className="text-2xl font-bold text-center text-gray-800 mb-2">Join HENNESSY SOCIAL CLUB</h2>
+        <h2 className="text-2xl font-bold text-center text-gray-800 mb-2">Join FUND MATE</h2>
         <p className="text-center text-gray-500 mb-8">Create your account to start saving</p>
 
         {apiError && (

@@ -220,7 +220,7 @@ export default function Settings() {
               <Link to="/dashboard" className="text-gray-600 hover:text-primary-600">
                 <ArrowLeft className="w-5 h-5" />
               </Link>
-              <h1 className="text-2xl font-bold text-primary-800">HENNESSY SOCIAL CLUB</h1>
+              <h1 className="text-2xl font-bold text-primary-800">FUND MATE</h1>
             </div>
           </div>
         </div>
@@ -649,7 +649,7 @@ export default function Settings() {
                       <span className="font-medium">Terms of Service</span>
                       <ChevronRight className="w-5 h-5 text-gray-400" />
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">Terms and conditions of using HENNESSY SOCIAL CLUB</p>
+                    <p className="text-xs text-gray-500 mt-1">Terms and conditions of using FUND MATE</p>
                   </Link>
                   <button onClick={() => { setShowDeleteModal(true); setDeletePassword(''); setDeleteError(''); }} className="w-full text-left p-3 hover:bg-red-50 rounded-lg border border-gray-200">
                     <div className="flex items-center justify-between">

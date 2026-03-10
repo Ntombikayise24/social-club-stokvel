@@ -4,7 +4,7 @@ import { body } from 'express-validator';
 import { validate } from '../middleware/validate.js';
 import { authenticate, requireAdmin } from '../middleware/auth.js';
 import pool from '../database/connection.js';
-import { sendApprovalEmail, sendJoinRequestApprovedEmail, sendStokvelAssignmentEmail, sendStokvelUnassignmentEmail, sendAccountDeletionEmail, sendWelcomeEmail } from '../utils/email.js';
+import { sendApprovalEmail, sendJoinRequestApprovedEmail, sendStokvelAssignmentEmail, sendStokvelUnassignmentEmail, sendAccountDeletionEmail, sendWelcomeEmail, sendLoanApprovalEmail } from '../utils/email.js';
 import { generatePDF, generateExcel, generateCSV, REPORT_COLUMNS, formatRowData } from '../utils/reports.js';
 
 const router = Router();
@@ -43,6 +43,36 @@ router.get('/stats', async (_req, res) => {
     );
     const [totalSaved] = await pool.query(
       "SELECT COALESCE(SUM(saved_amount), 0) as total FROM profiles WHERE status = 'active'"
+    );
+
+    // Interest pot stats
+    const [interestPot] = await pool.query(
+      `SELECT 
+        COALESCE(SUM(CASE WHEN status = 'repaid' THEN interest ELSE 0 END), 0) as total_earned,
+        COUNT(CASE WHEN status = 'repaid' THEN 1 END) as repaid_count,
+        COALESCE(SUM(CASE WHEN status IN ('active', 'overdue') THEN interest ELSE 0 END), 0) as pending_interest,
+        COUNT(CASE WHEN status IN ('active', 'overdue') THEN 1 END) as active_count
+       FROM loans`
+    );
+
+    // All members with savings
+    const [allMembers] = await pool.query(
+      `SELECT u.id, u.full_name, u.status as user_status, p.saved_amount, p.target_amount, s.name as stokvel_name
+       FROM profiles p
+       JOIN users u ON u.id = p.user_id
+       JOIN stokvels s ON s.id = p.stokvel_id
+       WHERE p.status = 'active'
+       ORDER BY u.full_name`
+    );
+
+    // All loans (active, overdue, pending)
+    const [allLoans] = await pool.query(
+      `SELECT l.*, u.full_name, s.name as stokvel_name
+       FROM loans l
+       JOIN users u ON u.id = l.user_id
+       JOIN stokvels s ON s.id = l.stokvel_id
+       WHERE l.status IN ('active', 'overdue', 'pending')
+       ORDER BY l.created_at DESC`
     );
 
     // Monthly contributions (last 6 months)
@@ -85,6 +115,33 @@ router.get('/stats', async (_req, res) => {
       memberGrowth: memberGrowth.map(m => ({
         month: m.month,
         count: m.count,
+      })),
+      interestPot: {
+        totalEarned: parseFloat(interestPot[0].total_earned),
+        repaidLoans: parseInt(interestPot[0].repaid_count),
+        pendingInterest: parseFloat(interestPot[0].pending_interest),
+        activeLoansCount: parseInt(interestPot[0].active_count),
+      },
+      allMembers: allMembers.map(m => ({
+        id: m.id,
+        name: m.full_name,
+        savedAmount: parseFloat(m.saved_amount),
+        targetAmount: parseFloat(m.target_amount),
+        stokvelName: m.stokvel_name,
+        progress: m.target_amount > 0 ? Math.round((m.saved_amount / m.target_amount) * 100) : 0,
+      })),
+      allActiveLoans: allLoans.map(l => ({
+        id: l.id,
+        userName: l.full_name,
+        stokvelName: l.stokvel_name,
+        amount: parseFloat(l.amount),
+        interest: parseFloat(l.interest),
+        totalRepayable: parseFloat(l.total_repayable),
+        status: l.status,
+        dueDate: l.due_date,
+        borrowedDate: l.borrowed_date,
+        createdAt: l.created_at,
+        loanTarget: l.loan_target || 'your-target',
       })),
     });
   } catch (err) {
@@ -932,6 +989,258 @@ router.post('/contributions/:id/confirm', async (req, res) => {
   }
 });
 
+// ── Confirm contribution with adjusted amount ──
+router.post('/contributions/:id/confirm-adjusted', async (req, res) => {
+  try {
+    const contributionId = req.params.id;
+    const { adjustedAmount } = req.body;
+
+    if (!adjustedAmount || adjustedAmount <= 0) {
+      return res.status(400).json({ error: 'Adjusted amount must be greater than 0' });
+    }
+
+    const [contributions] = await pool.query(
+      "SELECT * FROM contributions WHERE id = ? AND status = 'pending'",
+      [contributionId]
+    );
+
+    if (contributions.length === 0) {
+      return res.status(404).json({ error: 'Pending contribution not found' });
+    }
+
+    const contribution = contributions[0];
+
+    // Update with adjusted amount and confirm
+    await pool.query(
+      'UPDATE contributions SET amount = ?, status = ?, confirmed_by = ?, confirmed_at = NOW() WHERE id = ?',
+      [adjustedAmount, 'confirmed', req.user.id, contributionId]
+    );
+
+    // Only update saved_amount if not madala-side
+    if (contribution.contribution_type !== 'madala-side') {
+      await pool.query(
+        'UPDATE profiles SET saved_amount = saved_amount + ? WHERE id = ?',
+        [adjustedAmount, contribution.profile_id]
+      );
+    }
+
+    const [stokvel] = await pool.query('SELECT name FROM stokvels WHERE id = ?', [contribution.stokvel_id]);
+    await pool.query(
+      'INSERT INTO notifications (user_id, type, title, message) VALUES (?, ?, ?, ?)',
+      [contribution.user_id, 'success', 'Contribution Confirmed',
+        `Your cash contribution of R${parseFloat(adjustedAmount).toLocaleString()} to ${stokvel[0].name} has been confirmed by admin.`]
+    );
+
+    res.json({ message: 'Contribution confirmed with adjusted amount' });
+  } catch (err) {
+    console.error('Confirm adjusted contribution error:', err);
+    res.status(500).json({ error: 'Failed to confirm contribution' });
+  }
+});
+
+// ── Reject contribution ──
+router.post('/contributions/:id/reject', async (req, res) => {
+  try {
+    const contributionId = req.params.id;
+    const { reason } = req.body;
+
+    const [contributions] = await pool.query(
+      "SELECT * FROM contributions WHERE id = ? AND status = 'pending'",
+      [contributionId]
+    );
+
+    if (contributions.length === 0) {
+      return res.status(404).json({ error: 'Pending contribution not found' });
+    }
+
+    const contribution = contributions[0];
+
+    await pool.query(
+      'UPDATE contributions SET status = ? WHERE id = ?',
+      ['failed', contributionId]
+    );
+
+    const [stokvel] = await pool.query('SELECT name FROM stokvels WHERE id = ?', [contribution.stokvel_id]);
+    await pool.query(
+      'INSERT INTO notifications (user_id, type, title, message) VALUES (?, ?, ?, ?)',
+      [contribution.user_id, 'error', 'Payment Rejected',
+        `Your cash contribution of R${parseFloat(contribution.amount).toLocaleString()} to ${stokvel[0].name} was rejected.${reason ? ' Reason: ' + reason : ''}`]
+    );
+
+    res.json({ message: 'Contribution rejected' });
+  } catch (err) {
+    console.error('Reject contribution error:', err);
+    res.status(500).json({ error: 'Failed to reject contribution' });
+  }
+});
+
+// ══════════════════════════════════════════════════
+//  LOAN MANAGEMENT (ADMIN)
+// ══════════════════════════════════════════════════
+
+// ── List pending loans ──
+router.get('/loans', async (req, res) => {
+  try {
+    const { status, page = 1, limit = 50 } = req.query;
+    const offset = (page - 1) * limit;
+
+    let where = 'WHERE 1=1';
+    const params = [];
+
+    if (status && status !== 'all') {
+      where += ' AND l.status = ?';
+      params.push(status);
+    }
+
+    const [countResult] = await pool.query(
+      `SELECT COUNT(*) as total FROM loans l ${where}`,
+      params
+    );
+
+    const [loans] = await pool.query(
+      `SELECT l.*, u.full_name AS user_name, s.name AS stokvel_name
+       FROM loans l
+       JOIN users u ON u.id = l.user_id
+       JOIN stokvels s ON s.id = l.stokvel_id
+       ${where}
+       ORDER BY l.created_at DESC
+       LIMIT ? OFFSET ?`,
+      [...params, parseInt(limit), parseInt(offset)]
+    );
+
+    res.json({
+      data: loans.map(l => ({
+        id: l.id,
+        userId: l.user_id,
+        userName: l.full_name || l.user_name,
+        userInitials: (l.full_name || l.user_name || '').split(' ').map(n => n[0]).join('').toUpperCase(),
+        stokvelName: l.stokvel_name,
+        amount: parseFloat(l.amount),
+        interestRate: parseFloat(l.interest_rate),
+        interest: parseFloat(l.interest),
+        totalRepayable: parseFloat(l.total_repayable),
+        status: l.status,
+        purpose: l.purpose,
+        borrowedDate: l.borrowed_date,
+        dueDate: l.due_date,
+        createdAt: l.created_at,
+      })),
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: countResult[0].total,
+        totalPages: Math.ceil(countResult[0].total / limit),
+      },
+    });
+  } catch (err) {
+    console.error('Admin list loans error:', err);
+    res.status(500).json({ error: 'Failed to fetch loans' });
+  }
+});
+
+// ── Approve loan ──
+router.post('/loans/:id/approve', async (req, res) => {
+  try {
+    const loanId = req.params.id;
+
+    const [loans] = await pool.query(
+      "SELECT * FROM loans WHERE id = ? AND status = 'pending'",
+      [loanId]
+    );
+
+    if (loans.length === 0) {
+      return res.status(404).json({ error: 'Pending loan not found' });
+    }
+
+    const loan = loans[0];
+
+    // Set due date to 30 days from now (approval date)
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + 30);
+
+    // Approve the loan
+    await pool.query(
+      'UPDATE loans SET status = ?, borrowed_date = NOW(), due_date = ? WHERE id = ?',
+      ['active', dueDate, loanId]
+    );
+
+    // Deduct the principal from saved_amount
+    await pool.query(
+      'UPDATE profiles SET saved_amount = GREATEST(saved_amount - ?, 0) WHERE id = ?',
+      [parseFloat(loan.amount), loan.profile_id]
+    );
+
+    // Notify user
+    const [stokvel] = await pool.query('SELECT name FROM stokvels WHERE id = ?', [loan.stokvel_id]);
+    await pool.query(
+      'INSERT INTO notifications (user_id, type, title, message) VALUES (?, ?, ?, ?)',
+      [loan.user_id, 'success', 'Loan Approved',
+        `Your loan of R${parseFloat(loan.amount).toLocaleString()} from ${stokvel[0].name} has been approved! Repayment of R${parseFloat(loan.total_repayable).toLocaleString()} is due by ${dueDate.toLocaleDateString()}.`]
+    );
+
+    // Send loan approval email
+    try {
+      const [user] = await pool.query('SELECT full_name, email FROM users WHERE id = ?', [loan.user_id]);
+      if (user.length > 0) {
+        await sendLoanApprovalEmail(user[0].email, user[0].full_name, {
+          amount: parseFloat(loan.amount),
+          interestRate: parseFloat(loan.interest_rate),
+          interest: parseFloat(loan.interest),
+          totalRepayable: parseFloat(loan.total_repayable),
+          stokvelName: stokvel[0].name,
+          borrowedDate: new Date(),
+          dueDate,
+        });
+      }
+    } catch (emailErr) {
+      console.error('Loan approval email failed:', emailErr.message);
+    }
+
+    res.json({ message: 'Loan approved successfully' });
+  } catch (err) {
+    console.error('Approve loan error:', err);
+    res.status(500).json({ error: 'Failed to approve loan' });
+  }
+});
+
+// ── Reject loan ──
+router.post('/loans/:id/reject', async (req, res) => {
+  try {
+    const loanId = req.params.id;
+    const { reason } = req.body;
+
+    const [loans] = await pool.query(
+      "SELECT * FROM loans WHERE id = ? AND status = 'pending'",
+      [loanId]
+    );
+
+    if (loans.length === 0) {
+      return res.status(404).json({ error: 'Pending loan not found' });
+    }
+
+    const loan = loans[0];
+
+    // Reject the loan
+    await pool.query(
+      'UPDATE loans SET status = ? WHERE id = ?',
+      ['rejected', loanId]
+    );
+
+    // Notify user with reason
+    const [stokvel] = await pool.query('SELECT name FROM stokvels WHERE id = ?', [loan.stokvel_id]);
+    await pool.query(
+      'INSERT INTO notifications (user_id, type, title, message) VALUES (?, ?, ?, ?)',
+      [loan.user_id, 'error', 'Loan Request Rejected',
+        `Your loan request of R${parseFloat(loan.amount).toLocaleString()} from ${stokvel[0].name} was rejected.${reason ? ' Reason: ' + reason : ''}`]
+    );
+
+    res.json({ message: 'Loan rejected' });
+  } catch (err) {
+    console.error('Reject loan error:', err);
+    res.status(500).json({ error: 'Failed to reject loan' });
+  }
+});
+
 // ══════════════════════════════════════════════════
 //  SITE SETTINGS
 // ══════════════════════════════════════════════════
@@ -1304,6 +1613,170 @@ router.post('/users/:id/reject', async (req, res) => {
   } catch (err) {
     console.error('Reject user error:', err);
     res.status(500).json({ error: 'Failed to reject user' });
+  }
+});
+
+// ══════════════════════════════════════════════════
+//  ADMIN FINES MANAGEMENT
+// ══════════════════════════════════════════════════
+
+const FINE_AMOUNTS = {
+  no_banking: 30,
+  no_attendance: 20,
+  sending: 30,
+  late_coming: 20,
+};
+
+const FINE_LABELS = {
+  no_banking: 'No Banking',
+  no_attendance: 'No Attendance',
+  sending: 'Sending',
+  late_coming: 'Late Coming',
+};
+
+// List all fines
+router.get('/fines', async (_req, res) => {
+  try {
+    const [fines] = await pool.query(
+      `SELECT f.*, u.full_name, s.name AS stokvel_name, iu.full_name AS issued_by_name
+       FROM fines f
+       JOIN users u ON u.id = f.user_id
+       JOIN stokvels s ON s.id = f.stokvel_id
+       LEFT JOIN users iu ON iu.id = f.issued_by
+       ORDER BY f.created_at DESC`
+    );
+
+    const [summary] = await pool.query(
+      "SELECT COALESCE(SUM(CASE WHEN status = 'unpaid' THEN amount ELSE 0 END), 0) as unpaid_total, COALESCE(SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END), 0) as paid_total, COALESCE(SUM(CASE WHEN status = 'pending' THEN amount ELSE 0 END), 0) as pending_total, COUNT(CASE WHEN status = 'unpaid' THEN 1 END) as unpaid_count, COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_count, COUNT(*) as total_count FROM fines"
+    );
+
+    res.json({
+      data: fines.map(f => ({
+        id: f.id,
+        userId: f.user_id,
+        userName: f.full_name,
+        stokvelName: f.stokvel_name,
+        fineType: f.fine_type,
+        fineLabel: FINE_LABELS[f.fine_type] || f.fine_type,
+        amount: parseFloat(f.amount),
+        status: f.status,
+        reason: f.reason,
+        issuedBy: f.issued_by_name,
+        paidDate: f.paid_date,
+        paymentMethod: f.payment_method,
+        createdAt: f.created_at,
+      })),
+      summary: {
+        unpaidTotal: parseFloat(summary[0].unpaid_total),
+        paidTotal: parseFloat(summary[0].paid_total),
+        pendingTotal: parseFloat(summary[0].pending_total),
+        unpaidCount: parseInt(summary[0].unpaid_count),
+        pendingCount: parseInt(summary[0].pending_count),
+        totalCount: parseInt(summary[0].total_count),
+      },
+      fineTypes: Object.entries(FINE_AMOUNTS).map(([key, amount]) => ({
+        value: key,
+        label: FINE_LABELS[key],
+        amount,
+      })),
+    });
+  } catch (err) {
+    console.error('Admin list fines error:', err);
+    res.status(500).json({ error: 'Failed to fetch fines' });
+  }
+});
+
+// Issue a fine to a member
+router.post('/fines', [
+  body('userId').isInt().withMessage('User is required'),
+  body('fineType').isIn(['no_banking', 'no_attendance', 'sending', 'late_coming']).withMessage('Invalid fine type'),
+  body('reason').optional().trim(),
+  validate,
+], async (req, res) => {
+  try {
+    const { userId, fineType, reason } = req.body;
+    const amount = FINE_AMOUNTS[fineType];
+
+    // Get user's stokvel
+    const [profiles] = await pool.query(
+      "SELECT p.stokvel_id, s.name as stokvel_name FROM profiles p JOIN stokvels s ON s.id = p.stokvel_id WHERE p.user_id = ? AND p.status = 'active' LIMIT 1",
+      [userId]
+    );
+
+    if (profiles.length === 0) {
+      return res.status(404).json({ error: 'User has no active stokvel membership' });
+    }
+
+    const [result] = await pool.query(
+      'INSERT INTO fines (user_id, stokvel_id, fine_type, amount, status, reason, issued_by) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [userId, profiles[0].stokvel_id, fineType, amount, 'unpaid', reason || null, req.user.id]
+    );
+
+    // Notify the user
+    await pool.query(
+      'INSERT INTO notifications (user_id, type, title, message) VALUES (?, ?, ?, ?)',
+      [userId, 'warning', 'Fine Issued', `You have been fined R${amount} for ${FINE_LABELS[fineType]}.${reason ? ' Reason: ' + reason : ''}`]
+    );
+
+    const [user] = await pool.query('SELECT full_name FROM users WHERE id = ?', [userId]);
+
+    res.status(201).json({
+      message: `Fine of R${amount} issued to ${user[0].full_name} for ${FINE_LABELS[fineType]}`,
+      fine: {
+        id: result.insertId,
+        userId,
+        userName: user[0].full_name,
+        fineType,
+        fineLabel: FINE_LABELS[fineType],
+        amount,
+        status: 'unpaid',
+      },
+    });
+  } catch (err) {
+    console.error('Issue fine error:', err);
+    res.status(500).json({ error: 'Failed to issue fine' });
+  }
+});
+
+// Delete / cancel a fine (admin)
+router.delete('/fines/:id', async (req, res) => {
+  try {
+    const [fines] = await pool.query('SELECT * FROM fines WHERE id = ?', [req.params.id]);
+    if (fines.length === 0) {
+      return res.status(404).json({ error: 'Fine not found' });
+    }
+
+    await pool.query('DELETE FROM fines WHERE id = ?', [req.params.id]);
+    res.json({ message: 'Fine removed' });
+  } catch (err) {
+    console.error('Delete fine error:', err);
+    res.status(500).json({ error: 'Failed to delete fine' });
+  }
+});
+
+// Confirm a pending fine payment (admin)
+router.post('/fines/:id/confirm', async (req, res) => {
+  try {
+    const [fines] = await pool.query('SELECT * FROM fines WHERE id = ? AND status = ?', [req.params.id, 'pending']);
+    if (fines.length === 0) {
+      return res.status(404).json({ error: 'Pending fine not found' });
+    }
+
+    await pool.query(
+      'UPDATE fines SET status = ?, paid_date = NOW() WHERE id = ?',
+      ['paid', req.params.id]
+    );
+
+    const fine = fines[0];
+    await pool.query(
+      'INSERT INTO notifications (user_id, type, title, message) VALUES (?, ?, ?, ?)',
+      [fine.user_id, 'success', 'Fine Payment Confirmed', `Your cash payment of R${parseFloat(fine.amount).toFixed(0)} for your fine has been confirmed by admin.`]
+    );
+
+    res.json({ message: 'Fine payment confirmed' });
+  } catch (err) {
+    console.error('Confirm fine error:', err);
+    res.status(500).json({ error: 'Failed to confirm fine' });
   }
 });
 

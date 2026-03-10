@@ -16,7 +16,7 @@ export default function RegistrationSuccess() {
         </h2>
         
         <p className="text-center text-gray-600 mb-6">
-          Thank you for joining HENNESSY SOCIAL CLUB
+          Thank you for joining FUND MATE
         </p>
 
         {/* Info Card */}

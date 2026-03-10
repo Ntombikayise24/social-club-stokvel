@@ -3,7 +3,7 @@ export default function Dashboard() {
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm border-b p-4">
         <h1 className="text-2xl font-bold text-primary-800">
-          SOCIAL CLUB Dashboard
+          FUND MATE Dashboard
         </h1>
       </header>
       <main className="p-8">

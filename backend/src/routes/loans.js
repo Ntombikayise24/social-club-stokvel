@@ -39,11 +39,30 @@ router.get('/', async (req, res) => {
       [...params, parseInt(limit), parseInt(offset)]
     );
 
+    // Auto-mark overdue loans in the database
+    const overdueIds = loans
+      .filter(l => l.status === 'active' && l.due_date && new Date(l.due_date) < new Date())
+      .map(l => l.id);
+    if (overdueIds.length > 0) {
+      await pool.query('UPDATE loans SET status = ? WHERE id IN (?)', ['overdue', overdueIds]);
+    }
+
     res.json({
       data: loans.map(l => {
         const daysRemaining = l.due_date
           ? Math.max(0, Math.ceil((new Date(l.due_date) - new Date()) / (1000 * 60 * 60 * 24)))
           : 0;
+
+        // Calculate overdue penalty: 30% of original loan amount per month overdue
+        let overdueMonths = 0;
+        let penaltyAmount = 0;
+        let currentTotalRepayable = parseFloat(l.total_repayable);
+        if (l.due_date && (l.status === 'active' || l.status === 'overdue') && new Date(l.due_date) < new Date()) {
+          const msOverdue = new Date() - new Date(l.due_date);
+          overdueMonths = Math.ceil(msOverdue / (1000 * 60 * 60 * 24 * 30)); // each 30-day period counts
+          penaltyAmount = parseFloat(l.amount) * 0.3 * overdueMonths;
+          currentTotalRepayable = parseFloat(l.amount) + parseFloat(l.interest) + penaltyAmount;
+        }
 
         return {
           id: l.id,
@@ -53,13 +72,16 @@ router.get('/', async (req, res) => {
           amount: parseFloat(l.amount),
           interestRate: parseFloat(l.interest_rate),
           interest: parseFloat(l.interest),
-          totalRepayable: parseFloat(l.total_repayable),
-          status: l.status,
+          totalRepayable: currentTotalRepayable,
+          status: l.due_date && (l.status === 'active') && new Date(l.due_date) < new Date() ? 'overdue' : l.status,
           purpose: l.purpose,
           borrowedDate: l.borrowed_date,
           dueDate: l.due_date,
           repaidDate: l.repaid_date,
           daysRemaining,
+          overdueMonths,
+          penaltyAmount,
+          loanTarget: l.loan_target || 'your-target',
           maxLoanable: parseFloat(l.saved_amount) * 0.5,
         };
       }),
@@ -180,7 +202,7 @@ router.post(
   ],
   async (req, res) => {
     try {
-      const { amount, profileId, stokvelId, purpose, cardId } = req.body;
+      const { amount, profileId, stokvelId, purpose, cardId, loanTarget } = req.body;
 
       // Verify profile
       let [profiles] = await pool.query(
@@ -247,6 +269,18 @@ router.post(
         });
       }
 
+      // Block loan if user's total outstanding interest >= R2,000
+      const [interestCheck] = await pool.query(
+        "SELECT COALESCE(SUM(interest), 0) as totalInterest FROM loans WHERE user_id = ? AND status IN ('active', 'overdue')",
+        [req.user.id]
+      );
+      const currentInterest = parseFloat(interestCheck[0].totalInterest);
+      if (currentInterest >= 2000) {
+        return res.status(400).json({
+          error: `Your outstanding loan interest has reached R${currentInterest.toFixed(2)}. You cannot take out new loans until your interest is below R2,000.`,
+        });
+      }
+
       // Get interest rate from stokvel
       const [stokvel] = await pool.query('SELECT interest_rate, name FROM stokvels WHERE id = ?', [profile.stokvel_id]);
       const interestRate = parseFloat(stokvel[0].interest_rate);
@@ -258,44 +292,20 @@ router.post(
       dueDate.setDate(dueDate.getDate() + 30);
 
       const [result] = await pool.query(
-        `INSERT INTO loans (user_id, profile_id, stokvel_id, amount, interest_rate, interest, total_repayable, status, purpose, borrowed_date, due_date, card_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)`,
-        [req.user.id, actualProfileId, profile.stokvel_id, amount, interestRate, interest, totalRepayable, purpose || null, borrowedDate, dueDate, cardId || null]
+        `INSERT INTO loans (user_id, profile_id, stokvel_id, amount, interest_rate, interest, total_repayable, status, purpose, borrowed_date, due_date, card_id, loan_target)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)`,
+        [req.user.id, actualProfileId, profile.stokvel_id, amount, interestRate, interest, totalRepayable, purpose || null, borrowedDate, dueDate, cardId || null, loanTarget || 'your-target']
       );
 
-      // Deduct the principal from saved_amount (user is borrowing from their savings)
-      await pool.query(
-        'UPDATE profiles SET saved_amount = GREATEST(saved_amount - ?, 0) WHERE id = ?',
-        [amount, actualProfileId]
-      );
-
-      // Notification
+      // Notification - loan request submitted
       await pool.query(
         'INSERT INTO notifications (user_id, type, title, message) VALUES (?, ?, ?, ?)',
-        [req.user.id, 'loan', 'Loan Approved',
-          `Your loan of R${amount.toLocaleString()} from ${stokvel[0].name} has been approved. Repayment of R${totalRepayable.toLocaleString()} due by ${dueDate.toLocaleDateString()}.`]
+        [req.user.id, 'info', 'Loan Request Submitted',
+          `Your loan request of R${amount.toLocaleString()} from ${stokvel[0].name} has been submitted and is awaiting admin approval.`]
       );
 
-      // Send loan approval email
-      try {
-        const [user] = await pool.query('SELECT full_name, email FROM users WHERE id = ?', [req.user.id]);
-        if (user.length > 0) {
-          await sendLoanApprovalEmail(user[0].email, user[0].full_name, {
-            amount,
-            interestRate,
-            interest,
-            totalRepayable,
-            stokvelName: stokvel[0].name,
-            borrowedDate,
-            dueDate,
-          });
-        }
-      } catch (emailErr) {
-        console.error('Loan approval email failed:', emailErr.message);
-      }
-
       res.status(201).json({
-        message: 'Loan approved',
+        message: 'Loan request submitted for approval',
         loan: {
           id: result.insertId,
           amount,
@@ -303,7 +313,7 @@ router.post(
           totalRepayable,
           borrowedDate,
           dueDate,
-          status: 'active',
+          status: 'pending',
         },
       });
     } catch (err) {
@@ -318,15 +328,16 @@ router.post(
   '/:id/repay',
   [
     body('cardId').optional().isInt(),
+    body('paymentMethod').optional().isIn(['card', 'cash']),
     validate,
   ],
   async (req, res) => {
     try {
       const loanId = req.params.id;
-      const { cardId } = req.body;
+      const { cardId, paymentMethod = 'card' } = req.body;
 
       const [loans] = await pool.query(
-        "SELECT * FROM loans WHERE id = ? AND user_id = ? AND status IN ('active', 'overdue')",
+        "SELECT * FROM loans WHERE id = ? AND user_id = ? AND status IN ('active', 'overdue', 'pending_repayment')",
         [loanId, req.user.id]
       );
 
@@ -336,35 +347,65 @@ router.post(
 
       const loan = loans[0];
 
-      // Check if user has at least one card
-      const [cards] = await pool.query(
-        'SELECT id FROM cards WHERE user_id = ? LIMIT 1',
-        [req.user.id]
-      );
+      // Only require card for card payments
+      if (paymentMethod === 'card') {
+        const [cards] = await pool.query(
+          'SELECT id FROM cards WHERE user_id = ? LIMIT 1',
+          [req.user.id]
+        );
 
-      if (cards.length === 0) {
-        return res.status(400).json({ 
-          error: 'No card found. Please add a card before repaying loans.',
-          code: 'NO_CARD'
-        });
+        if (cards.length === 0) {
+          return res.status(400).json({ 
+            error: 'No card found. Please add a card before repaying loans.',
+            code: 'NO_CARD'
+          });
+        }
       }
 
-      // Mark as repaid
+      const interest = parseFloat(loan.interest);
+      const principal = parseFloat(loan.amount);
+      
+      // Calculate overdue penalty: 30% of original loan amount per month overdue
+      let penaltyAmount = 0;
+      if (loan.due_date && new Date(loan.due_date) < new Date()) {
+        const msOverdue = new Date() - new Date(loan.due_date);
+        const overdueMonths = Math.ceil(msOverdue / (1000 * 60 * 60 * 24 * 30));
+        penaltyAmount = principal * 0.3 * overdueMonths;
+      }
+      
+      const totalRepayable = principal + interest + penaltyAmount;
+
+      if (paymentMethod === 'cash') {
+        // Cash: mark as pending_repayment, admin confirms at meeting
+        await pool.query(
+          'UPDATE loans SET status = ? WHERE id = ?',
+          ['pending_repayment', loanId]
+        );
+
+        // Notification
+        const [stokvel] = await pool.query('SELECT name FROM stokvels WHERE id = ?', [loan.stokvel_id]);
+        await pool.query(
+          'INSERT INTO notifications (user_id, type, title, message) VALUES (?, ?, ?, ?)',
+          [req.user.id, 'info', 'Loan Repayment Pending',
+            `Your cash repayment of R${totalRepayable.toLocaleString()} for ${stokvel[0].name} has been submitted. It will be confirmed by admin at the next Sunday meeting.`]
+        );
+
+        return res.json({ message: 'Cash repayment submitted. Pending admin confirmation.', status: 'pending' });
+      }
+
+      // Card payment: mark as repaid immediately
       await pool.query(
         'UPDATE loans SET status = ?, repaid_date = NOW() WHERE id = ?',
         ['repaid', loanId]
       );
 
-      const interest = parseFloat(loan.interest);
-      const principal = parseFloat(loan.amount);
-      const totalRepayable = parseFloat(loan.total_repayable);
-
-      // Record interest as a confirmed contribution for the interest pot records
+      // Record interest + penalty as a confirmed contribution for the interest pot records
+      const totalInterestAndPenalty = interest + penaltyAmount;
       const reference = `LOAN-INT-${loanId}-${Date.now()}`;
       await pool.query(
         `INSERT INTO contributions (user_id, profile_id, stokvel_id, amount, payment_method, reference, status, confirmed_at, card_id)
          VALUES (?, ?, ?, ?, 'loan_repayment', ?, 'confirmed', NOW(), ?)`,
-        [req.user.id, loan.profile_id, loan.stokvel_id, interest, reference, cardId || loan.card_id || null]
+        [req.user.id, loan.profile_id, loan.stokvel_id, totalInterestAndPenalty, reference, cardId || loan.card_id || null]
       );
 
       // Return the principal back to saved_amount on repay
@@ -375,13 +416,14 @@ router.post(
 
       // Notification
       const [stokvel] = await pool.query('SELECT name FROM stokvels WHERE id = ?', [loan.stokvel_id]);
+      const penaltyNote = penaltyAmount > 0 ? ` (includes R${penaltyAmount.toLocaleString()} overdue penalty)` : '';
       await pool.query(
         'INSERT INTO notifications (user_id, type, title, message) VALUES (?, ?, ?, ?)',
         [req.user.id, 'success', 'Loan Repaid',
-          `Your loan of R${totalRepayable.toLocaleString()} to ${stokvel[0].name} has been repaid. R${interest.toLocaleString()} interest added to the group pot.`]
+          `Your loan of R${totalRepayable.toLocaleString()} to ${stokvel[0].name} has been repaid. R${totalInterestAndPenalty.toLocaleString()} interest added to the group pot${penaltyNote}.`]
       );
 
-      res.json({ message: 'Loan repaid successfully', principalReturned: principal, interestPaid: interest });
+      res.json({ message: 'Loan repaid successfully', principalReturned: principal, interestPaid: interest, penaltyPaid: penaltyAmount });
     } catch (err) {
       console.error('Repay loan error:', err);
       res.status(500).json({ error: 'Failed to repay loan' });

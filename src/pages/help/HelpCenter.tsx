@@ -142,7 +142,7 @@ export default function HelpCenter() {
               <Link to="/dashboard" className="text-gray-600 hover:text-primary-600">
                 <ArrowLeft className="w-5 h-5" />
               </Link>
-              <h1 className="text-2xl font-bold text-primary-800">HENNESSY SOCIAL CLUB</h1>
+              <h1 className="text-2xl font-bold text-primary-800">FUND MATE</h1>
             </div>
           </div>
         </div>
@@ -153,7 +153,7 @@ export default function HelpCenter() {
         <div className="text-center mb-8">
           <HelpCircle className="w-16 h-16 text-primary-600 mx-auto mb-4" />
           <h2 className="text-3xl font-bold text-gray-800 mb-2">How can we help you?</h2>
-          <p className="text-gray-600">Find answers to common questions about HENNESSY SOCIAL CLUB</p>
+          <p className="text-gray-600">Find answers to common questions about FUND MATE</p>
         </div>
 
         {/* Search Bar */}

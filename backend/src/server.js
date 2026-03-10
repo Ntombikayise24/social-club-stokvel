@@ -22,6 +22,7 @@ import settingsRoutes from './routes/settings.js';
 import helpRoutes from './routes/help.js';
 import adminRoutes from './routes/admin.js';
 import paymentRoutes from './routes/payments.js';
+import finesRoutes from './routes/fines.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -56,6 +57,7 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/help', helpRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/fines', finesRoutes);
 
 // ── Health check ──
 app.get('/api/health', async (_req, res) => {

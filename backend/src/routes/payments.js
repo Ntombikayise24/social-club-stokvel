@@ -31,7 +31,7 @@ router.post('/webhook', async (req, res) => {
       const { reference } = event.data;
 
       const [contributions] = await pool.query(
-        "SELECT id, profile_id, amount, stokvel_id, user_id FROM contributions WHERE reference = ? AND status = 'pending'",
+        "SELECT id, profile_id, amount, stokvel_id, user_id, contribution_type FROM contributions WHERE reference = ? AND status = 'pending'",
         [reference]
       );
 
@@ -42,10 +42,13 @@ router.post('/webhook', async (req, res) => {
           "UPDATE contributions SET status = 'confirmed', confirmed_at = NOW() WHERE id = ?",
           [contrib.id]
         );
-        await pool.query(
-          'UPDATE profiles SET saved_amount = saved_amount + ? WHERE id = ?',
-          [contrib.amount, contrib.profile_id]
-        );
+        // Only update saved_amount for 'your-target', not 'madala-side'
+        if (contrib.contribution_type !== 'madala-side') {
+          await pool.query(
+            'UPDATE profiles SET saved_amount = saved_amount + ? WHERE id = ?',
+            [contrib.amount, contrib.profile_id]
+          );
+        }
 
         const [stokvel] = await pool.query('SELECT name FROM stokvels WHERE id = ?', [contrib.stokvel_id]);
         await pool.query(
@@ -78,11 +81,12 @@ router.post(
     body('amount').isFloat({ min: 100 }).withMessage('Minimum contribution is R100'),
     body('profileId').isInt().withMessage('Profile is required'),
     body('stokvelId').optional().isInt(),
+    body('contributionType').optional().isIn(['your-target', 'madala-side']),
     validate,
   ],
   async (req, res) => {
     try {
-      const { amount, profileId, stokvelId } = req.body;
+      const { amount, profileId, stokvelId, contributionType } = req.body;
 
       // Verify profile belongs to user
       let [profiles] = await pool.query(
@@ -113,17 +117,19 @@ router.post(
         return res.status(404).json({ error: 'Profile not found. Please ensure you are assigned to a stokvel.' });
       }
 
-      // Check contribution does not exceed target
+      // Check contribution does not exceed target (only for 'your-target', not 'madala-side')
       const profile = profiles[0];
-      const remaining = parseFloat(profile.target_amount) - parseFloat(profile.saved_amount);
-      if (remaining <= 0) {
-        return res.status(400).json({ error: 'You have already reached your contribution target.' });
-      }
-      if (amount > remaining) {
-        return res.status(400).json({
-          error: `Amount exceeds your remaining target. You can contribute up to R${remaining.toLocaleString()}.`,
-          maxAmount: remaining,
-        });
+      if (contributionType !== 'madala-side') {
+        const remaining = parseFloat(profile.target_amount) - parseFloat(profile.saved_amount);
+        if (remaining <= 0) {
+          return res.status(400).json({ error: 'You have already reached your contribution target.' });
+        }
+        if (amount > remaining) {
+          return res.status(400).json({
+            error: `Amount exceeds your remaining target. You can contribute up to R${remaining.toLocaleString()}.`,
+            maxAmount: remaining,
+          });
+        }
       }
 
       // Check if user has at least one card
@@ -147,9 +153,9 @@ router.post(
 
       // Create pending contribution record
       const [result] = await pool.query(
-        `INSERT INTO contributions (user_id, profile_id, stokvel_id, amount, payment_method, reference, status)
-         VALUES (?, ?, ?, ?, 'paystack', ?, 'pending')`,
-        [req.user.id, profileId, profiles[0].stokvel_id, amount, reference]
+        `INSERT INTO contributions (user_id, profile_id, stokvel_id, amount, payment_method, reference, status, contribution_type)
+         VALUES (?, ?, ?, ?, 'paystack', ?, 'pending', ?)`,
+        [req.user.id, profileId, profiles[0].stokvel_id, amount, reference, contributionType || 'your-target']
       );
 
       // Initialize Paystack transaction
@@ -197,6 +203,92 @@ router.post(
   }
 );
 
+// ────────────────── CASH CONTRIBUTION (pending until admin confirms) ──────────────────
+router.post(
+  '/cash',
+  [
+    body('amount').isFloat({ min: 100 }).withMessage('Minimum contribution is R100'),
+    body('profileId').isInt().withMessage('Profile is required'),
+    body('stokvelId').optional().isInt(),
+    body('contributionType').optional().isIn(['your-target', 'madala-side']),
+    validate,
+  ],
+  async (req, res) => {
+    try {
+      const { amount, profileId, stokvelId, contributionType } = req.body;
+
+      // Verify profile belongs to user
+      let [profiles] = await pool.query(
+        'SELECT id, stokvel_id, user_id, target_amount, saved_amount FROM profiles WHERE id = ? AND user_id = ?',
+        [profileId, req.user.id]
+      );
+
+      if (profiles.length === 0 && stokvelId) {
+        [profiles] = await pool.query(
+          "SELECT id, stokvel_id, user_id, target_amount, saved_amount FROM profiles WHERE stokvel_id = ? AND user_id = ? AND status = 'active'",
+          [stokvelId, req.user.id]
+        );
+      }
+
+      if (profiles.length === 0) {
+        [profiles] = await pool.query(
+          "SELECT id, stokvel_id, user_id, target_amount, saved_amount FROM profiles WHERE user_id = ? AND status = 'active' LIMIT 1",
+          [req.user.id]
+        );
+      }
+
+      if (profiles.length === 0) {
+        return res.status(404).json({ error: 'Profile not found.' });
+      }
+
+      const profile = profiles[0];
+
+      // For 'your-target', check contribution does not exceed target
+      if (contributionType !== 'madala-side') {
+        const remaining = parseFloat(profile.target_amount) - parseFloat(profile.saved_amount);
+        if (remaining <= 0) {
+          return res.status(400).json({ error: 'You have already reached your contribution target.' });
+        }
+        if (amount > remaining) {
+          return res.status(400).json({
+            error: `Amount exceeds your remaining target. You can contribute up to R${remaining.toLocaleString()}.`,
+            maxAmount: remaining,
+          });
+        }
+      }
+
+      const reference = `CASH-${Date.now()}-${uuidv4().slice(0, 6).toUpperCase()}`;
+
+      // Create contribution with status 'pending' - admin will confirm at Sunday meeting
+      await pool.query(
+        `INSERT INTO contributions (user_id, profile_id, stokvel_id, amount, payment_method, reference, status, contribution_type)
+         VALUES (?, ?, ?, ?, 'cash', ?, 'pending', ?)`,
+        [req.user.id, profileId, profile.stokvel_id, amount, reference, contributionType || 'your-target']
+      );
+
+      // Notify user
+      await pool.query(
+        'INSERT INTO notifications (user_id, type, title, message) VALUES (?, ?, ?, ?)',
+        [
+          req.user.id,
+          'contribution',
+          'Cash Contribution Submitted 💵',
+          `Your R${parseFloat(amount).toLocaleString()} cash contribution (${contributionType === 'madala-side' ? 'Madala Side' : 'Your Target'}) is pending. Admin will confirm at the next Sunday meeting.`,
+        ]
+      );
+
+      res.json({
+        status: true,
+        message: 'Cash contribution recorded as pending. Admin will confirm at the next Sunday meeting.',
+        data: { reference },
+      });
+    } catch (err) {
+      console.error('Cash contribution error:', err.message);
+      res.status(500).json({ error: 'Failed to record cash contribution' });
+    }
+  }
+);
+
 // ────────────────── VERIFY PAYMENT ──────────────────
 router.get('/verify/:reference', async (req, res) => {
   try {
@@ -223,27 +315,30 @@ router.get('/verify/:reference', async (req, res) => {
 
       // Get the contribution to update profile saved_amount
       const [contributions] = await pool.query(
-        'SELECT id, profile_id, amount, stokvel_id FROM contributions WHERE reference = ?',
+        'SELECT id, profile_id, amount, stokvel_id, contribution_type FROM contributions WHERE reference = ?',
         [reference]
       );
 
       if (contributions.length > 0) {
         const contrib = contributions[0];
 
-        // Cap saved_amount so it never exceeds target_amount
-        const [profileRows] = await pool.query(
-          'SELECT target_amount, saved_amount FROM profiles WHERE id = ?',
-          [contrib.profile_id]
-        );
-        const profileTarget = parseFloat(profileRows[0].target_amount);
-        const currentSaved = parseFloat(profileRows[0].saved_amount);
-        const addAmount = Math.min(parseFloat(contrib.amount), Math.max(profileTarget - currentSaved, 0));
+        // Only update saved_amount for 'your-target', not 'madala-side'
+        if (contrib.contribution_type !== 'madala-side') {
+          // Cap saved_amount so it never exceeds target_amount
+          const [profileRows] = await pool.query(
+            'SELECT target_amount, saved_amount FROM profiles WHERE id = ?',
+            [contrib.profile_id]
+          );
+          const profileTarget = parseFloat(profileRows[0].target_amount);
+          const currentSaved = parseFloat(profileRows[0].saved_amount);
+          const addAmount = Math.min(parseFloat(contrib.amount), Math.max(profileTarget - currentSaved, 0));
 
-        // Update saved amount on profile (capped at target)
-        await pool.query(
-          'UPDATE profiles SET saved_amount = LEAST(saved_amount + ?, target_amount) WHERE id = ?',
-          [addAmount, contrib.profile_id]
-        );
+          // Update saved amount on profile (capped at target)
+          await pool.query(
+            'UPDATE profiles SET saved_amount = LEAST(saved_amount + ?, target_amount) WHERE id = ?',
+            [addAmount, contrib.profile_id]
+          );
+        }
 
         // Create success notification
         const [stokvel] = await pool.query('SELECT name FROM stokvels WHERE id = ?', [contrib.stokvel_id]);
@@ -268,9 +363,9 @@ router.get('/verify/:reference', async (req, res) => {
         },
       });
     } else {
-      // Payment failed - update contribution
+      // Payment failed/declined - update contribution
       await pool.query(
-        "UPDATE contributions SET status = 'deleted', deleted_at = NOW() WHERE reference = ?",
+        "UPDATE contributions SET status = 'failed', deleted_at = NOW() WHERE reference = ?",
         [reference]
       );
 
@@ -279,7 +374,7 @@ router.get('/verify/:reference', async (req, res) => {
         message: 'Payment was not successful',
         data: {
           reference,
-          status: paystackData.status,
+          status: paystackData.status || 'failed',
         },
       });
     }

@@ -20,30 +20,30 @@ export default function Blog() {
   const posts: BlogPost[] = [
     {
       id: 1,
-      title: "Understanding Stokvels: A Guide for Beginners",
-      excerpt: "Stokvels are one of South Africa's oldest and most trusted forms of community savings. Learn how they work, why they matter, and how to get started with your first group.",
+      title: "Understanding Savings Groups: A Guide for Beginners",
+      excerpt: "Savings groups are one of South Africa's oldest and most trusted forms of community savings. Learn how they work, why they matter, and how to get started with your first group.",
       category: "Getting Started",
-      author: "Social Club Team",
+      author: "Fund Mate Team",
       date: "15 Feb 2026",
       readTime: "5 min read",
       icon: <BookOpen className="w-5 h-5" />
     },
     {
       id: 2,
-      title: "5 Tips to Maximize Your Stokvel Savings",
-      excerpt: "Small habits lead to big results. Discover practical strategies to boost your contributions, avoid late fees, and make the most of your stokvel membership.",
+      title: "5 Tips to Maximize Your Group Savings",
+      excerpt: "Small habits lead to big results. Discover practical strategies to boost your contributions, avoid late fees, and make the most of your group membership.",
       category: "Savings Tips",
-      author: "Social Club Team",
+      author: "Fund Mate Team",
       date: "28 Jan 2026",
       readTime: "4 min read",
       icon: <TrendingUp className="w-5 h-5" />
     },
     {
       id: 3,
-      title: "How Stokvel Loans Work: Borrowing Against Your Savings",
-      excerpt: "Need cash in a pinch? Learn how stokvel loans work, what the interest rates are, and how to borrow responsibly against your saved contributions.",
+      title: "How Group Loans Work: Borrowing Against Your Savings",
+      excerpt: "Need cash in a pinch? Learn how group loans work, what the interest rates are, and how to borrow responsibly against your saved contributions.",
       category: "Loans",
-      author: "Social Club Team",
+      author: "Fund Mate Team",
       date: "10 Jan 2026",
       readTime: "6 min read",
       icon: <Shield className="w-5 h-5" />
@@ -51,29 +51,29 @@ export default function Blog() {
     {
       id: 4,
       title: "The Power of Community Saving in South Africa",
-      excerpt: "From burial societies to investment clubs, stokvels have evolved over centuries. Explore the rich history and modern resurgence of community-based savings.",
+      excerpt: "From burial societies to investment clubs, savings groups have evolved over centuries. Explore the rich history and modern resurgence of community-based savings.",
       category: "Community",
-      author: "Social Club Team",
+      author: "Fund Mate Team",
       date: "20 Dec 2025",
       readTime: "7 min read",
       icon: <Users className="w-5 h-5" />
     },
     {
       id: 5,
-      title: "Digital vs Traditional Stokvels: What's Changed?",
-      excerpt: "Technology is transforming how stokvels operate. Compare traditional paper-based methods with modern digital platforms and see why members are making the switch.",
+      title: "Digital vs Traditional Savings Groups: What's Changed?",
+      excerpt: "Technology is transforming how savings groups operate. Compare traditional paper-based methods with modern digital platforms and see why members are making the switch.",
       category: "Technology",
-      author: "Social Club Team",
+      author: "Fund Mate Team",
       date: "05 Dec 2025",
       readTime: "5 min read",
       icon: <TrendingUp className="w-5 h-5" />
     },
     {
       id: 6,
-      title: "Setting Financial Goals with Your Stokvel Group",
-      excerpt: "A stokvel is more than just saving — it's about reaching goals together. Learn how to set realistic targets and hold each other accountable.",
+      title: "Setting Financial Goals with Your Savings Group",
+      excerpt: "A savings group is more than just saving — it's about reaching goals together. Learn how to set realistic targets and hold each other accountable.",
       category: "Planning",
-      author: "Social Club Team",
+      author: "Fund Mate Team",
       date: "18 Nov 2025",
       readTime: "4 min read",
       icon: <BookOpen className="w-5 h-5" />
@@ -166,7 +166,7 @@ export default function Blog() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl font-bold text-white mb-4">Start Your Savings Journey</h2>
           <p className="text-white/90 mb-8 max-w-2xl mx-auto">
-            Ready to put these tips into action? Join Social Club today.
+            Ready to put these tips into action? Join Fund Mate today.
           </p>
           <Link
             to="/register"
@@ -181,7 +181,7 @@ export default function Blog() {
       {/* Footer */}
       <footer className="bg-gray-900 text-gray-400 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <p className="text-sm">© {new Date().getFullYear()} SOCIAL CLUB. All rights reserved.</p>
+          <p className="text-sm">© {new Date().getFullYear()} FUND MATE. All rights reserved.</p>
         </div>
       </footer>
     </div>

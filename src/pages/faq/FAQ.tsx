@@ -128,7 +128,7 @@ export default function FAQ() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h1 className="text-4xl md:text-5xl font-bold mb-4">Frequently Asked Questions</h1>
           <p className="text-lg text-white/90 max-w-2xl mx-auto mb-8">
-            Find answers to common questions about Social Club and stokvels
+            Find answers to common questions about Fund Mate and savings
           </p>
 
           {/* Search */}
@@ -210,7 +210,7 @@ export default function FAQ() {
       {/* Footer */}
       <footer className="bg-gray-900 text-gray-400 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <p className="text-sm">© {new Date().getFullYear()} SOCIAL CLUB. All rights reserved.</p>
+          <p className="text-sm">© {new Date().getFullYear()} FUND MATE. All rights reserved.</p>
         </div>
       </footer>
     </div>

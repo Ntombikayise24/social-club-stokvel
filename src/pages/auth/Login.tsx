@@ -167,7 +167,7 @@ export default function Login() {
         {/* Powered by line */}
         <div className="mt-6 pt-4 border-t border-gray-200">
           <p className="text-xs text-gray-400 text-center">
-            Secured by SOCIAL CLUB • Bank-level encryption
+            Secured by FUND MATE • Bank-level encryption
           </p>
         </div>
       </div>

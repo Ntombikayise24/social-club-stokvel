@@ -39,7 +39,7 @@ router.get('/', async (req, res) => {
 
     const [contributions] = await pool.query(
       `SELECT c.id, c.amount, c.payment_method, c.reference, c.status,
-              c.confirmed_at, c.created_at,
+              c.confirmed_at, c.created_at, c.contribution_type,
               s.name AS stokvel_name, s.icon,
               u2.full_name AS confirmed_by_name
        FROM contributions c
@@ -58,6 +58,7 @@ router.get('/', async (req, res) => {
         paymentMethod: c.payment_method,
         reference: c.reference,
         status: c.status,
+        contributionType: c.contribution_type || 'your-target',
         stokvelName: c.stokvel_name,
         stokvelIcon: c.icon,
         confirmedBy: c.confirmed_by_name,

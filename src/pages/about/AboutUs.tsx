@@ -29,7 +29,7 @@ export default function AboutUs() {
   ];
 
   const milestones = [
-    { year: "2024", event: "Social Club founded with a vision to digitize stokvels" },
+    { year: "2024", event: "Fund Mate founded with a vision to digitize savings groups" },
     { year: "2024", event: "First 50 members joined the platform" },
     { year: "2025", event: "Launched loan management and card payment features" },
     { year: "2025", event: "Reached 100+ active members across multiple stokvels" },
@@ -58,11 +58,11 @@ export default function AboutUs() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <div className="inline-flex items-center space-x-2 bg-white/20 px-4 py-2 rounded-full mb-6">
             <Globe className="w-4 h-4" />
-            <span className="text-sm font-medium">About Social Club</span>
+            <span className="text-sm font-medium">About Fund Mate</span>
           </div>
           <h1 className="text-4xl md:text-5xl font-bold mb-6">Building Wealth Together</h1>
           <p className="text-lg text-white/90 max-w-3xl mx-auto leading-relaxed">
-            Social Club is a modern digital platform that brings the traditional South African stokvel 
+            Fund Mate is a modern digital platform that brings the traditional South African savings group 
             into the digital age. We help communities save, grow, and achieve their financial goals together.
           </p>
         </div>
@@ -165,7 +165,7 @@ export default function AboutUs() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl font-bold text-white mb-4">Ready to Join the Community?</h2>
           <p className="text-white/90 mb-8 max-w-2xl mx-auto">
-            Start saving smarter today. Join Social Club and be part of a trusted community of savers.
+            Start saving smarter today. Join Fund Mate and be part of a trusted community of savers.
           </p>
           <Link
             to="/register"
@@ -179,7 +179,7 @@ export default function AboutUs() {
       {/* Footer */}
       <footer className="bg-gray-900 text-gray-400 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <p className="text-sm">© {new Date().getFullYear()} SOCIAL CLUB. All rights reserved.</p>
+          <p className="text-sm">© {new Date().getFullYear()} FUND MATE. All rights reserved.</p>
         </div>
       </footer>
     </div>

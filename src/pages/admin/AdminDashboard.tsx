@@ -1346,17 +1346,28 @@ interface ConfirmContributionModalProps {
   contribution: Contribution;
   onClose: () => void;
   onConfirm: (contributionId: number) => void;
+  onConfirmAdjusted: (contributionId: number, adjustedAmount: number) => void;
+  onReject: (contributionId: number, reason?: string) => void;
 }
 
-function ConfirmContributionModal({ contribution, onClose, onConfirm }: ConfirmContributionModalProps) {
+function ConfirmContributionModal({ contribution, onClose, onConfirm, onConfirmAdjusted, onReject }: ConfirmContributionModalProps) {
   const [isProcessing, setIsProcessing] = useState(false);
+  const [mode, setMode] = useState<'review' | 'adjust' | 'reject'>('review');
+  const [adjustedAmount, setAdjustedAmount] = useState(contribution.amount);
+  const [rejectReason, setRejectReason] = useState('');
 
   const handleConfirm = () => {
     setIsProcessing(true);
-    setTimeout(() => {
+    if (mode === 'adjust' && adjustedAmount !== contribution.amount) {
+      onConfirmAdjusted(contribution.id, adjustedAmount);
+    } else {
       onConfirm(contribution.id);
-      setIsProcessing(false);
-    }, 1000);
+    }
+  };
+
+  const handleReject = () => {
+    setIsProcessing(true);
+    onReject(contribution.id, rejectReason || undefined);
   };
 
   return (
@@ -1364,7 +1375,7 @@ function ConfirmContributionModal({ contribution, onClose, onConfirm }: ConfirmC
       <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
         <div className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-800">Confirm Contribution</h2>
+            <h2 className="text-xl font-semibold text-gray-800">Review Payment</h2>
             <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
               <X className="w-5 h-5" />
             </button>
@@ -1384,7 +1395,7 @@ function ConfirmContributionModal({ contribution, onClose, onConfirm }: ConfirmC
 
           <div className="space-y-3 mb-6">
             <div className="flex justify-between items-center py-2 border-b border-gray-100">
-              <span className="text-gray-600">Amount:</span>
+              <span className="text-gray-600">Original Amount:</span>
               <span className="font-bold text-lg text-primary-600">
                 R {contribution.amount.toLocaleString()}
               </span>
@@ -1399,35 +1410,294 @@ function ConfirmContributionModal({ contribution, onClose, onConfirm }: ConfirmC
             </div>
           </div>
 
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-6">
-            <p className="text-xs text-yellow-700 flex items-center">
-              <AlertCircle className="w-3 h-3 mr-1" />
-              Confirming this payment will update the member's contribution history and group total.
-            </p>
+          {mode === 'review' && (
+            <>
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-6">
+                <p className="text-xs text-yellow-700 flex items-center">
+                  <AlertCircle className="w-3 h-3 mr-1" />
+                  You can confirm, adjust the amount, or reject this payment.
+                </p>
+              </div>
+              <div className="flex flex-col space-y-2">
+                <button
+                  onClick={handleConfirm}
+                  disabled={isProcessing}
+                  className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2 disabled:opacity-50"
+                >
+                  {isProcessing ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Processing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="w-4 h-4" />
+                      <span>Confirm Full Amount (R {contribution.amount.toLocaleString()})</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => setMode('adjust')}
+                  disabled={isProcessing}
+                  className="w-full px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors flex items-center justify-center space-x-2"
+                >
+                  <Edit2 className="w-4 h-4" />
+                  <span>Adjust Amount</span>
+                </button>
+                <button
+                  onClick={() => setMode('reject')}
+                  disabled={isProcessing}
+                  className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center space-x-2"
+                >
+                  <XCircle className="w-4 h-4" />
+                  <span>Reject Payment</span>
+                </button>
+                <button onClick={onClose} className="w-full px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors" disabled={isProcessing}>
+                  Cancel
+                </button>
+              </div>
+            </>
+          )}
+
+          {mode === 'adjust' && (
+            <>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Adjusted Amount (R)</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={adjustedAmount}
+                  onChange={e => setAdjustedAmount(Number(e.target.value))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                />
+                {adjustedAmount !== contribution.amount && (
+                  <p className="text-xs text-orange-600 mt-1">
+                    Changed from R {contribution.amount.toLocaleString()} → R {adjustedAmount.toLocaleString()}
+                  </p>
+                )}
+              </div>
+              <div className="flex space-x-3">
+                <button onClick={() => setMode('review')} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors" disabled={isProcessing}>
+                  Back
+                </button>
+                <button
+                  onClick={handleConfirm}
+                  disabled={isProcessing || adjustedAmount <= 0}
+                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2 disabled:opacity-50"
+                >
+                  {isProcessing ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Processing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="w-4 h-4" />
+                      <span>Confirm R {adjustedAmount.toLocaleString()}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </>
+          )}
+
+          {mode === 'reject' && (
+            <>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Reason for Rejection (optional)</label>
+                <textarea
+                  value={rejectReason}
+                  onChange={e => setRejectReason(e.target.value)}
+                  rows={3}
+                  placeholder="e.g. Amount received does not match, payment not verified..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                />
+              </div>
+              <div className="flex space-x-3">
+                <button onClick={() => setMode('review')} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors" disabled={isProcessing}>
+                  Back
+                </button>
+                <button
+                  onClick={handleReject}
+                  disabled={isProcessing}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center space-x-2 disabled:opacity-50"
+                >
+                  {isProcessing ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Rejecting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="w-4 h-4" />
+                      <span>Reject Payment</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Loan Action Modal
+interface LoanActionModalProps {
+  loan: any;
+  onClose: () => void;
+  onApprove: (loanId: number) => void;
+  onReject: (loanId: number, reason: string) => void;
+}
+
+function LoanActionModal({ loan, onClose, onApprove, onReject }: LoanActionModalProps) {
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [mode, setMode] = useState<'review' | 'reject'>('review');
+  const [rejectReason, setRejectReason] = useState('');
+
+  const handleApprove = () => {
+    setIsProcessing(true);
+    onApprove(loan.id);
+  };
+
+  const handleReject = () => {
+    if (!rejectReason.trim()) return;
+    setIsProcessing(true);
+    onReject(loan.id, rejectReason);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-gray-800">Review Loan Request</h2>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+              <X className="w-5 h-5" />
+            </button>
           </div>
 
-          <div className="flex space-x-3">
-            <button onClick={onClose} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors" disabled={isProcessing}>
-              Cancel
-            </button>
-            <button
-              onClick={handleConfirm}
-              disabled={isProcessing}
-              className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isProcessing ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  <span>Processing...</span>
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="w-4 h-4" />
-                  <span>Confirm Payment</span>
-                </>
-              )}
-            </button>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                <DollarSign className="w-6 h-6 text-blue-600" />
+              </div>
+              <div>
+                <p className="font-medium text-gray-800">{loan.userName}</p>
+                <p className="text-sm text-gray-500">{loan.stokvelName}</p>
+              </div>
+            </div>
           </div>
+
+          <div className="space-y-3 mb-6">
+            <div className="flex justify-between items-center py-2 border-b border-gray-100">
+              <span className="text-gray-600">Loan Amount:</span>
+              <span className="font-bold text-lg text-primary-600">
+                R {Number(loan.amount).toLocaleString()}
+              </span>
+            </div>
+            <div className="flex justify-between items-center py-2 border-b border-gray-100">
+              <span className="text-gray-600">Interest (30%):</span>
+              <span className="font-medium text-orange-600">
+                R {(Number(loan.amount) * 0.3).toLocaleString()}
+              </span>
+            </div>
+            <div className="flex justify-between items-center py-2 border-b border-gray-100">
+              <span className="text-gray-600">Total Repayment:</span>
+              <span className="font-bold text-red-600">
+                R {(Number(loan.amount) * 1.3).toLocaleString()}
+              </span>
+            </div>
+            <div className="flex justify-between items-center py-2 border-b border-gray-100">
+              <span className="text-gray-600">Date Requested:</span>
+              <span className="font-medium">{loan.createdAt ? new Date(loan.createdAt).toLocaleString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A'}</span>
+            </div>
+            {loan.purpose && (
+              <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                <span className="text-gray-600">Purpose:</span>
+                <span className="font-medium">{loan.purpose}</span>
+              </div>
+            )}
+          </div>
+
+          {mode === 'review' && (
+            <>
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-6">
+                <p className="text-xs text-yellow-700 flex items-center">
+                  <AlertCircle className="w-3 h-3 mr-1" />
+                  Approving will deduct the loan amount from the member's savings and mark the loan as active.
+                </p>
+              </div>
+              <div className="flex flex-col space-y-2">
+                <button
+                  onClick={handleApprove}
+                  disabled={isProcessing}
+                  className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2 disabled:opacity-50"
+                >
+                  {isProcessing ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Processing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="w-4 h-4" />
+                      <span>Approve Loan</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => setMode('reject')}
+                  disabled={isProcessing}
+                  className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center space-x-2"
+                >
+                  <XCircle className="w-4 h-4" />
+                  <span>Reject Loan</span>
+                </button>
+                <button onClick={onClose} className="w-full px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors" disabled={isProcessing}>
+                  Cancel
+                </button>
+              </div>
+            </>
+          )}
+
+          {mode === 'reject' && (
+            <>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Reason for Rejection <span className="text-red-500">*</span></label>
+                <textarea
+                  value={rejectReason}
+                  onChange={e => setRejectReason(e.target.value)}
+                  rows={3}
+                  placeholder="e.g. Insufficient savings balance, outstanding loan exists..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                />
+              </div>
+              <div className="flex space-x-3">
+                <button onClick={() => setMode('review')} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors" disabled={isProcessing}>
+                  Back
+                </button>
+                <button
+                  onClick={handleReject}
+                  disabled={isProcessing || !rejectReason.trim()}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center space-x-2 disabled:opacity-50"
+                >
+                  {isProcessing ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Rejecting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="w-4 h-4" />
+                      <span>Reject Loan</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -1491,7 +1761,7 @@ function SettingsModal({ onClose, onSave }: SettingsModalProps) {
     // Load settings from localStorage if they exist
     const savedSettings = localStorage.getItem('adminSettings');
     return savedSettings ? JSON.parse(savedSettings) : {
-      siteName: 'HENNESSY SOCIAL CLUB',
+      siteName: 'FUND MATE',
       adminEmail: 'admin@hennessyclub.co.za',
       currency: 'ZAR',
       dateFormat: 'DD MMM YYYY',
@@ -2031,6 +2301,7 @@ export default function AdminDashboard() {
   const [showDeleteStokvelConfirm, setShowDeleteStokvelConfirm] = useState<number | null>(null);
   const [showApproveUserModal, setShowApproveUserModal] = useState<User | null>(null);
   const [showConfirmContributionModal, setShowConfirmContributionModal] = useState<Contribution | null>(null);
+  const [showLoanActionModal, setShowLoanActionModal] = useState<any>(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [showDeletedUsersModal, setShowDeletedUsersModal] = useState(false);
@@ -2043,8 +2314,13 @@ export default function AdminDashboard() {
   const [stokvels, setStokvels] = useState<Stokvel[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [contributions, setContributions] = useState<Contribution[]>([]);
+  const [pendingLoanRequests, setPendingLoanRequests] = useState<any[]>([]);
   const [apiStats, setApiStats] = useState<any>(null);
   const [joinRequests, setJoinRequests] = useState<any[]>([]);
+  const [fines, setFines] = useState<any[]>([]);
+  const [finesSummary, setFinesSummary] = useState<any>({ unpaidTotal: 0, paidTotal: 0, unpaidCount: 0, totalCount: 0 });
+  const [fineTypes, setFineTypes] = useState<any[]>([]);
+  const [showIssueFineModal, setShowIssueFineModal] = useState(false);
 
   // ── Load all data from backend ──
   const fetchData = useCallback(async () => {
@@ -2056,6 +2332,8 @@ export default function AdminDashboard() {
         adminApi.listContributions({ limit: 100 }),
         adminApi.listDeletedUsers(),
         adminApi.listJoinRequests(),
+        adminApi.listLoans({ status: 'pending' }),
+        adminApi.listFines(),
       ]);
 
       const statsRes = results[0].status === 'fulfilled' ? results[0].value : null;
@@ -2064,8 +2342,16 @@ export default function AdminDashboard() {
       const contributionsRes = results[3].status === 'fulfilled' ? results[3].value : null;
       const deletedRes = results[4].status === 'fulfilled' ? results[4].value : null;
       const joinReqRes = results[5].status === 'fulfilled' ? results[5].value : null;
+      const loansRes = results[6].status === 'fulfilled' ? results[6].value : null;
+      const finesRes = results[7].status === 'fulfilled' ? results[7].value : null;
 
       if (statsRes) setApiStats(statsRes.data);
+
+      if (finesRes) {
+        setFines(finesRes.data.data || []);
+        setFinesSummary(finesRes.data.summary || { unpaidTotal: 0, paidTotal: 0, unpaidCount: 0, totalCount: 0 });
+        setFineTypes(finesRes.data.fineTypes || []);
+      }
 
       if (usersRes) {
       setUsers(
@@ -2159,6 +2445,7 @@ export default function AdminDashboard() {
       }
 
       if (joinReqRes) setJoinRequests(joinReqRes.data || []);
+      if (loansRes) setPendingLoanRequests(loansRes.data?.data || []);
     } catch (err) {
       console.error('Failed to load admin data:', err);
     } finally {
@@ -2344,6 +2631,28 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleIssueFine = async (data: { userId: number; fineType: string; reason?: string }) => {
+    try {
+      const res = await adminApi.issueFine(data);
+      showSuccess(res.data.message || 'Fine issued successfully');
+      setShowIssueFineModal(false);
+      fetchData();
+    } catch (err: any) {
+      const msg = err.response?.data?.error || 'Failed to issue fine';
+      showError(msg);
+    }
+  };
+
+  const handleDeleteFine = async (fineId: number) => {
+    try {
+      await adminApi.deleteFine(fineId);
+      showSuccess('Fine removed');
+      fetchData();
+    } catch (err: any) {
+      showError(err.response?.data?.error || 'Failed to delete fine');
+    }
+  };
+
   const handleEditStokvel = async (updatedStokvel: Stokvel) => {
     try {
       await adminApi.updateStokvel(updatedStokvel.id, {
@@ -2416,6 +2725,58 @@ export default function AdminDashboard() {
     } catch (err: any) {
       setShowConfirmContributionModal(null);
       const msg = err.response?.data?.error || 'Failed to confirm payment';
+      showError(msg);
+    }
+  };
+
+  const handleConfirmContributionAdjusted = async (contributionId: number, adjustedAmount: number) => {
+    try {
+      await adminApi.confirmContributionAdjusted(contributionId, adjustedAmount);
+      setShowConfirmContributionModal(null);
+      showSuccess(`Payment confirmed with adjusted amount of R ${adjustedAmount.toLocaleString()}!`);
+      await fetchData();
+    } catch (err: any) {
+      setShowConfirmContributionModal(null);
+      const msg = err.response?.data?.error || 'Failed to confirm payment';
+      showError(msg);
+    }
+  };
+
+  const handleRejectContribution = async (contributionId: number, reason?: string) => {
+    try {
+      await adminApi.rejectContribution(contributionId, reason);
+      setShowConfirmContributionModal(null);
+      showSuccess('Payment rejected.');
+      await fetchData();
+    } catch (err: any) {
+      setShowConfirmContributionModal(null);
+      const msg = err.response?.data?.error || 'Failed to reject payment';
+      showError(msg);
+    }
+  };
+
+  const handleApproveLoan = async (loanId: number) => {
+    try {
+      await adminApi.approveLoan(loanId);
+      setShowLoanActionModal(null);
+      showSuccess('Loan approved successfully!');
+      await fetchData();
+    } catch (err: any) {
+      setShowLoanActionModal(null);
+      const msg = err.response?.data?.error || 'Failed to approve loan';
+      showError(msg);
+    }
+  };
+
+  const handleRejectLoan = async (loanId: number, reason: string) => {
+    try {
+      await adminApi.rejectLoan(loanId, reason);
+      setShowLoanActionModal(null);
+      showSuccess('Loan request rejected.');
+      await fetchData();
+    } catch (err: any) {
+      setShowLoanActionModal(null);
+      const msg = err.response?.data?.error || 'Failed to reject loan';
       showError(msg);
     }
   };
@@ -2531,7 +2892,7 @@ export default function AdminDashboard() {
             <div className="flex items-center space-x-4">
               <Shield className="w-8 h-8 text-primary-200" />
               <div>
-                <h1 className="text-2xl font-bold">HENNESSY SOCIAL CLUB</h1>
+                <h1 className="text-2xl font-bold">FUND MATE</h1>
                 <p className="text-sm text-primary-200">Admin Dashboard</p>
               </div>
             </div>
@@ -2618,6 +2979,21 @@ export default function AdminDashboard() {
               {joinRequests.length > 0 && (
                 <span className="ml-2 bg-red-500 text-white text-xs rounded-full px-2 py-0.5">
                   {joinRequests.length}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab('fines')}
+              className={`px-4 py-3 font-medium text-sm transition-colors border-b-2 relative ${
+                activeTab === 'fines'
+                  ? 'border-primary-600 text-primary-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Fines
+              {finesSummary.unpaidCount > 0 && (
+                <span className="ml-2 bg-orange-500 text-white text-xs rounded-full px-2 py-0.5">
+                  {finesSummary.unpaidCount}
                 </span>
               )}
             </button>
@@ -2709,6 +3085,140 @@ export default function AdminDashboard() {
               </button>
             </div>
 
+            {/* Interest Pot Section */}
+            {apiStats?.interestPot && (
+              <div className="bg-gradient-to-r from-amber-50 to-yellow-50 rounded-xl shadow-sm border border-amber-200 p-6">
+                <h3 className="font-semibold text-amber-800 mb-4 flex items-center">
+                  <DollarSign className="w-5 h-5 text-amber-600 mr-2" />
+                  Interest Pot
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="bg-white rounded-lg p-4">
+                    <p className="text-xs text-gray-500 mb-1">Total Earned</p>
+                    <p className="text-xl font-bold text-green-600">{formatCurrency(apiStats.interestPot.totalEarned)}</p>
+                    <p className="text-xs text-gray-400 mt-1">{apiStats.interestPot.repaidLoans} repaid loan{apiStats.interestPot.repaidLoans !== 1 ? 's' : ''}</p>
+                  </div>
+                  <div className="bg-white rounded-lg p-4">
+                    <p className="text-xs text-gray-500 mb-1">Pending Interest</p>
+                    <p className="text-xl font-bold text-orange-600">{formatCurrency(apiStats.interestPot.pendingInterest)}</p>
+                    <p className="text-xs text-gray-400 mt-1">{apiStats.interestPot.activeLoansCount} active loan{apiStats.interestPot.activeLoansCount !== 1 ? 's' : ''}</p>
+                  </div>
+                  <div className="bg-white rounded-lg p-4">
+                    <p className="text-xs text-gray-500 mb-1">Total Interest (Earned + Pending)</p>
+                    <p className="text-xl font-bold text-amber-700">{formatCurrency(apiStats.interestPot.totalEarned + apiStats.interestPot.pendingInterest)}</p>
+                  </div>
+                  <div className="bg-white rounded-lg p-4">
+                    <p className="text-xs text-gray-500 mb-1">Active Loans</p>
+                    <p className="text-xl font-bold text-blue-600">{apiStats.activeLoans || 0}</p>
+                    <p className="text-xs text-gray-400 mt-1">{formatCurrency(apiStats.activeLoanAmount || 0)} total</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* All Members Section */}
+            {apiStats?.allMembers && apiStats.allMembers.length > 0 && (
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <h3 className="font-semibold text-gray-800 mb-4 flex items-center">
+                  <Users className="w-5 h-5 text-primary-600 mr-2" />
+                  All Members — Savings Progress
+                  <span className="ml-2 bg-primary-100 text-primary-700 text-xs font-medium px-2 py-0.5 rounded-full">
+                    {apiStats.allMembers.length}
+                  </span>
+                </h3>
+                <div className="space-y-3">
+                  {apiStats.allMembers.map((member: any) => (
+                    <div key={member.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
+                          <span className="text-xs font-medium text-primary-700">
+                            {member.name.split(' ').map((n: string) => n[0]).join('').toUpperCase()}
+                          </span>
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-800">{member.name}</p>
+                          <p className="text-xs text-gray-500">{member.stokvelName}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-4">
+                        <div className="w-32">
+                          <div className="flex justify-between text-xs mb-1">
+                            <span className="text-gray-500">{member.progress}%</span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-1.5">
+                            <div className="bg-primary-600 h-1.5 rounded-full" style={{ width: `${Math.min(100, member.progress)}%` }}></div>
+                          </div>
+                        </div>
+                        <div className="text-right min-w-[100px]">
+                          <p className="font-semibold text-gray-800">{formatCurrency(member.savedAmount)}</p>
+                          <p className="text-xs text-gray-500">of {formatCurrency(member.targetAmount)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* All Active Loans Section */}
+            {apiStats?.allActiveLoans && apiStats.allActiveLoans.length > 0 && (
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <h3 className="font-semibold text-gray-800 mb-4 flex items-center">
+                  <DollarSign className="w-5 h-5 text-red-500 mr-2" />
+                  All Loans (Active, Overdue & Pending)
+                  <span className="ml-2 bg-red-100 text-red-700 text-xs font-medium px-2 py-0.5 rounded-full">
+                    {apiStats.allActiveLoans.length}
+                  </span>
+                </h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-gray-500 border-b border-gray-200">
+                        <th className="pb-2 font-medium">Member</th>
+                        <th className="pb-2 font-medium">Target</th>
+                        <th className="pb-2 font-medium">Principal</th>
+                        <th className="pb-2 font-medium">Interest</th>
+                        <th className="pb-2 font-medium">Total</th>
+                        <th className="pb-2 font-medium">Status</th>
+                        <th className="pb-2 font-medium">Due Date</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {apiStats.allActiveLoans.map((loan: any) => (
+                        <tr key={loan.id} className="hover:bg-gray-50">
+                          <td className="py-3">
+                            <p className="font-medium text-gray-800">{loan.userName}</p>
+                            <p className="text-xs text-gray-500">{loan.stokvelName}</p>
+                          </td>
+                          <td className="py-3">
+                            <span className={`px-2 py-0.5 text-xs rounded-full ${loan.loanTarget === 'madala-side' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                              {loan.loanTarget === 'madala-side' ? 'Madala Side' : 'Collective Pot'}
+                            </span>
+                          </td>
+                          <td className="py-3 font-medium">{formatCurrency(loan.amount)}</td>
+                          <td className="py-3 text-orange-600">{formatCurrency(loan.interest)}</td>
+                          <td className="py-3 font-bold text-primary-700">{formatCurrency(loan.totalRepayable)}</td>
+                          <td className="py-3">
+                            <span className={`px-2 py-0.5 text-xs rounded-full ${
+                              loan.status === 'active' ? 'bg-green-100 text-green-700' :
+                              loan.status === 'overdue' ? 'bg-red-100 text-red-700' :
+                              loan.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                              'bg-gray-100 text-gray-700'
+                            }`}>
+                              {loan.status}
+                            </span>
+                          </td>
+                          <td className="py-3 text-gray-600">
+                            {loan.dueDate ? new Date(loan.dueDate).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Pending'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
             {pendingUsers.length > 0 && (
               <div className="bg-yellow-50 rounded-xl shadow-sm border border-yellow-200 p-6">
                 <h3 className="font-semibold text-yellow-800 mb-4 flex items-center">
@@ -2774,6 +3284,41 @@ export default function AdminDashboard() {
                         className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                       >
                         Review Payment
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {pendingLoanRequests.length > 0 && (
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <h3 className="font-semibold text-gray-800 mb-4 flex items-center">
+                  <DollarSign className="w-5 h-5 text-blue-500 mr-2" />
+                  Pending Loan Requests
+                  <span className="ml-2 bg-blue-100 text-blue-700 text-xs font-medium px-2 py-0.5 rounded-full">
+                    {pendingLoanRequests.length}
+                  </span>
+                </h3>
+                <div className="space-y-3">
+                  {pendingLoanRequests.map((loan: any) => (
+                    <div key={loan.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                          <DollarSign className="w-4 h-4 text-blue-700" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-800">{loan.userName}</p>
+                          <p className="text-sm text-gray-500">
+                            {loan.stokvelName} • R {Number(loan.amount).toLocaleString()} • {new Date(loan.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setShowLoanActionModal(loan)}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                      >
+                        Review Loan
                       </button>
                     </div>
                   ))}
@@ -3153,7 +3698,187 @@ export default function AdminDashboard() {
             )}
           </div>
         )}
+
+        {activeTab === 'fines' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-gray-800">Fines Management</h2>
+                <p className="text-sm text-gray-500 mt-1">Issue and manage member fines</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowIssueFineModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm font-medium"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  Issue Fine
+                </button>
+                <button onClick={fetchData} className="flex items-center gap-2 px-4 py-2 bg-primary-50 text-primary-700 rounded-lg hover:bg-primary-100 transition-colors">
+                  <RefreshCw className="w-4 h-4" />
+                  Refresh
+                </button>
+              </div>
+            </div>
+
+            {/* Fine Types Reference */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {fineTypes.map((ft: any) => (
+                <div key={ft.value} className="bg-white rounded-lg border border-gray-200 p-4 text-center">
+                  <p className="text-sm font-medium text-gray-700">{ft.label}</p>
+                  <p className="text-xl font-bold text-red-600 mt-1">R {ft.amount}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                <p className="text-sm text-red-600">Unpaid Fines</p>
+                <p className="text-2xl font-bold text-red-700">{formatCurrency(finesSummary.unpaidTotal)}</p>
+                <p className="text-xs text-red-500">{finesSummary.unpaidCount} outstanding</p>
+              </div>
+              <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                <p className="text-sm text-green-600">Paid Fines</p>
+                <p className="text-2xl font-bold text-green-700">{formatCurrency(finesSummary.paidTotal)}</p>
+              </div>
+              <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                <p className="text-sm text-gray-600">Total Fines Issued</p>
+                <p className="text-2xl font-bold text-gray-700">{finesSummary.totalCount}</p>
+              </div>
+            </div>
+
+            {/* Fines Table */}
+            {fines.length === 0 ? (
+              <div className="bg-white rounded-xl shadow-sm border p-12 text-center">
+                <AlertCircle className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-600">No fines issued yet</h3>
+                <p className="text-sm text-gray-400 mt-1">Click "Issue Fine" to fine a member</p>
+              </div>
+            ) : (
+              <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Member</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fine Type</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {fines.map((fine: any) => (
+                        <tr key={fine.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center font-semibold text-xs">
+                                {fine.userName?.split(' ').map((n: string) => n[0]).join('').toUpperCase() || '?'}
+                              </div>
+                              <div>
+                                <p className="font-medium text-gray-800">{fine.userName}</p>
+                                <p className="text-xs text-gray-500">{fine.stokvelName}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="px-2.5 py-1 bg-orange-100 text-orange-700 text-xs rounded-full font-medium">
+                              {fine.fineLabel}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 font-semibold text-gray-800">R {fine.amount}</td>
+                          <td className="px-6 py-4">
+                            <span className={`px-2 py-1 text-xs rounded-full font-medium ${
+                              fine.status === 'paid' ? 'bg-green-100 text-green-700' : fine.status === 'pending' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
+                            }`}>
+                              {fine.status === 'paid' ? 'Paid' : fine.status === 'pending' ? 'Cash Pending' : 'Unpaid'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-500">
+                            {fine.createdAt ? new Date(fine.createdAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A'}
+                          </td>
+                          <td className="px-6 py-4 text-right space-x-2">
+                            {fine.status === 'pending' && (
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    await adminApi.confirmFine(fine.id);
+                                    showSuccess('Fine payment confirmed');
+                                    fetchData();
+                                  } catch { showError('Failed to confirm'); }
+                                }}
+                                className="text-green-600 hover:text-green-800 text-sm font-medium"
+                              >
+                                Confirm
+                              </button>
+                            )}
+                            {fine.status !== 'paid' && (
+                              <button
+                                onClick={() => handleDeleteFine(fine.id)}
+                                className="text-red-500 hover:text-red-700 text-sm font-medium"
+                              >
+                                Remove
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </main>
+
+      {/* Issue Fine Modal */}
+      {showIssueFineModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Issue a Fine</h3>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const form = e.target as HTMLFormElement;
+              const formData = new FormData(form);
+              handleIssueFine({
+                userId: Number(formData.get('userId')),
+                fineType: formData.get('fineType') as string,
+                reason: (formData.get('reason') as string) || undefined,
+              });
+            }} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Member *</label>
+                <select name="userId" required className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500">
+                  <option value="">Select a member</option>
+                  {users.filter(u => u.status === 'active').map(u => (
+                    <option key={u.id} value={u.id}>{u.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Fine Type *</label>
+                <select name="fineType" required className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500">
+                  <option value="">Select fine type</option>
+                  {fineTypes.map((ft: any) => (
+                    <option key={ft.value} value={ft.value}>{ft.label} — R{ft.amount}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Reason (optional)</label>
+                <textarea name="reason" rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="e.g. Missed Sunday meeting..." />
+              </div>
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button type="button" onClick={() => setShowIssueFineModal(false)} className="px-4 py-2 text-gray-600 hover:text-gray-800">Cancel</button>
+                <button type="submit" className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium">Issue Fine</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {showAddUserModal && (
         <AddUserModal
@@ -3221,6 +3946,17 @@ export default function AdminDashboard() {
           contribution={showConfirmContributionModal}
           onClose={() => setShowConfirmContributionModal(null)}
           onConfirm={handleConfirmContribution}
+          onConfirmAdjusted={handleConfirmContributionAdjusted}
+          onReject={handleRejectContribution}
+        />
+      )}
+
+      {showLoanActionModal && (
+        <LoanActionModal
+          loan={showLoanActionModal}
+          onClose={() => setShowLoanActionModal(null)}
+          onApprove={handleApproveLoan}
+          onReject={handleRejectLoan}
         />
       )}
 

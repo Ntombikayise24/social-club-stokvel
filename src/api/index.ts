@@ -108,10 +108,11 @@ export const loanApi = {
     profileId: number;
     purpose?: string;
     cardId?: number;
+    loanTarget?: string;
   }) => api.post('/loans/request', data),
 
-  repay: (id: number, cardId?: number) =>
-    api.post(`/loans/${id}/repay`, { cardId }),
+  repay: (id: number, cardId?: number, paymentMethod?: string) =>
+    api.post(`/loans/${id}/repay`, { cardId, paymentMethod }),
 
   download: (params: { profileId?: number; format: string }) =>
     api.get('/loans/download', { params, responseType: 'blob' }),
@@ -240,6 +241,22 @@ export const adminApi = {
   confirmContribution: (id: number) =>
     api.post(`/admin/contributions/${id}/confirm`),
 
+  confirmContributionAdjusted: (id: number, adjustedAmount: number) =>
+    api.post(`/admin/contributions/${id}/confirm-adjusted`, { adjustedAmount }),
+
+  rejectContribution: (id: number, reason?: string) =>
+    api.post(`/admin/contributions/${id}/reject`, { reason }),
+
+  // Loans
+  listLoans: (params?: Record<string, unknown>) =>
+    api.get('/admin/loans', { params }),
+
+  approveLoan: (id: number) =>
+    api.post(`/admin/loans/${id}/approve`),
+
+  rejectLoan: (id: number, reason?: string) =>
+    api.post(`/admin/loans/${id}/reject`, { reason }),
+
   // Site settings
   getSiteSettings: () => api.get('/admin/settings'),
 
@@ -264,16 +281,41 @@ export const adminApi = {
 
   rejectJoinRequest: (id: number) =>
     api.post(`/admin/join-requests/${id}/reject`),
+
+  // Fines
+  listFines: () => api.get('/admin/fines'),
+
+  issueFine: (data: { userId: number; fineType: string; reason?: string }) =>
+    api.post('/admin/fines', data),
+
+  deleteFine: (id: number) => api.delete(`/admin/fines/${id}`),
+
+  confirmFine: (id: number) => api.post(`/admin/fines/${id}/confirm`),
 };
 
 // ══════════════════════════════════════════
 //  PAYMENTS (Paystack)
 // ══════════════════════════════════════════
 
+// ══════════════════════════════════════════
+//  FINES
+// ══════════════════════════════════════════
+
+export const finesApi = {
+  list: (params?: { status?: string }) =>
+    api.get('/fines', { params }),
+
+  pay: (id: number, data?: { paymentMethod?: string; cardId?: number }) =>
+    api.post(`/fines/${id}/pay`, data || {}),
+};
+
 export const paymentApi = {
-  initialize: (data: { amount: number; profileId: number; stokvelId?: number }) =>
+  initialize: (data: { amount: number; profileId: number; stokvelId?: number; contributionType?: string }) =>
     api.post('/payments/initialize', data),
 
   verify: (reference: string) =>
     api.get(`/payments/verify/${reference}`),
+
+  cash: (data: { amount: number; profileId: number; stokvelId?: number; contributionType?: string }) =>
+    api.post('/payments/cash', data),
 };

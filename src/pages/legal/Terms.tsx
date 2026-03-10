@@ -11,7 +11,7 @@ export default function Terms() {
             <button onClick={() => navigate(-1)} className="text-gray-600 hover:text-primary-600">
               <ArrowLeft className="w-5 h-5" />
             </button>
-            <h1 className="text-2xl font-bold text-primary-800">HENNESSY SOCIAL CLUB</h1>
+            <h1 className="text-2xl font-bold text-primary-800">FUND MATE</h1>
           </div>
         </div>
       </header>
@@ -28,7 +28,7 @@ export default function Terms() {
                 1. Acceptance of Terms
               </h2>
               <p className="text-gray-600 leading-relaxed">
-                By accessing or using HENNESSY SOCIAL CLUB, you agree to be bound by these Terms and Conditions. 
+                By accessing or using FUND MATE, you agree to be bound by these Terms and Conditions. 
                 If you do not agree to these terms, please do not use our service.
               </p>
             </section>
@@ -106,7 +106,7 @@ export default function Terms() {
                 6. Account Termination
               </h2>
               <p className="text-gray-600 leading-relaxed mb-3">
-                HENNESSY SOCIAL CLUB reserves the right to terminate or suspend accounts that violate these terms. 
+                FUND MATE reserves the right to terminate or suspend accounts that violate these terms. 
                 Upon termination:
               </p>
               <ul className="list-disc list-inside text-gray-600 space-y-2 ml-4">

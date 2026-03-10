@@ -46,7 +46,7 @@ export async function sendApprovalEmail(email, fullName, stokvelNames = []) {
         Hi <strong>${fullName}</strong>,
       </p>
       <p style="margin:0 0 16px;color:#374151;font-size:16px;">
-        Great news! Your account has been reviewed and <strong style="color:#16a34a;">approved</strong> by our admin team. You can now log in and start contributing to your stokvel.
+        Great news! Your account has been reviewed and <strong style="color:#16a34a;">approved</strong> by our admin team. You can now log in and start contributing to your savings group.
       </p>
 
       ${stokvelList}
@@ -75,13 +75,13 @@ export async function sendApprovalEmail(email, fullName, stokvelNames = []) {
     <!-- Footer -->
     <div style="background:#f9fafb;padding:16px 24px;text-align:center;">
       <p style="margin:0;color:#9ca3af;font-size:12px;">
-        &copy; ${new Date().getFullYear()} Stokvel Management System. All rights reserved.
+        &copy; ${new Date().getFullYear()} Fund Mate. All rights reserved.
       </p>
     </div>
   </div>`;
 
   const mailOptions = {
-    from: `"Stokvel Management" <${process.env.SMTP_USER || 'noreply@stokvel.co.za'}>`,
+    from: `"Fund Mate" <${process.env.SMTP_USER || 'noreply@fundmate.co.za'}>`,
     to: email,
     subject: '🎉 Your Account Has Been Approved!',
     html,
@@ -135,20 +135,20 @@ export async function sendJoinRequestApprovedEmail(email, fullName, stokvelName)
       <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;" />
 
       <p style="margin:0;color:#9ca3af;font-size:13px;text-align:center;">
-        If you did not request to join this stokvel, please ignore this email.
+        If you did not request to join this group, please ignore this email.
       </p>
     </div>
 
     <!-- Footer -->
     <div style="background:#f9fafb;padding:16px 24px;text-align:center;">
       <p style="margin:0;color:#9ca3af;font-size:12px;">
-        &copy; ${new Date().getFullYear()} Stokvel Management System. All rights reserved.
+        &copy; ${new Date().getFullYear()} Fund Mate. All rights reserved.
       </p>
     </div>
   </div>`;
 
   const mailOptions = {
-    from: `"Stokvel Management" <${process.env.SMTP_USER || 'noreply@stokvel.co.za'}>`,
+    from: `"Fund Mate" <${process.env.SMTP_USER || 'noreply@fundmate.co.za'}>`,
     to: email,
     subject: `🎉 You've been added to ${stokvelName}!`,
     html,
@@ -174,7 +174,7 @@ export async function sendStokvelAssignmentEmail(email, fullName, stokvelNames =
   <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
     <!-- Header -->
     <div style="background:linear-gradient(135deg,#2563eb,#1d4ed8);padding:32px 24px;text-align:center;">
-      <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;">New Stokvel Assignment! 🎉</h1>
+      <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;">New Group Assignment! 🎉</h1>
     </div>
 
     <!-- Body -->
@@ -183,7 +183,7 @@ export async function sendStokvelAssignmentEmail(email, fullName, stokvelNames =
         Hi <strong>${fullName}</strong>,
       </p>
       <p style="margin:0 0 16px;color:#374151;font-size:16px;">
-        You have been assigned to ${stokvelNames.length === 1 ? 'a new stokvel' : 'new stokvels'} by the admin. You can now start contributing!
+        You have been assigned to ${stokvelNames.length === 1 ? 'a new group' : 'new groups'} by the admin. You can now start contributing!
       </p>
 
       <p style="margin:0 0 8px;font-weight:600;color:#374151;">You've been added to:</p>
@@ -215,23 +215,23 @@ export async function sendStokvelAssignmentEmail(email, fullName, stokvelNames =
     <!-- Footer -->
     <div style="background:#f9fafb;padding:16px 24px;text-align:center;">
       <p style="margin:0;color:#9ca3af;font-size:12px;">
-        &copy; ${new Date().getFullYear()} Stokvel Management System. All rights reserved.
+        &copy; ${new Date().getFullYear()} Fund Mate. All rights reserved.
       </p>
     </div>
   </div>`;
 
   const mailOptions = {
-    from: `"Stokvel Management" <${process.env.SMTP_USER || 'noreply@stokvel.co.za'}>`,
+    from: `"Fund Mate" <${process.env.SMTP_USER || 'noreply@fundmate.co.za'}>`,
     to: email,
-    subject: `🎉 You've been assigned to ${stokvelNames.length === 1 ? stokvelNames[0] : 'new stokvels'}!`,
+    subject: `🎉 You've been assigned to ${stokvelNames.length === 1 ? stokvelNames[0] : 'new groups'}!`,
     html,
   };
 
   try {
     await transporter.sendMail(mailOptions);
-    console.log(`📧 Stokvel assignment email sent to ${email}`);
+    console.log(`📧 group assignment email sent to ${email}`);
   } catch (err) {
-    console.error(`⚠️  Failed to send stokvel assignment email to ${email}:`, err.message);
+    console.error(`⚠️  Failed to send group assignment email to ${email}:`, err.message);
   }
 }
 
@@ -247,7 +247,7 @@ export async function sendStokvelUnassignmentEmail(email, fullName, stokvelNames
   <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
     <!-- Header -->
     <div style="background:linear-gradient(135deg,#dc2626,#b91c1c);padding:32px 24px;text-align:center;">
-      <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;">Stokvel Membership Update</h1>
+      <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;">Group Membership Update</h1>
     </div>
 
     <!-- Body -->
@@ -256,7 +256,7 @@ export async function sendStokvelUnassignmentEmail(email, fullName, stokvelNames
         Hi <strong>${fullName}</strong>,
       </p>
       <p style="margin:0 0 16px;color:#374151;font-size:16px;">
-        We're writing to let you know that you have been removed from the following stokvel${stokvelNames.length > 1 ? 's' : ''} by the admin:
+        We're writing to let you know that you have been removed from the following group${stokvelNames.length > 1 ? 's' : ''} by the admin:
       </p>
 
       <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:16px;margin:0 0 24px;">
@@ -279,30 +279,30 @@ export async function sendStokvelUnassignmentEmail(email, fullName, stokvelNames
       <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;" />
 
       <p style="margin:0;color:#9ca3af;font-size:13px;text-align:center;">
-        This is an automated notification from the Stokvel Management System.
+        This is an automated notification from the Fund Mate.
       </p>
     </div>
 
     <!-- Footer -->
     <div style="background:#f9fafb;padding:16px 24px;text-align:center;">
       <p style="margin:0;color:#9ca3af;font-size:12px;">
-        &copy; ${new Date().getFullYear()} Stokvel Management System. All rights reserved.
+        &copy; ${new Date().getFullYear()} Fund Mate. All rights reserved.
       </p>
     </div>
   </div>`;
 
   const mailOptions = {
-    from: `"Stokvel Management" <${process.env.SMTP_USER || 'noreply@stokvel.co.za'}>`,
+    from: `"Fund Mate" <${process.env.SMTP_USER || 'noreply@fundmate.co.za'}>`,
     to: email,
-    subject: `Stokvel Membership Removed — ${stokvelNames.join(', ')}`,
+    subject: `Group Membership Removed — ${stokvelNames.join(', ')}`,
     html,
   };
 
   try {
     await transporter.sendMail(mailOptions);
-    console.log(`📧 Stokvel unassignment email sent to ${email}`);
+    console.log(`📧 group unassignment email sent to ${email}`);
   } catch (err) {
-    console.error(`⚠️  Failed to send stokvel unassignment email to ${email}:`, err.message);
+    console.error(`⚠️  Failed to send group unassignment email to ${email}:`, err.message);
   }
 }
 
@@ -323,7 +323,7 @@ export async function sendAccountDeletionEmail(email, fullName, reason = 'Remove
         Hi <strong>${fullName}</strong>,
       </p>
       <p style="margin:0 0 16px;color:#374151;font-size:16px;">
-        We're writing to inform you that your account on the Stokvel Management System has been <strong style="color:#dc2626;">removed</strong> by an administrator.
+        We're writing to inform you that your account on the Fund Mate has been <strong style="color:#dc2626;">removed</strong> by an administrator.
       </p>
 
       <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:16px;margin:0 0 24px;">
@@ -332,7 +332,7 @@ export async function sendAccountDeletionEmail(email, fullName, reason = 'Remove
       </div>
 
       <p style="margin:0 0 16px;color:#374151;font-size:16px;">
-        All your stokvel memberships have been deactivated. If you believe this was done in error, please contact the administrator or our support team.
+        All your group memberships have been deactivated. If you believe this was done in error, please contact the administrator or our support team.
       </p>
 
       <p style="margin:0 0 16px;color:#374151;font-size:16px;">
@@ -342,20 +342,20 @@ export async function sendAccountDeletionEmail(email, fullName, reason = 'Remove
       <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;" />
 
       <p style="margin:0;color:#9ca3af;font-size:13px;text-align:center;">
-        This is an automated notification from the Stokvel Management System.
+        This is an automated notification from the Fund Mate.
       </p>
     </div>
 
     <!-- Footer -->
     <div style="background:#f9fafb;padding:16px 24px;text-align:center;">
       <p style="margin:0;color:#9ca3af;font-size:12px;">
-        &copy; ${new Date().getFullYear()} Stokvel Management System. All rights reserved.
+        &copy; ${new Date().getFullYear()} Fund Mate. All rights reserved.
       </p>
     </div>
   </div>`;
 
   const mailOptions = {
-    from: `"Stokvel Management" <${process.env.SMTP_USER || 'noreply@stokvel.co.za'}>`,
+    from: `"Fund Mate" <${process.env.SMTP_USER || 'noreply@fundmate.co.za'}>`,
     to: email,
     subject: 'Your Account Has Been Removed',
     html,
@@ -386,7 +386,7 @@ export async function sendWelcomeEmail(email, fullName, tempPassword, stokvelNam
   <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
     <!-- Header -->
     <div style="background:linear-gradient(135deg,#16a34a,#15803d);padding:32px 24px;text-align:center;">
-      <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;">Welcome to Stokvel Management! 🎉</h1>
+      <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;">Welcome to Fund Mate! 🎉</h1>
     </div>
 
     <!-- Body -->
@@ -434,13 +434,13 @@ export async function sendWelcomeEmail(email, fullName, tempPassword, stokvelNam
     <!-- Footer -->
     <div style="background:#f9fafb;padding:16px 24px;text-align:center;">
       <p style="margin:0;color:#9ca3af;font-size:12px;">
-        &copy; ${new Date().getFullYear()} Stokvel Management System. All rights reserved.
+        &copy; ${new Date().getFullYear()} Fund Mate. All rights reserved.
       </p>
     </div>
   </div>`;
 
   const mailOptions = {
-    from: `"Stokvel Management" <${process.env.SMTP_USER || 'noreply@stokvel.co.za'}>`,
+    from: `"Fund Mate" <${process.env.SMTP_USER || 'noreply@fundmate.co.za'}>`,
     to: email,
     subject: '🎉 Welcome to Stokvel Management — Your Account is Ready!',
     html,
@@ -531,13 +531,13 @@ export async function sendLoanApprovalEmail(email, fullName, loanDetails = {}) {
     <!-- Footer -->
     <div style="background:#f9fafb;padding:16px 24px;text-align:center;">
       <p style="margin:0;color:#9ca3af;font-size:12px;">
-        &copy; ${new Date().getFullYear()} Stokvel Management System. All rights reserved.
+        &copy; ${new Date().getFullYear()} Fund Mate. All rights reserved.
       </p>
     </div>
   </div>`;
 
   const mailOptions = {
-    from: `"Stokvel Management" <${process.env.SMTP_USER || 'noreply@stokvel.co.za'}>`,
+    from: `"Fund Mate" <${process.env.SMTP_USER || 'noreply@fundmate.co.za'}>`,
     to: email,
     subject: `✅ Loan of R ${parseFloat(amount).toFixed(2)} Approved — ${stokvelName}`,
     html,
@@ -590,13 +590,13 @@ export async function sendPasswordResetEmail(email, code) {
     <!-- Footer -->
     <div style="background:#f9fafb;padding:16px 24px;text-align:center;">
       <p style="margin:0;color:#9ca3af;font-size:12px;">
-        &copy; ${new Date().getFullYear()} Stokvel Management System. All rights reserved.
+        &copy; ${new Date().getFullYear()} Fund Mate. All rights reserved.
       </p>
     </div>
   </div>`;
 
   const mailOptions = {
-    from: `"Stokvel Management" <${process.env.SMTP_USER || 'noreply@stokvel.co.za'}>`,
+    from: `"Fund Mate" <${process.env.SMTP_USER || 'noreply@fundmate.co.za'}>`,
     to: email,
     subject: '🔐 Password Reset Code',
     html,

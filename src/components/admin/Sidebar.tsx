@@ -276,7 +276,7 @@ function App() {
                 <Users className="w-6 h-6 text-white" />
               </div>
               <span className="text-xl font-bold bg-gradient-to-r from-primary-800 to-primary-600 bg-clip-text text-transparent">
-                HENNESSY SOCIAL CLUB
+                FUND MATE
               </span>
             </Link>
 
@@ -363,7 +363,7 @@ function App() {
               
               <p className="text-lg text-gray-600 leading-relaxed">
                 Join a community of smart savers. Reach your financial goals faster with 
-                <span className="font-semibold text-primary-600"> SOCIAL CLUB </span> 
+                <span className="font-semibold text-primary-600"> FUND MATE </span> 
                 — the digital Stokvel management system that brings transparency and trust to group savings.
               </p>
               
@@ -552,7 +552,7 @@ function App() {
             Ready to Start Saving?
           </h2>
           <p className="text-white/90 text-lg mb-8 max-w-2xl mx-auto">
-            Join SOCIAL CLUB today and take control of your financial future
+            Join FUND MATE today and take control of your financial future
           </p>
           <Link
             to="/register"
@@ -574,7 +574,7 @@ function App() {
                 <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
                   <Users className="w-5 h-5 text-white" />
                 </div>
-                <span className="text-white font-bold">SOCIAL CLUB</span>
+                <span className="text-white font-bold">FUND MATE</span>
               </div>
               <p className="text-sm">
                 Building wealth together through trusted community savings.
@@ -636,7 +636,7 @@ function App() {
 
           {/* Copyright */}
           <div className="border-t border-gray-800 pt-8 text-sm text-center">
-            <p>© 2026 SOCIAL CLUB. All rights reserved. Your trusted Stokvel partner.</p>
+            <p>© 2026 FUND MATE. All rights reserved. Your trusted savings partner.</p>
           </div>
         </div>
       </footer>
