@@ -104,17 +104,18 @@ export default function GroupDetails() {
         const icons = ['🌱', '💰', '🎯', '🏦', '💎'];
         const idx = (profilesRes.data || []).findIndex((p: any) => String(p.id) === profileId);
         
+        const groupTarget = (d.targetAmount || 0) * (d.currentMembers || 1);
         setGroupData({
           id: String(d.id),
           name: d.name || '',
           icon: d.icon || icons[idx % icons.length] || '🌱',
           color: d.color || colors[idx % colors.length] || 'primary',
           description: d.description || '',
-          targetAmount: d.targetAmount || 0,
+          targetAmount: groupTarget,
           totalSaved: d.totalPool || 0,
           memberCount: d.currentMembers || 0,
           maxMembers: d.maxMembers || 0,
-          progress: d.targetAmount > 0 ? Math.min(100, Math.round(((d.totalPool || 0) / d.targetAmount) * 100)) : 0,
+          progress: groupTarget > 0 ? Math.min(100, Math.round(((d.totalPool || 0) / groupTarget) * 100)) : 0,
           cycle: d.cycle || '',
           meetingDay: d.meetingDay || 'Sunday',
           nextPayout: d.nextPayout ? new Date(d.nextPayout).toLocaleDateString('en-ZA', {day:'2-digit', month:'short', year:'numeric'}) : '',

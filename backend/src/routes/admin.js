@@ -65,6 +65,20 @@ router.get('/stats', async (_req, res) => {
        ORDER BY u.full_name`
     );
 
+    // Madala Side contributions per member
+    const [madalaSideData] = await pool.query(
+      `SELECT u.id, u.full_name, s.name as stokvel_name,
+              COALESCE(SUM(c.amount), 0) as madala_saved
+       FROM profiles p
+       JOIN users u ON u.id = p.user_id
+       JOIN stokvels s ON s.id = p.stokvel_id
+       LEFT JOIN contributions c ON c.user_id = u.id AND c.stokvel_id = s.id 
+         AND c.contribution_type = 'madala-side' AND c.status = 'confirmed'
+       WHERE p.status = 'active'
+       GROUP BY u.id, u.full_name, s.name
+       ORDER BY u.full_name`
+    );
+
     // All loans (active, overdue, pending)
     const [allLoans] = await pool.query(
       `SELECT l.*, u.full_name, s.name as stokvel_name
@@ -129,6 +143,14 @@ router.get('/stats', async (_req, res) => {
         targetAmount: parseFloat(m.target_amount),
         stokvelName: m.stokvel_name,
         progress: m.target_amount > 0 ? Math.round((m.saved_amount / m.target_amount) * 100) : 0,
+      })),
+      madalaSideMembers: madalaSideData.map(m => ({
+        id: m.id,
+        name: m.full_name,
+        stokvelName: m.stokvel_name,
+        madalaSaved: parseFloat(m.madala_saved),
+        madalaTarget: 2200,
+        progress: Math.round((parseFloat(m.madala_saved) / 2200) * 100),
       })),
       allActiveLoans: allLoans.map(l => ({
         id: l.id,

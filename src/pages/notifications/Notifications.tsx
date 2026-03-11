@@ -129,9 +129,11 @@ export default function Notifications() {
               <h1 className="text-2xl font-bold text-primary-800">FUND MATE</h1>
             </div>
             <div className="flex items-center space-x-4">
-              <span className="text-sm bg-primary-100 text-primary-700 px-3 py-1 rounded-full">
-                {unreadCount} unread
-              </span>
+              {unreadCount > 0 && (
+                <span className="text-sm bg-primary-100 text-primary-700 px-3 py-1 rounded-full">
+                  {unreadCount} unread
+                </span>
+              )}
             </div>
           </div>
         </div>

@@ -362,8 +362,8 @@ router.get('/verify/:reference', async (req, res) => {
           status: 'success',
         },
       });
-    } else {
-      // Payment failed/declined - update contribution
+    } else if (paystackData.status === 'failed' || paystackData.status === 'abandoned') {
+      // Payment explicitly failed or was abandoned - mark contribution as failed
       await pool.query(
         "UPDATE contributions SET status = 'failed', deleted_at = NOW() WHERE reference = ?",
         [reference]
@@ -374,7 +374,17 @@ router.get('/verify/:reference', async (req, res) => {
         message: 'Payment was not successful',
         data: {
           reference,
-          status: paystackData.status || 'failed',
+          status: paystackData.status,
+        },
+      });
+    } else {
+      // Payment still processing (pending, ongoing, etc.) - keep polling
+      res.json({
+        status: 'pending',
+        message: 'Payment is still being processed',
+        data: {
+          reference,
+          status: paystackData.status || 'pending',
         },
       });
     }

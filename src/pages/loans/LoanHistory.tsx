@@ -31,7 +31,7 @@ interface Loan {
   interest: number;
   interestRate: number;
   totalRepayable: number;
-  status: 'active' | 'repaid' | 'overdue' | 'pending_repayment';
+  status: 'active' | 'repaid' | 'overdue' | 'pending_repayment' | 'pending' | 'rejected';
   borrowedDate: string;
   dueDate: string;
   repaidDate?: string;
@@ -151,6 +151,10 @@ export default function LoanHistory() {
         return <Clock className="w-5 h-5 text-blue-600" />;
       case 'pending_repayment':
         return <Clock className="w-5 h-5 text-amber-600" />;
+      case 'pending':
+        return <Clock className="w-5 h-5 text-yellow-600" />;
+      case 'rejected':
+        return <AlertCircle className="w-5 h-5 text-red-600" />;
       default:
         return null;
     }
@@ -174,6 +178,10 @@ export default function LoanHistory() {
         );
       case 'pending_repayment':
         return <span className="px-2 py-1 bg-amber-100 text-amber-700 text-xs rounded-full">Cash Pending</span>;
+      case 'pending':
+        return <span className="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs rounded-full">Pending Approval</span>;
+      case 'rejected':
+        return <span className="px-2 py-1 bg-red-100 text-red-700 text-xs rounded-full">Rejected</span>;
       default:
         return null;
     }
@@ -417,6 +425,26 @@ export default function LoanHistory() {
           >
             Overdue ({stats.overdueLoans})
           </button>
+          <button
+            onClick={() => setFilter('pending')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
+              filter === 'pending' 
+                ? 'bg-yellow-600 text-white' 
+                : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
+            }`}
+          >
+            Pending ({profileLoans.filter(l => l.status === 'pending').length})
+          </button>
+          <button
+            onClick={() => setFilter('rejected')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
+              filter === 'rejected' 
+                ? 'bg-red-600 text-white' 
+                : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
+            }`}
+          >
+            Rejected ({profileLoans.filter(l => l.status === 'rejected').length})
+          </button>
         </div>
 
         {/* Loans List */}
@@ -456,6 +484,16 @@ export default function LoanHistory() {
                   </span>
                   {getInterestBadge(loan.interestRate)}
                 </div>
+
+                {/* Stokvel Name */}
+                {loan.stokvelName && (
+                  <div className="mt-1 text-xs text-gray-500">
+                    <span className="inline-flex items-center space-x-1">
+                      <Users className="w-3 h-3" />
+                      <span>{loan.stokvelName}</span>
+                    </span>
+                  </div>
+                )}
 
                 {/* Quick action for active loans */}
                 {loan.status === 'active' && (

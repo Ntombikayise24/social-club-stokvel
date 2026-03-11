@@ -38,6 +38,7 @@ interface User {
   name: string;
   email: string;
   phone: string;
+  role: 'member' | 'admin';
   status: 'active' | 'inactive' | 'pending' | 'deleted';
   joinedDate: string;
   lastActive?: string;
@@ -2360,6 +2361,7 @@ export default function AdminDashboard() {
           name: u.name,
           email: u.email,
           phone: u.phone,
+          role: u.role || 'member',
           status: u.status,
           joinedDate: new Date(u.joinedDate).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }),
           lastActive: u.lastActive
@@ -2631,10 +2633,14 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleIssueFine = async (data: { userId: number; fineType: string; reason?: string }) => {
+  const handleIssueFine = async (data: { userId: number; fineTypes: string[]; reason?: string }) => {
     try {
-      const res = await adminApi.issueFine(data);
-      showSuccess(res.data.message || 'Fine issued successfully');
+      const results = [];
+      for (const fineType of data.fineTypes) {
+        const res = await adminApi.issueFine({ userId: data.userId, fineType, reason: data.reason });
+        results.push(res.data.message);
+      }
+      showSuccess(results.join('. '));
       setShowIssueFineModal(false);
       fetchData();
     } catch (err: any) {
@@ -2968,6 +2974,21 @@ export default function AdminDashboard() {
               Contributions
             </button>
             <button
+              onClick={() => setActiveTab('pending')}
+              className={`px-4 py-3 font-medium text-sm transition-colors border-b-2 relative ${
+                activeTab === 'pending'
+                  ? 'border-primary-600 text-primary-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Pending
+              {(pendingUsers.length + pendingContributions.length + pendingLoanRequests.length + fines.filter((f: any) => f.status === 'pending').length) > 0 && (
+                <span className="ml-2 bg-amber-500 text-white text-xs rounded-full px-2 py-0.5">
+                  {pendingUsers.length + pendingContributions.length + pendingLoanRequests.length + fines.filter((f: any) => f.status === 'pending').length}
+                </span>
+              )}
+            </button>
+            <button
               onClick={() => setActiveTab('join-requests')}
               className={`px-4 py-3 font-medium text-sm transition-colors border-b-2 relative ${
                 activeTab === 'join-requests'
@@ -3160,6 +3181,50 @@ export default function AdminDashboard() {
               </div>
             )}
 
+            {/* Madala Side — Savings Progress */}
+            {apiStats?.madalaSideMembers && apiStats.madalaSideMembers.length > 0 && (
+              <div className="bg-white rounded-xl shadow-sm border border-green-200 p-6">
+                <h3 className="font-semibold text-gray-800 mb-4 flex items-center">
+                  🌱
+                  <span className="ml-2">Madala Side — Savings Progress</span>
+                  <span className="ml-2 bg-green-100 text-green-700 text-xs font-medium px-2 py-0.5 rounded-full">
+                    R2,200 target
+                  </span>
+                </h3>
+                <div className="space-y-3">
+                  {apiStats.madalaSideMembers.map((member: any) => (
+                    <div key={`madala-${member.id}`} className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                          <span className="text-xs font-medium text-green-700">
+                            {member.name.split(' ').map((n: string) => n[0]).join('').toUpperCase()}
+                          </span>
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-800">{member.name}</p>
+                          <p className="text-xs text-gray-500">{member.stokvelName}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-4">
+                        <div className="w-32">
+                          <div className="flex justify-between text-xs mb-1">
+                            <span className="text-gray-500">{Math.min(100, member.progress)}%</span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-1.5">
+                            <div className="bg-green-600 h-1.5 rounded-full" style={{ width: `${Math.min(100, member.progress)}%` }}></div>
+                          </div>
+                        </div>
+                        <div className="text-right min-w-[100px]">
+                          <p className="font-semibold text-gray-800">{formatCurrency(member.madalaSaved)}</p>
+                          <p className="text-xs text-gray-500">of {formatCurrency(member.madalaTarget)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* All Active Loans Section */}
             {apiStats?.allActiveLoans && apiStats.allActiveLoans.length > 0 && (
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -3219,10 +3284,63 @@ export default function AdminDashboard() {
               </div>
             )}
 
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <button
+                onClick={() => setShowAddUserModal(true)}
+                className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary-300 transition-colors text-left"
+              >
+                <UserPlus className="w-8 h-8 text-primary-600 mb-3" />
+                <h3 className="font-semibold text-gray-800">Add New User</h3>
+                <p className="text-sm text-gray-500 mt-1">Create a new member account</p>
+              </button>
+              
+              <button
+                onClick={() => setShowAddStokvelModal(true)}
+                className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary-300 transition-colors text-left"
+              >
+                <PlusCircle className="w-8 h-8 text-primary-600 mb-3" />
+                <h3 className="font-semibold text-gray-800">Create Stokvel</h3>
+                <p className="text-sm text-gray-500 mt-1">Start a new savings group</p>
+              </button>
+              
+              <button
+                onClick={() => setShowReportModal(true)}
+                className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary-300 transition-colors text-left"
+              >
+                <Download className="w-8 h-8 text-primary-600 mb-3" />
+                <h3 className="font-semibold text-gray-800">Generate Report</h3>
+                <p className="text-sm text-gray-500 mt-1">Export transaction data</p>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'pending' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-bold text-gray-800 flex items-center">
+                <Clock className="w-6 h-6 text-amber-500 mr-2" />
+                Pending Items
+                {(pendingUsers.length + pendingContributions.length + pendingLoanRequests.length + fines.filter((f: any) => f.status === 'pending').length) > 0 && (
+                  <span className="ml-2 bg-amber-100 text-amber-700 text-sm font-medium px-2.5 py-0.5 rounded-full">
+                    {pendingUsers.length + pendingContributions.length + pendingLoanRequests.length + fines.filter((f: any) => f.status === 'pending').length}
+                  </span>
+                )}
+              </h2>
+            </div>
+
+            {pendingUsers.length === 0 && pendingContributions.length === 0 && pendingLoanRequests.length === 0 && fines.filter((f: any) => f.status === 'pending').length === 0 && (
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
+                <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-3" />
+                <h3 className="text-lg font-semibold text-gray-700">All Clear!</h3>
+                <p className="text-gray-500 mt-1">There are no pending items that need your attention.</p>
+              </div>
+            )}
+
             {pendingUsers.length > 0 && (
               <div className="bg-yellow-50 rounded-xl shadow-sm border border-yellow-200 p-6">
                 <h3 className="font-semibold text-yellow-800 mb-4 flex items-center">
-                  <Clock className="w-5 h-5 mr-2" />
+                  <UserPlus className="w-5 h-5 mr-2" />
                   Pending User Approvals ({pendingUsers.length})
                 </h3>
                 <div className="space-y-3">
@@ -3261,9 +3379,9 @@ export default function AdminDashboard() {
 
             {pendingContributions.length > 0 && (
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <h3 className="font-semibold text-gray-800 mb-4 flex items-center">
+                <h3 className="font-semibold text-yellow-800 mb-4 flex items-center">
                   <Clock className="w-5 h-5 text-orange-500 mr-2" />
-                  Pending Contribution Confirmations
+                  Pending Contribution Confirmations ({pendingContributions.length})
                 </h3>
                 <div className="space-y-3">
                   {pendingContributions.map(c => (
@@ -3293,12 +3411,9 @@ export default function AdminDashboard() {
 
             {pendingLoanRequests.length > 0 && (
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <h3 className="font-semibold text-gray-800 mb-4 flex items-center">
+                <h3 className="font-semibold text-blue-800 mb-4 flex items-center">
                   <DollarSign className="w-5 h-5 text-blue-500 mr-2" />
-                  Pending Loan Requests
-                  <span className="ml-2 bg-blue-100 text-blue-700 text-xs font-medium px-2 py-0.5 rounded-full">
-                    {pendingLoanRequests.length}
-                  </span>
+                  Pending Loan Requests ({pendingLoanRequests.length})
                 </h3>
                 <div className="space-y-3">
                   {pendingLoanRequests.map((loan: any) => (
@@ -3326,34 +3441,43 @@ export default function AdminDashboard() {
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <button
-                onClick={() => setShowAddUserModal(true)}
-                className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary-300 transition-colors text-left"
-              >
-                <UserPlus className="w-8 h-8 text-primary-600 mb-3" />
-                <h3 className="font-semibold text-gray-800">Add New User</h3>
-                <p className="text-sm text-gray-500 mt-1">Create a new member account</p>
-              </button>
-              
-              <button
-                onClick={() => setShowAddStokvelModal(true)}
-                className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary-300 transition-colors text-left"
-              >
-                <PlusCircle className="w-8 h-8 text-primary-600 mb-3" />
-                <h3 className="font-semibold text-gray-800">Create Stokvel</h3>
-                <p className="text-sm text-gray-500 mt-1">Start a new savings group</p>
-              </button>
-              
-              <button
-                onClick={() => setShowReportModal(true)}
-                className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary-300 transition-colors text-left"
-              >
-                <Download className="w-8 h-8 text-primary-600 mb-3" />
-                <h3 className="font-semibold text-gray-800">Generate Report</h3>
-                <p className="text-sm text-gray-500 mt-1">Export transaction data</p>
-              </button>
-            </div>
+            {fines.filter((f: any) => f.status === 'pending').length > 0 && (
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <h3 className="font-semibold text-amber-800 mb-4 flex items-center">
+                  <AlertTriangle className="w-5 h-5 text-amber-500 mr-2" />
+                  Pending Fine Payments ({fines.filter((f: any) => f.status === 'pending').length})
+                </h3>
+                <div className="space-y-3">
+                  {fines.filter((f: any) => f.status === 'pending').map((fine: any) => (
+                    <div key={fine.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center">
+                          <AlertTriangle className="w-4 h-4 text-amber-700" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-800">{fine.userName}</p>
+                          <p className="text-sm text-gray-500">
+                            {fine.stokvelName} • {fine.fineLabel} • R {fine.amount}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          try {
+                            await adminApi.confirmFine(fine.id);
+                            showSuccess('Fine payment confirmed');
+                            fetchData();
+                          } catch { showError('Failed to confirm'); }
+                        }}
+                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                      >
+                        Confirm Payment
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -3843,9 +3967,14 @@ export default function AdminDashboard() {
               e.preventDefault();
               const form = e.target as HTMLFormElement;
               const formData = new FormData(form);
+              const selectedFineTypes = formData.getAll('fineTypes') as string[];
+              if (selectedFineTypes.length === 0) {
+                showError('Please select at least one fine type');
+                return;
+              }
               handleIssueFine({
                 userId: Number(formData.get('userId')),
-                fineType: formData.get('fineType') as string,
+                fineTypes: selectedFineTypes,
                 reason: (formData.get('reason') as string) || undefined,
               });
             }} className="space-y-4">
@@ -3853,19 +3982,22 @@ export default function AdminDashboard() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Member *</label>
                 <select name="userId" required className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500">
                   <option value="">Select a member</option>
-                  {users.filter(u => u.status === 'active').map(u => (
+                  {users.filter(u => u.status === 'active' && u.role !== 'admin').map(u => (
                     <option key={u.id} value={u.id}>{u.name}</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Fine Type *</label>
-                <select name="fineType" required className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500">
-                  <option value="">Select fine type</option>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Fine Type(s) * <span className="text-xs text-gray-400 font-normal">— select one or more</span></label>
+                <div className="space-y-2 mt-2">
                   {fineTypes.map((ft: any) => (
-                    <option key={ft.value} value={ft.value}>{ft.label} — R{ft.amount}</option>
+                    <label key={ft.value} className="flex items-center space-x-3 p-2 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer">
+                      <input type="checkbox" name="fineTypes" value={ft.value} className="w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500" />
+                      <span className="text-sm text-gray-700 flex-1">{ft.label}</span>
+                      <span className="text-sm font-semibold text-red-600">R{ft.amount}</span>
+                    </label>
                   ))}
-                </select>
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Reason (optional)</label>

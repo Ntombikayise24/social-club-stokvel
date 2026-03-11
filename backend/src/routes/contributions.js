@@ -88,7 +88,7 @@ router.get('/download', async (req, res) => {
     if (profileId) { where += ' AND c.profile_id = ?'; params.push(profileId); }
 
     const [contributions] = await pool.query(
-      `SELECT c.id, u.full_name, s.name AS stokvel_name, c.amount, c.status, c.payment_method, c.reference, c.created_at, c.confirmed_at
+      `SELECT c.id, u.full_name, s.name AS stokvel_name, c.amount, c.status, c.payment_method, c.contribution_type, c.reference, c.created_at, c.confirmed_at
        FROM contributions c
        JOIN users u ON u.id = c.user_id
        JOIN stokvels s ON s.id = c.stokvel_id
@@ -102,12 +102,19 @@ router.get('/download', async (req, res) => {
       { key: 'stokvel_name', header: 'Stokvel' },
       { key: 'amount', header: 'Amount (R)' },
       { key: 'status', header: 'Status' },
+      { key: 'target', header: 'Target' },
       { key: 'payment_method', header: 'Payment Method' },
       { key: 'reference', header: 'Reference' },
       { key: 'created_at', header: 'Date' },
       { key: 'confirmed_at', header: 'Confirmed At' },
     ];
-    const rows = formatRowData(contributions, 'contributions');
+    // Map status and contribution_type for display
+    const mappedContributions = contributions.map(row => ({
+      ...row,
+      status: row.status === 'failed' ? 'Declined' : row.status,
+      target: row.contribution_type === 'madala-side' ? 'Madala Side' : row.contribution_type === 'your-target' ? 'Your Target (Collective Pot)' : row.contribution_type || '-',
+    }));
+    const rows = formatRowData(mappedContributions, 'contributions');
     const title = 'Contribution History Report';
 
     if (format === 'pdf') {

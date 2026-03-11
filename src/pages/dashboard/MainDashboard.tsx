@@ -142,8 +142,8 @@ export default function MainDashboard() {
       setNotifications(notifData.map((n: any) => ({
         id: n.id,
         message: n.title || n.message,
-        time: n.createdAt ? new Date(n.createdAt).toLocaleDateString() : '',
-        read: n.isRead || false,
+        time: n.createdAt ? new Date(n.createdAt).toLocaleDateString() : (n.time ? new Date(n.time).toLocaleDateString() : ''),
+        read: !!n.read,
       })));
 
       // Loan stats are now calculated per-profile in the activeProfile effect
@@ -159,6 +159,80 @@ export default function MainDashboard() {
   }, [navigate]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Handle Paystack callback — verify payment when redirected back with ?trxref= or ?reference=
+  useEffect(() => {
+    const trxref = searchParams.get('trxref') || searchParams.get('reference');
+    if (!trxref) return;
+
+    // Clean up URL params immediately
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete('trxref');
+    newParams.delete('reference');
+    newParams.delete('payment');
+    setSearchParams(newParams, { replace: true });
+
+    // Verify the payment
+    const verifyPayment = async () => {
+      try {
+        const verifyRes = await paymentApi.verify(trxref);
+        if (verifyRes.data.data?.status === 'success') {
+          showToast.success('Payment confirmed! Your contribution has been recorded.');
+          fetchData();
+        } else if (verifyRes.data.status === false) {
+          showToast.error('You declined your payment. No contribution was made.');
+          fetchData();
+          navigate('/dashboard');
+        } else {
+          // Still pending — poll a few more times
+          let attempts = 0;
+          const retryVerify = setInterval(async () => {
+            attempts++;
+            try {
+              const retry = await paymentApi.verify(trxref);
+              if (retry.data.data?.status === 'success') {
+                clearInterval(retryVerify);
+                showToast.success('Payment confirmed! Your contribution has been recorded.');
+                fetchData();
+              } else if (retry.data.status === false || attempts >= 5) {
+                clearInterval(retryVerify);
+                if (retry.data.status === false) {
+                  showToast.error('You declined your payment. No contribution was made.');
+                  navigate('/dashboard');
+                } else {
+                  showToast.info('Payment is still processing. It will be confirmed shortly.');
+                }
+                fetchData();
+              }
+            } catch {
+              if (attempts >= 5) clearInterval(retryVerify);
+            }
+          }, 3000);
+        }
+      } catch {
+        showToast.error('Could not verify payment. Please check your contribution history.');
+      }
+    };
+
+    verifyPayment();
+  }, []);
+
+  // Re-fetch notifications when page regains focus (e.g. after visiting /notifications)
+  useEffect(() => {
+    const handleFocus = () => {
+      notificationApi.list({ limit: 10 }).then(notifRes => {
+        const notifData = Array.isArray(notifRes.data) ? notifRes.data : notifRes.data?.data || [];
+        setNotifications(notifData.map((n: any) => ({
+          id: n.id,
+          message: n.title || n.message,
+          time: n.createdAt ? new Date(n.createdAt).toLocaleDateString() : (n.time ? new Date(n.time).toLocaleDateString() : ''),
+          read: !!n.read,
+        })));
+      }).catch(() => {});
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, []);
 
   // Filter stokvels based on search and category
   const filteredStokvels = availableStokvels.filter(stokvel => {
@@ -391,7 +465,7 @@ export default function MainDashboard() {
   // Get rejected profiles to show in notifications only
   const rejectedProfiles = profiles.filter(p => p.status === 'rejected');
   
-  const unreadCount = notifications.filter(n => !n.read).length + rejectedProfiles.length;
+  const unreadCount = notifications.filter(n => !n.read).length;
 
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
@@ -422,7 +496,7 @@ export default function MainDashboard() {
         return;
       }
 
-      // Card payment — existing Paystack flow
+      // Card payment — Paystack inline popup
       const res = await paymentApi.initialize({
         amount,
         profileId: Number(activeProfile.id),
@@ -430,69 +504,52 @@ export default function MainDashboard() {
         contributionType: contributionTarget,
       });
 
-      const { authorizationUrl, reference } = res.data.data;
+      const { accessCode, reference } = res.data.data;
 
-      // Open Paystack payment page
-      const paymentWindow = window.open(authorizationUrl, '_blank');
-
-      // Poll for payment completion + detect window close
-      const checkPayment = setInterval(async () => {
-        try {
-          // If user closed the payment window without completing, cancel
-          if (paymentWindow && paymentWindow.closed) {
-            clearInterval(checkPayment);
-            clearTimeout(pollTimeout);
-            setShowAddContribution(false);
-            setIsProcessingPayment(false);
-            setContributionData({ amount: '' });
-            setContributionTarget('your-target');
-            setPaymentMethod('card');
-            showToast.error('Payment was cancelled. You can try again anytime.');
-            fetchData();
-            navigate('/dashboard');
-            return;
-          }
-
-          const verifyRes = await paymentApi.verify(reference);
-          if (verifyRes.data.data?.status === 'success') {
-            clearInterval(checkPayment);
-            clearTimeout(pollTimeout);
-            setShowAddContribution(false);
-            setIsProcessingPayment(false);
-            setContributionData({ amount: '' });
-            setContributionTarget('your-target');
-            setPaymentMethod('card');
-            showToast.success(`Payment of R ${contributionData.amount} confirmed! Your contribution has been recorded.`);
-            fetchData();
-          } else if (verifyRes.data.status === false) {
-            // Payment was declined or failed
-            clearInterval(checkPayment);
-            clearTimeout(pollTimeout);
-            if (paymentWindow && !paymentWindow.closed) paymentWindow.close();
-            setShowAddContribution(false);
-            setIsProcessingPayment(false);
-            setContributionData({ amount: '' });
-            setContributionTarget('your-target');
-            setPaymentMethod('card');
-            showToast.error('Payment was declined. Please try again or use a different payment method.');
-            fetchData();
-            navigate('/dashboard');
-          }
-        } catch {
-          // Still pending, keep polling
-        }
-      }, 3000);
-
-      // Stop polling after 5 minutes
-      const pollTimeout = setTimeout(() => {
-        clearInterval(checkPayment);
+      // Use Paystack Inline popup (stays on our page, gives us direct callbacks)
+      const PaystackPop = (window as any).PaystackPop;
+      if (!PaystackPop) {
+        showToast.error('Payment system is loading. Please try again.');
         setIsProcessingPayment(false);
-      }, 300000);
+        return;
+      }
 
-      return () => {
-        clearInterval(checkPayment);
-        clearTimeout(pollTimeout);
-      };
+      const popup = new PaystackPop();
+      popup.resumeTransaction(accessCode, {
+        onSuccess: async () => {
+          try {
+            await paymentApi.verify(reference);
+            showToast.success('Payment confirmed! Your contribution has been recorded.');
+          } catch {
+            showToast.success('Payment completed! It will be confirmed shortly.');
+          }
+          setShowAddContribution(false);
+          setIsProcessingPayment(false);
+          setContributionData({ amount: '' });
+          setContributionTarget('your-target');
+          setPaymentMethod('card');
+          fetchData();
+        },
+        onCancel: async () => {
+          // User closed popup — check if payment went through or was declined
+          try {
+            const verifyRes = await paymentApi.verify(reference);
+            if (verifyRes.data.data?.status === 'success') {
+              showToast.success('Payment confirmed! Your contribution has been recorded.');
+            } else {
+              showToast.error('You declined your payment. No contribution was made.');
+            }
+          } catch {
+            showToast.error('You declined your payment. No contribution was made.');
+          }
+          setShowAddContribution(false);
+          setIsProcessingPayment(false);
+          setContributionData({ amount: '' });
+          setContributionTarget('your-target');
+          setPaymentMethod('card');
+          fetchData();
+        },
+      });
 
     } catch (err: any) {
       setIsProcessingPayment(false);
@@ -1068,7 +1125,7 @@ export default function MainDashboard() {
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-6">
           <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
             <button 
-              onClick={() => remainingAmount > 0 ? setShowAddContribution(true) : showToast.info('You have already reached your contribution target!')}
+              onClick={() => setShowAddContribution(true)}
               className="flex flex-col items-center p-3 bg-primary-50 hover:bg-primary-100 rounded-xl transition-all group hover:shadow-sm"
             >
               <PlusCircle className="w-6 h-6 text-primary-600 mb-1.5 group-hover:scale-110 transition-transform" />
@@ -1560,14 +1617,14 @@ export default function MainDashboard() {
                   ) : (
                     <>
                       <CreditCard className="w-4 h-4 mr-2" />
-                      Pay with Paystack
+                      Confirm
                     </>
                   )}
                 </button>
               </div>
               {isProcessingPayment && paymentMethod === 'card' && (
                 <p className="text-xs text-center text-gray-500 mt-3">
-                  Complete payment in the Paystack window. This page will update automatically.
+                  Complete your payment in the Paystack popup.
                 </p>
               )}
             </div>
