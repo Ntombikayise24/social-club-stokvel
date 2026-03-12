@@ -42,7 +42,7 @@ router.get('/stats', async (_req, res) => {
       "SELECT COUNT(*) as count FROM users WHERE status = 'deleted'"
     );
     const [totalSaved] = await pool.query(
-      "SELECT COALESCE(SUM(saved_amount), 0) as total FROM profiles WHERE status = 'active'"
+      "SELECT COALESCE(SUM(amount), 0) as total FROM contributions WHERE status = 'confirmed'"
     );
 
     // Interest pot stats
