@@ -23,6 +23,7 @@ import {
   AlertCircle,
   Loader2
 } from 'lucide-react';
+import LoadingScreen from '../../components/common/LoadingScreen';
 import ProfileSwitcher from './ProfileSwitcher';
 import { userApi, stokvelApi, loanApi, contributionApi, notificationApi, paymentApi, finesApi, cardApi } from '../../api';
 import { showToast } from '../../utils/toast';
@@ -83,6 +84,7 @@ export default function MainDashboard() {
   const [stokvelDetails, setStokvelDetails] = useState<StokvelData | null>(null);
   const [interestPot, setInterestPot] = useState({ totalInterest: 0, activeLoans: 0, paidInterest: 0 });
   const [madalaSideTotal, setMadalaSideTotal] = useState(0);
+  const [madalaMonthlyPaid, setMadalaMonthlyPaid] = useState<number[]>(new Array(11).fill(0));
   const [userFines, setUserFines] = useState<any[]>([]);
   const [finesSummary, setFinesSummary] = useState({ unpaidTotal: 0, paidTotal: 0, unpaidCount: 0 });
   const [payingFineId, setPayingFineId] = useState<number | null>(null);
@@ -344,12 +346,30 @@ export default function MainDashboard() {
     contributionApi.list({ profileId: Number(activeProfile.id), limit: 1000 })
       .then(res => {
         const contributions = res.data?.data || [];
-        const madalaSideConfirmed = contributions
-          .filter((c: any) => c.contributionType === 'madala-side' && c.status === 'confirmed')
+        const madalaContributions = contributions
+          .filter((c: any) => c.contributionType === 'madala-side' && c.status === 'confirmed');
+        const madalaSideConfirmed = madalaContributions
           .reduce((sum: number, c: any) => sum + (c.amount || 0), 0);
         setMadalaSideTotal(madalaSideConfirmed);
+
+        // Calculate per-month totals (Jan=0 to Nov=10)
+        const currentYear = new Date().getFullYear();
+        const monthlyTotals = new Array(11).fill(0);
+        madalaContributions.forEach((c: any) => {
+          const date = new Date(c.confirmedAt || c.createdAt || c.date);
+          if (date.getFullYear() === currentYear) {
+            const month = date.getMonth(); // 0=Jan, 10=Nov
+            if (month <= 10) {
+              monthlyTotals[month] += (c.amount || 0);
+            }
+          }
+        });
+        setMadalaMonthlyPaid(monthlyTotals);
       })
-      .catch(() => setMadalaSideTotal(0));
+      .catch(() => {
+        setMadalaSideTotal(0);
+        setMadalaMonthlyPaid(new Array(11).fill(0));
+      });
 
     // Fetch user's fines
     finesApi.list()
@@ -423,12 +443,13 @@ export default function MainDashboard() {
   // Calculate remaining amount based on selected target
   const MADALA_SIDE_TARGET = 2200;
   const MADALA_SIDE_MIN = 200;
+  const madalaRemaining = Math.max(0, MADALA_SIDE_TARGET - madalaSideTotal);
   const remainingAmount = activeProfile
     ? contributionTarget === 'madala-side'
-      ? MADALA_SIDE_TARGET
+      ? madalaRemaining
       : Math.max(0, activeProfile.targetAmount - activeProfile.savedAmount)
     : 0;
-  const minContribution = contributionTarget === 'madala-side' ? MADALA_SIDE_MIN : 100;
+  const minContribution = contributionTarget === 'madala-side' ? Math.min(MADALA_SIDE_MIN, madalaRemaining) : 100;
   const progressPercentage = activeProfile ? (activeProfile.targetAmount > 0 ? Math.min(100, (activeProfile.savedAmount / activeProfile.targetAmount) * 100) : 0) : 0;
 
   // Use loan stats from backend
@@ -518,8 +539,14 @@ export default function MainDashboard() {
       popup.resumeTransaction(accessCode, {
         onSuccess: async () => {
           try {
-            await paymentApi.verify(reference);
-            showToast.success('Payment confirmed! Your contribution has been recorded.');
+            const verifyRes = await paymentApi.verify(reference);
+            const paymentStatus = verifyRes.data.data?.status;
+            if (verifyRes.data.status === true && paymentStatus === 'success') {
+              showToast.success('Payment confirmed! Your contribution has been recorded.');
+            } else {
+              // Paystack fired onSuccess but the actual charge was declined/failed
+              showToast.error('Payment was declined by your bank. No contribution was made.');
+            }
           } catch {
             showToast.success('Payment completed! It will be confirmed shortly.');
           }
@@ -531,16 +558,19 @@ export default function MainDashboard() {
           fetchData();
         },
         onCancel: async () => {
-          // User closed popup — check if payment went through or was declined
+          // User closed popup or payment was declined
           try {
             const verifyRes = await paymentApi.verify(reference);
-            if (verifyRes.data.data?.status === 'success') {
+            const paymentStatus = verifyRes.data.data?.status;
+            if (verifyRes.data.status === true && paymentStatus === 'success') {
               showToast.success('Payment confirmed! Your contribution has been recorded.');
+            } else if (paymentStatus === 'failed') {
+              showToast.error('Payment was declined by your bank. No contribution was made.');
             } else {
-              showToast.error('You declined your payment. No contribution was made.');
+              showToast.error('Payment was cancelled. No contribution was made.');
             }
           } catch {
-            showToast.error('You declined your payment. No contribution was made.');
+            showToast.error('Payment was cancelled. No contribution was made.');
           }
           setShowAddContribution(false);
           setIsProcessingPayment(false);
@@ -567,12 +597,7 @@ export default function MainDashboard() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-primary-600 mx-auto mb-3" />
-          <p className="text-gray-500">Loading dashboard...</p>
-        </div>
-      </div>
+      <LoadingScreen message="Loading dashboard..." fullScreen />
     );
   }
 
@@ -925,31 +950,70 @@ export default function MainDashboard() {
               </span>
             </div>
 
-            <div className="mb-4">
-              <span className="text-3xl font-bold text-green-800">
-                R {madalaSideTotal.toLocaleString()}
-              </span>
-              <span className="text-gray-500 text-sm ml-1">
-                / R 2,200
-              </span>
+            {/* Circular progress ring */}
+            <div className="flex items-center justify-center mb-4">
+              <div className="relative w-32 h-32">
+                <svg className="w-32 h-32 -rotate-90" viewBox="0 0 120 120">
+                  <circle cx="60" cy="60" r="52" fill="none" stroke="#e5e7eb" strokeWidth="10" />
+                  <circle cx="60" cy="60" r="52" fill="none" stroke="url(#madalaGrad)" strokeWidth="10"
+                    strokeLinecap="round"
+                    strokeDasharray={`${Math.min(100, Math.round((madalaSideTotal / MADALA_SIDE_TARGET) * 100)) * 3.267} 326.7`}
+                  />
+                  <defs>
+                    <linearGradient id="madalaGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" stopColor="#4ade80" />
+                      <stop offset="100%" stopColor="#16a34a" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-2xl font-bold text-green-800">{Math.min(100, Math.round((madalaSideTotal / MADALA_SIDE_TARGET) * 100))}%</span>
+                  <span className="text-xs text-gray-500">R{madalaSideTotal.toLocaleString()}</span>
+                </div>
+              </div>
             </div>
 
-            <div className="mb-3">
-              <div className="flex justify-between text-xs mb-1.5">
-                <span className="text-gray-500">Progress</span>
-                <span className="font-semibold text-green-600">{Math.min(100, Math.round((madalaSideTotal / MADALA_SIDE_TARGET) * 100))}%</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2.5">
-                <div 
-                  className="bg-gradient-to-r from-green-400 to-green-600 h-2.5 rounded-full" 
-                  style={{ width: `${Math.min(100, Math.round((madalaSideTotal / MADALA_SIDE_TARGET) * 100))}%` }}
-                ></div>
-              </div>
+            {/* Monthly dots grid - based on total / R200 */}
+            <div className="grid grid-cols-11 gap-1 mb-3">
+              {['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N'].map((month, idx) => {
+                const fullMonthsPaid = Math.floor(madalaSideTotal / MADALA_SIDE_MIN);
+                const partialFraction = (madalaSideTotal % MADALA_SIDE_MIN) / MADALA_SIDE_MIN;
+                const isPaid = idx < fullMonthsPaid;
+                const isPartial = idx === fullMonthsPaid && partialFraction > 0;
+                const partialPct = Math.round(partialFraction * 100);
+                return (
+                  <div key={idx} className="flex flex-col items-center" title={isPaid ? 'R200 Paid' : isPartial ? `R${(partialFraction * MADALA_SIDE_MIN).toFixed(0)} / R200` : 'Not paid'}>
+                    <div className="relative w-6 h-6 rounded-full overflow-hidden">
+                      {isPaid ? (
+                        <div className="w-full h-full bg-green-500 flex items-center justify-center shadow-sm shadow-green-300">
+                          <span className="text-white text-xs font-bold">✓</span>
+                        </div>
+                      ) : isPartial ? (
+                        <div className="w-full h-full bg-gray-200 relative">
+                          <div className="absolute bottom-0 left-0 w-full bg-yellow-400 transition-all" style={{ height: `${partialPct}%` }}></div>
+                          <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-gray-600">{month}</span>
+                        </div>
+                      ) : (
+                        <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                          <span className="text-xs font-bold text-gray-400">{month}</span>
+                        </div>
+                      )}
+                    </div>
+                    <span className="text-[9px] text-gray-400 mt-0.5">
+                      {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov'][idx]}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
 
-            <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="grid grid-cols-3 gap-2 text-xs">
               <div className="bg-white/60 p-2 rounded-lg text-center">
-                <p className="text-gray-400">Min. Monthly</p>
+                <p className="text-gray-400">Paid</p>
+                <p className="font-semibold text-green-700">{Math.floor(madalaSideTotal / MADALA_SIDE_MIN)} / 11</p>
+              </div>
+              <div className="bg-white/60 p-2 rounded-lg text-center">
+                <p className="text-gray-400">Monthly</p>
                 <p className="font-semibold text-gray-700">R200</p>
               </div>
               <div className="bg-white/60 p-2 rounded-lg text-center">
@@ -1068,7 +1132,7 @@ export default function MainDashboard() {
               </div>
               <div>
                 <h3 className="font-semibold text-gray-800">Fines</h3>
-                <p className="text-xs text-gray-400">Outstanding penalties</p>
+                <p className="text-xs text-gray-400">Penalties &amp; fine types</p>
               </div>
             </div>
             {finesSummary.unpaidCount > 0 && (
@@ -1078,47 +1142,126 @@ export default function MainDashboard() {
             )}
           </div>
 
-          <div className="mb-4">
-            <span className="text-3xl font-bold text-red-700">
-              R {finesSummary.unpaidTotal.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
-            </span>
-            <p className="text-xs text-gray-400 mt-1">Total outstanding fines</p>
+          {/* Summary Stats */}
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            <div className="bg-red-100/60 p-3 rounded-xl text-center">
+              <p className="text-xs text-gray-500 mb-0.5">Unpaid</p>
+              <p className="text-lg font-bold text-red-700">R {finesSummary.unpaidTotal.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}</p>
+            </div>
+            <div className="bg-green-100/60 p-3 rounded-xl text-center">
+              <p className="text-xs text-gray-500 mb-0.5">Paid</p>
+              <p className="text-lg font-bold text-green-700">R {finesSummary.paidTotal.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}</p>
+            </div>
+            <div className="bg-gray-100/60 p-3 rounded-xl text-center">
+              <p className="text-xs text-gray-500 mb-0.5">Total Issued</p>
+              <p className="text-lg font-bold text-gray-700">{userFines.length}</p>
+            </div>
           </div>
 
-          {userFines.filter((f: any) => f.status === 'unpaid').length > 0 ? (
-            <div className="space-y-2">
-              {userFines.filter((f: any) => f.status === 'unpaid').map((fine: any) => (
-                <div key={fine.id} className="flex items-center justify-between bg-white/70 p-3 rounded-xl">
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">{fine.fineLabel}</p>
-                    <p className="text-xs text-gray-400">
-                      {fine.createdAt ? new Date(fine.createdAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' }) : ''}
-                    </p>
+          {/* Unpaid Fines */}
+          {userFines.filter((f: any) => f.status === 'unpaid').length > 0 && (
+            <div className="mb-3">
+              <p className="text-xs font-semibold text-red-600 uppercase tracking-wide mb-2">Unpaid Fines</p>
+              <div className="space-y-2">
+                {userFines.filter((f: any) => f.status === 'unpaid').map((fine: any) => (
+                  <div key={fine.id} className="flex items-center justify-between bg-white/70 p-3 rounded-xl">
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">{fine.fineLabel}</p>
+                      <p className="text-xs text-gray-400">
+                        {fine.createdAt ? new Date(fine.createdAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' }) : ''}
+                      </p>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <span className="font-bold text-red-600">R {fine.amount}</span>
+                      <button
+                        onClick={() => handlePayFine(fine)}
+                        disabled={payingFineId === fine.id}
+                        className="px-3 py-1 bg-primary-600 text-white text-xs rounded-lg hover:bg-primary-700 disabled:opacity-50 font-medium"
+                      >
+                        {payingFineId === fine.id ? 'Paying...' : 'Pay'}
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center space-x-3">
-                    <span className="font-bold text-red-600">R {fine.amount}</span>
-                    <button
-                      onClick={() => handlePayFine(fine)}
-                      disabled={payingFineId === fine.id}
-                      className="px-3 py-1 bg-primary-600 text-white text-xs rounded-lg hover:bg-primary-700 disabled:opacity-50 font-medium"
-                    >
-                      {payingFineId === fine.id ? 'Paying...' : 'Pay'}
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-3 bg-white/70 rounded-xl">
-              <p className="text-sm text-gray-500">No outstanding fines 🎉</p>
+                ))}
+              </div>
             </div>
           )}
 
-          {finesSummary.paidTotal > 0 && (
-            <p className="text-xs text-gray-400 mt-3 text-center">
-              R {finesSummary.paidTotal.toLocaleString('en-ZA', { minimumFractionDigits: 2 })} in fines paid
-            </p>
+          {/* Paid Fines */}
+          {userFines.filter((f: any) => f.status === 'paid').length > 0 && (
+            <div className="mb-3">
+              <p className="text-xs font-semibold text-green-600 uppercase tracking-wide mb-2">Paid Fines</p>
+              <div className="space-y-2">
+                {userFines.filter((f: any) => f.status === 'paid').map((fine: any) => (
+                  <div key={fine.id} className="flex items-center justify-between bg-white/70 p-3 rounded-xl">
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">{fine.fineLabel}</p>
+                      <p className="text-xs text-gray-400">
+                        Paid {fine.paidDate ? new Date(fine.paidDate).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' }) : ''}
+                      </p>
+                    </div>
+                    <span className="font-bold text-green-600">R {fine.amount}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
+
+          {/* Pending Fines (cash payment awaiting confirmation) */}
+          {userFines.filter((f: any) => f.status === 'pending').length > 0 && (
+            <div className="mb-3">
+              <p className="text-xs font-semibold text-amber-600 uppercase tracking-wide mb-2">Pending Confirmation</p>
+              <div className="space-y-2">
+                {userFines.filter((f: any) => f.status === 'pending').map((fine: any) => (
+                  <div key={fine.id} className="flex items-center justify-between bg-white/70 p-3 rounded-xl">
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">{fine.fineLabel}</p>
+                      <p className="text-xs text-amber-500">Cash — awaiting admin confirmation</p>
+                    </div>
+                    <span className="font-bold text-amber-600">R {fine.amount}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {userFines.length === 0 && (
+            <div className="text-center py-3 bg-white/70 rounded-xl">
+              <p className="text-sm text-gray-500">No fines issued 🎉</p>
+            </div>
+          )}
+        </div>
+
+        {/* Fine Types Reference */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 mb-5">
+          <div className="flex items-center space-x-2 mb-4">
+            <div className="p-2 bg-amber-100 rounded-xl">
+              <span className="text-lg">📋</span>
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-800">Fine Types</h3>
+              <p className="text-xs text-gray-400">Possible fines and their amounts</p>
+            </div>
+          </div>
+          <div className="space-y-2">
+            {[
+              { label: 'No Banking', amount: 30, desc: 'Failure to use the banking system' },
+              { label: 'No Attendance', amount: 20, desc: 'Missing a scheduled meeting' },
+              { label: 'Sending (proxy)', amount: 30, desc: 'Sending someone in your place' },
+              { label: 'Late Coming', amount: 20, desc: 'Arriving late to a meeting' },
+              { label: 'Vulgar Language', amount: 50, desc: 'Using inappropriate language' },
+              { label: 'Misbehaving', amount: 20, desc: 'Unacceptable conduct at meetings' },
+              { label: 'Madala Non-Payment', amount: 50, desc: 'Not paying R200 Madala Side contribution for the month' },
+            ].map((ft) => (
+              <div key={ft.label} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                <div>
+                  <p className="text-sm font-medium text-gray-700">{ft.label}</p>
+                  <p className="text-xs text-gray-400">{ft.desc}</p>
+                </div>
+                <span className="font-bold text-red-600 text-sm">R {ft.amount}</span>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Quick Actions Bar */}
@@ -1478,16 +1621,25 @@ export default function MainDashboard() {
                       {progressPercentage.toFixed(0)}% complete
                     </span>
                   )}
+                  {contributionTarget === 'madala-side' && (
+                    <span className="text-xs bg-green-200 text-green-800 px-2 py-1 rounded-full">
+                      {Math.min(100, Math.round((madalaSideTotal / MADALA_SIDE_TARGET) * 100))}% complete
+                    </span>
+                  )}
                 </div>
               </div>
 
               {/* Amount Input */}
               <div className="mb-6">
-                {contributionTarget !== 'madala-side' && remainingAmount <= 0 ? (
+                {remainingAmount <= 0 ? (
                   <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
                     <CheckCircle className="w-8 h-8 text-green-600 mx-auto mb-2" />
                     <p className="text-sm font-medium text-green-800">Target Reached!</p>
-                    <p className="text-xs text-green-600 mt-1">You've already met your contribution target.</p>
+                    <p className="text-xs text-green-600 mt-1">
+                      {contributionTarget === 'madala-side'
+                        ? 'You\'ve completed your Madala Side target of R2,200.'
+                        : 'You\'ve already met your contribution target.'}
+                    </p>
                   </div>
                 ) : (
                   <>

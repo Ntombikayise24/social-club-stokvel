@@ -18,6 +18,17 @@ async function seed() {
 
   console.log('🌱 Seeding database...\n');
 
+  // ── Superadmin user ──
+  const superadminPassword = await bcrypt.hash('Super@123', 12);
+  const [superadminResult] = await connection.query(
+    `INSERT INTO users (full_name, email, phone, password_hash, role, status)
+     VALUES (?, ?, ?, ?, 'superadmin', 'active')
+     ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)`,
+    ['Super Admin', 'superadmin@stokvel.co.za', '+27610000000', superadminPassword]
+  );
+  const superadminId = superadminResult.insertId;
+  console.log('✅ Superadmin user created (superadmin@stokvel.co.za / Super@123)');
+
   // ── Admin user ──
   const adminPassword = await bcrypt.hash('Admin@123', 12);
   const [adminResult] = await connection.query(
@@ -34,7 +45,7 @@ async function seed() {
     `INSERT INTO stokvels (name, type, description, target_amount, max_members, interest_rate, cycle, meeting_day, next_payout, status, icon, color, created_by)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)`,
-    ['Hennesy Social Club', 'traditional', 'Group target savings — the collective pot (R5000) and Madala Side (R200/month, Jan–Nov).', 5000, 18, 30, 'weekly', 'Sunday', '2026-12-12', 'active', '💰', 'blue', adminId]
+    ['Hennesy Social Club', 'traditional', 'Group target savings — the collective pot (R5000) and Madala Side (R200/month, Jan–Nov).', 5000, 30, 30, 'weekly', 'Sunday', '2026-12-12', 'active', '💰', 'blue', adminId]
   );
   const stokvel1Id = s1.insertId;
 
@@ -44,9 +55,23 @@ async function seed() {
   await connection.query(
     `INSERT INTO user_settings (user_id) VALUES (?)
      ON DUPLICATE KEY UPDATE user_id=user_id`,
+    [superadminId]
+  );
+  await connection.query(
+    `INSERT INTO user_settings (user_id) VALUES (?)
+     ON DUPLICATE KEY UPDATE user_id=user_id`,
     [adminId]
   );
   console.log('✅ User settings initialized');
+
+  // ── Assign admin to stokvel ──
+  await connection.query(
+    `INSERT INTO admin_stokvel_assignments (admin_id, stokvel_id, assigned_by)
+     VALUES (?, ?, ?)
+     ON DUPLICATE KEY UPDATE admin_id=admin_id`,
+    [adminId, stokvel1Id, superadminId]
+  );
+  console.log('✅ Admin assigned to Hennesy Social Club');
 
   // ── Site Settings ──
   const siteSettings = [
@@ -55,7 +80,7 @@ async function seed() {
     ['min_contribution', '100'],
     ['max_loan_percentage', '50'],
     ['loan_interest_rate', '30'],
-    ['loan_term_days', '30'],
+    ['loan_term_days', '28'],
     ['late_fee_percentage', '5'],
     ['grace_period_days', '7'],
     ['voluntary_exit_refund', '50'],
@@ -78,7 +103,7 @@ async function seed() {
     ['Contributions', 'Which payment methods are accepted?', 'We accept Visa, Mastercard, and American Express debit/credit cards. Bank transfers and cash contributions (confirmed by admin) are also supported.', 5],
     ['Loans', 'How much can I borrow?', 'You can borrow up to 50% of your total savings in a group. The amount depends on your contribution history and standing in the group.', 6],
     ['Loans', 'What is the interest rate on loans?', 'The standard interest rate is 30% flat on the borrowed amount. Overdue loans incur an additional 30% penalty (60% total).', 7],
-    ['Loans', 'What is the repayment period?', 'All loans must be repaid within 30 days from the date of borrowing. Early repayment is encouraged and welcomed.', 8],
+    ['Loans', 'What is the repayment period?', 'All loans must be repaid within 28 days from the date of borrowing. Early repayment is encouraged and welcomed.', 8],
     ['Account & Security', 'How do I reset my password?', 'Click "Forgot Password" on the login page. Enter your registered email and you\'ll receive a 6-digit verification code to reset your password.', 9],
     ['Account & Security', 'Can I belong to multiple savings groups?', 'Yes! You can be a member of multiple savings groups simultaneously. Use the profile switcher on your dashboard to navigate between them.', 10],
     ['Leaving a Group', 'What happens if I leave voluntarily?', 'If you leave voluntarily, you will receive a refund of 50% of your total contributions. Any outstanding loans must be repaid first.', 11],
@@ -94,7 +119,8 @@ async function seed() {
 
   console.log('\n🎉 Seeding completed successfully!');
   console.log('\n📋 Login credentials:');
-  console.log('   Admin:  admin@stokvel.co.za / Admin@123');
+  console.log('   Superadmin: superadmin@stokvel.co.za / Super@123');
+  console.log('   Admin:      admin@stokvel.co.za / Admin@123');
 
   await connection.end();
 }

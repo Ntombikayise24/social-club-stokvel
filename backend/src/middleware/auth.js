@@ -22,11 +22,21 @@ export function authenticate(req, res, next) {
 }
 
 /**
- * Require admin role
+ * Require admin role (admin or superadmin)
  */
 export function requireAdmin(req, res, next) {
-  if (req.user?.role !== 'admin') {
+  if (req.user?.role !== 'admin' && req.user?.role !== 'superadmin') {
     return res.status(403).json({ error: 'Admin access required' });
+  }
+  next();
+}
+
+/**
+ * Require superadmin role
+ */
+export function requireSuperAdmin(req, res, next) {
+  if (req.user?.role !== 'superadmin') {
+    return res.status(403).json({ error: 'Superadmin access required' });
   }
   next();
 }

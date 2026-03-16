@@ -117,9 +117,27 @@ router.post(
         return res.status(404).json({ error: 'Profile not found. Please ensure you are assigned to a stokvel.' });
       }
 
-      // Check contribution does not exceed target (only for 'your-target', not 'madala-side')
+      // Check contribution does not exceed target
       const profile = profiles[0];
-      if (contributionType !== 'madala-side') {
+      if (contributionType === 'madala-side') {
+        // Madala Side: check against R2,200 annual target
+        const MADALA_TARGET = 2200;
+        const [madalaRows] = await pool.query(
+          "SELECT COALESCE(SUM(amount), 0) AS total FROM contributions WHERE profile_id = ? AND contribution_type = 'madala-side' AND status IN ('confirmed', 'pending')",
+          [profile.id]
+        );
+        const madalaPaid = parseFloat(madalaRows[0].total);
+        const madalaRemaining = MADALA_TARGET - madalaPaid;
+        if (madalaRemaining <= 0) {
+          return res.status(400).json({ error: 'You have already completed your Madala Side target (R2,200).' });
+        }
+        if (amount > madalaRemaining) {
+          return res.status(400).json({
+            error: `Amount exceeds your remaining Madala Side target. You can contribute up to R${madalaRemaining.toLocaleString()}.`,
+            maxAmount: madalaRemaining,
+          });
+        }
+      } else {
         const remaining = parseFloat(profile.target_amount) - parseFloat(profile.saved_amount);
         if (remaining <= 0) {
           return res.status(400).json({ error: 'You have already reached your contribution target.' });
@@ -243,8 +261,25 @@ router.post(
 
       const profile = profiles[0];
 
-      // For 'your-target', check contribution does not exceed target
-      if (contributionType !== 'madala-side') {
+      // Check contribution does not exceed target
+      if (contributionType === 'madala-side') {
+        const MADALA_TARGET = 2200;
+        const [madalaRows] = await pool.query(
+          "SELECT COALESCE(SUM(amount), 0) AS total FROM contributions WHERE profile_id = ? AND contribution_type = 'madala-side' AND status IN ('confirmed', 'pending')",
+          [profile.id]
+        );
+        const madalaPaid = parseFloat(madalaRows[0].total);
+        const madalaRemaining = MADALA_TARGET - madalaPaid;
+        if (madalaRemaining <= 0) {
+          return res.status(400).json({ error: 'You have already completed your Madala Side target (R2,200).' });
+        }
+        if (amount > madalaRemaining) {
+          return res.status(400).json({
+            error: `Amount exceeds your remaining Madala Side target. You can contribute up to R${madalaRemaining.toLocaleString()}.`,
+            maxAmount: madalaRemaining,
+          });
+        }
+      } else {
         const remaining = parseFloat(profile.target_amount) - parseFloat(profile.saved_amount);
         if (remaining <= 0) {
           return res.status(400).json({ error: 'You have already reached your contribution target.' });

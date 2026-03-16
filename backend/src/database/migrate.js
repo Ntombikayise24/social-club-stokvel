@@ -35,7 +35,7 @@ async function migrate() {
       email VARCHAR(255) NOT NULL UNIQUE,
       phone VARCHAR(30),
       password_hash VARCHAR(255) NOT NULL,
-      role ENUM('member', 'admin') DEFAULT 'member',
+      role ENUM('member', 'admin', 'superadmin') DEFAULT 'member',
       status ENUM('active', 'inactive', 'pending', 'deleted') DEFAULT 'pending',
       avatar_url VARCHAR(500),
       last_active DATETIME,
@@ -59,7 +59,7 @@ async function migrate() {
       type ENUM('traditional', 'flexible') DEFAULT 'traditional',
       description TEXT,
       target_amount DECIMAL(15,2) DEFAULT 0,
-      max_members INT DEFAULT 50,
+      max_members INT DEFAULT 30,
       interest_rate DECIMAL(5,2) DEFAULT 30.00,
       cycle ENUM('weekly', 'monthly', 'quarterly') DEFAULT 'monthly',
       meeting_day VARCHAR(20),
@@ -186,10 +186,17 @@ async function migrate() {
 
   // Update loans status enum for existing tables
   try {
-    await connection.query(`ALTER TABLE loans MODIFY COLUMN status ENUM('active', 'repaid', 'overdue', 'pending', 'rejected') DEFAULT 'pending'`);
+    await connection.query(`ALTER TABLE loans MODIFY COLUMN status ENUM('active', 'repaid', 'overdue', 'pending', 'rejected', 'blk', 'ftp', 'pending_repayment') DEFAULT 'pending'`);
   } catch (e) { /* column already correct */ }
   try {
     await connection.query(`ALTER TABLE loans ADD COLUMN loan_target VARCHAR(50) DEFAULT 'your-target' AFTER card_id`);
+  } catch (e) { /* column already exists */ }
+  // Add repayment_type and amount_paid columns for BLK/installment/FTP
+  try {
+    await connection.query(`ALTER TABLE loans ADD COLUMN repayment_type ENUM('full', 'blk', 'installment', 'ftp') DEFAULT NULL AFTER loan_target`);
+  } catch (e) { /* column already exists */ }
+  try {
+    await connection.query(`ALTER TABLE loans ADD COLUMN amount_paid DECIMAL(15,2) DEFAULT 0 AFTER repayment_type`);
   } catch (e) { /* column already exists */ }
 
   // ───────────────── CARDS TABLE ─────────────────
@@ -326,7 +333,7 @@ async function migrate() {
       id INT AUTO_INCREMENT PRIMARY KEY,
       user_id INT NOT NULL,
       stokvel_id INT NOT NULL,
-      fine_type ENUM('no_banking', 'no_attendance', 'sending', 'late_coming') NOT NULL,
+      fine_type ENUM('no_banking', 'no_attendance', 'sending', 'late_coming', 'vulgar', 'misbehaving', 'madala_non_payment') NOT NULL,
       amount DECIMAL(15,2) NOT NULL,
       status ENUM('unpaid', 'paid') DEFAULT 'unpaid',
       reason TEXT,
@@ -342,6 +349,44 @@ async function migrate() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
   console.log('✅ fines table created');
+
+  console.log('\n✅ All migrations completed!');
+
+  // ── Alter existing tables for new features ──
+  
+  // Update users role ENUM to include superadmin
+  try {
+    await connection.query(`ALTER TABLE users MODIFY COLUMN role ENUM('member', 'admin', 'superadmin') DEFAULT 'member'`);
+    console.log('✅ Updated users.role ENUM to include superadmin');
+  } catch (e) { /* already correct */ }
+
+  // Update max_members default to 30
+  try {
+    await connection.query(`ALTER TABLE stokvels MODIFY COLUMN max_members INT DEFAULT 30`);
+    console.log('✅ Updated stokvels.max_members default to 30');
+  } catch (e) { /* already correct */ }
+
+  // Update fines fine_type ENUM to include new types
+  try {
+    await connection.query(`ALTER TABLE fines MODIFY COLUMN fine_type ENUM('no_banking', 'no_attendance', 'sending', 'late_coming', 'vulgar', 'misbehaving', 'madala_non_payment') NOT NULL`);
+    console.log('✅ Updated fines.fine_type ENUM with new types');
+  } catch (e) { /* already correct */ }
+
+  // ───────────────── ADMIN STOKVEL ASSIGNMENTS TABLE ─────────────────
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS admin_stokvel_assignments (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      admin_id INT NOT NULL,
+      stokvel_id INT NOT NULL,
+      assigned_by INT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uk_admin_stokvel (admin_id, stokvel_id),
+      FOREIGN KEY (admin_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (stokvel_id) REFERENCES stokvels(id) ON DELETE CASCADE,
+      FOREIGN KEY (assigned_by) REFERENCES users(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+  console.log('✅ admin_stokvel_assignments table created');
 
   console.log('\n✅ All migrations completed successfully!');
 

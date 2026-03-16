@@ -44,7 +44,7 @@ interface User {
   lastActive?: string;
   totalContributions: number;
   stokvelCount: number;
-  role: 'member' | 'admin' | 'treasurer';
+  role: 'member' | 'admin' | 'treasurer' | 'superadmin';
 }
 
 interface UserManagementTableProps {
@@ -160,14 +160,16 @@ export default function UserManagementTable({
           return (
             <span
               className={`px-3 py-1 inline-flex items-center text-xs font-medium rounded-full ${
-                role === 'admin'
+                role === 'superadmin'
+                  ? 'bg-red-100 text-red-800'
+                  : role === 'admin'
                   ? 'bg-purple-100 text-purple-800'
                   : role === 'treasurer'
                   ? 'bg-blue-100 text-blue-800'
                   : 'bg-gray-100 text-gray-800'
               }`}
             >
-              {role === 'admin' && <Shield className="w-3 h-3 mr-1" />}
+              {(role === 'admin' || role === 'superadmin') && <Shield className="w-3 h-3 mr-1" />}
               {role === 'treasurer' && <Star className="w-3 h-3 mr-1" />}
               {role.charAt(0).toUpperCase() + role.slice(1)}
             </span>

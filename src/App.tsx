@@ -4,7 +4,7 @@ import {
   Users, Target, Wallet, Shield, ArrowRight, ArrowLeft, Settings, X, Mail, Lock, 
   AlertCircle, Eye, EyeOff, TrendingUp, CheckCircle, Clock, Award,
   ChevronRight, Star, Facebook, Twitter, Instagram, Linkedin,
-  Menu, Phone, MapPin, DollarSign, Bell
+  Menu, Phone, MapPin, DollarSign, Bell, Download
 } from 'lucide-react';
 import { authApi } from './api';
 
@@ -18,8 +18,39 @@ function App() {
   const [showPassword, setShowPassword] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [pwaPrompt, setPwaPrompt] = useState<any>(null);
+  const [isPwaInstalled, setIsPwaInstalled] = useState(
+    typeof window !== 'undefined' && window.matchMedia('(display-mode: standalone)').matches
+  );
+  const [bannerDismissed, setBannerDismissed] = useState(false);
 
   // Admin credentials handled by backend API
+
+  // Capture PWA install prompt
+  useEffect(() => {
+    const handler = (e: Event) => { e.preventDefault(); setPwaPrompt(e); };
+    window.addEventListener('beforeinstallprompt', handler);
+    window.addEventListener('appinstalled', () => setIsPwaInstalled(true));
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstallPwa = async () => {
+    if (pwaPrompt) {
+      await pwaPrompt.prompt();
+      const { outcome } = await pwaPrompt.userChoice;
+      if (outcome === 'accepted') setIsPwaInstalled(true);
+      setPwaPrompt(null);
+    } else {
+      // Fallback for browsers where beforeinstallprompt hasn't fired yet
+      // Check if it's iOS Safari
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      if (isIOS) {
+        alert('To install Fund Mate:\n\n1. Tap the Share button (arrow icon)\n2. Scroll down and tap "Add to Home Screen"\n3. Tap "Add"');
+      } else {
+        alert('To install Fund Mate:\n\n1. Click the install icon (⊕) in your browser\'s address bar\n2. Or open browser menu (⋮) and select "Install app"');
+      }
+    }
+  };
 
   // Handle scroll effect for navbar
   useEffect(() => {
@@ -47,7 +78,7 @@ function App() {
       const res = await authApi.login({ email: adminEmail, password: adminPassword });
       const { token, user } = res.data;
 
-      if (user.role !== 'admin') {
+      if (user.role !== 'admin' && user.role !== 'superadmin') {
         setLoginError('This account does not have admin access');
         return;
       }
@@ -356,6 +387,20 @@ function App() {
                   Get Started
                   <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
                 </Link>
+                {!isPwaInstalled && (
+                  <button
+                    onClick={handleInstallPwa}
+                    className="group inline-flex items-center justify-center px-6 py-3.5 bg-gray-900 text-white rounded-xl hover:bg-gray-800 transition-all font-medium text-base shadow-md hover:shadow-xl hover:-translate-y-0.5 duration-200"
+                  >
+                    <div className="w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center mr-3">
+                      <Download className="w-4 h-4 text-white" />
+                    </div>
+                    <div className="text-left">
+                      <span className="text-[10px] text-gray-400 block leading-none">GET THE</span>
+                      <span className="text-sm font-semibold leading-tight">Fund Mate App</span>
+                    </div>
+                  </button>
+                )}
               </div>
 
               <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-gray-500">
@@ -561,6 +606,49 @@ function App() {
           </div>
         </div>
       </footer>
+
+      {/* PWA Install Banner - modern floating bottom */}
+      {!isPwaInstalled && !bannerDismissed && (
+        <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:max-w-sm z-50 animate-slide-up">
+          <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 p-4 relative overflow-hidden">
+            {/* Decorative accent */}
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary-500 via-emerald-400 to-primary-600" />
+            
+            {/* Close button */}
+            <button
+              onClick={() => setBannerDismissed(true)}
+              className="absolute top-3 right-3 w-6 h-6 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+
+            <div className="flex items-center space-x-3">
+              {/* App icon */}
+              <div className="w-12 h-12 bg-gradient-to-br from-primary-500 to-emerald-600 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-md">
+                <span className="text-white font-bold text-sm">FM</span>
+              </div>
+              <div className="flex-1 min-w-0 pr-4">
+                <p className="font-bold text-gray-900 text-sm">Fund Mate</p>
+                <p className="text-xs text-gray-500 truncate">Save together, grow together</p>
+                <div className="flex items-center mt-0.5">
+                  {[...Array(5)].map((_, i) => (
+                    <Star key={i} className="w-3 h-3 text-yellow-400 fill-yellow-400" />
+                  ))}
+                  <span className="text-[10px] text-gray-400 ml-1">FREE</span>
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={handleInstallPwa}
+              className="w-full mt-3 flex items-center justify-center space-x-2 bg-primary-600 text-white py-2.5 rounded-xl font-semibold text-sm hover:bg-primary-700 transition-all active:scale-[0.98]"
+            >
+              <Download className="w-4 h-4" />
+              <span>Install App</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       <style>{`
         @keyframes modalIn {

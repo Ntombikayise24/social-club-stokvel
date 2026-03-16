@@ -18,6 +18,7 @@ import {
 import { helpApi } from '../../api';
 import { showToast } from '../../utils/toast';
 import { getCurrentUser } from '../../utils/auth';
+import LoadingScreen from '../../components/common/LoadingScreen';
 
 export default function HelpCenter() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -59,7 +60,7 @@ export default function HelpCenter() {
       questions: [
         { q: 'How much can I borrow?', a: 'You can borrow up to 50% of your total contributions.' },
         { q: 'What is the interest rate?', a: 'Loans have a 30% interest rate. If overdue, an additional 30% is added.' },
-        { q: 'How long do I have to repay?', a: 'Loans must be repaid within 30 days.' }
+        { q: 'How long do I have to repay?', a: 'Loans must be repaid within 28 days.' }
       ]
     },
     {
@@ -149,6 +150,9 @@ export default function HelpCenter() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {loading ? (
+          <LoadingScreen message="Loading help center..." />
+        ) : (<>
         {/* Hero Section */}
         <div className="text-center mb-8">
           <HelpCircle className="w-16 h-16 text-primary-600 mx-auto mb-4" />
@@ -369,6 +373,7 @@ export default function HelpCenter() {
             </div>
           </div>
         </div>
+      </>)}
       </main>
     </div>
   );

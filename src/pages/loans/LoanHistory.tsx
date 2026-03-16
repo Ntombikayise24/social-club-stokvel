@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import LoadingScreen from '../../components/common/LoadingScreen';
 import { 
   ArrowLeft,
   DollarSign,
@@ -31,7 +32,7 @@ interface Loan {
   interest: number;
   interestRate: number;
   totalRepayable: number;
-  status: 'active' | 'repaid' | 'overdue' | 'pending_repayment' | 'pending' | 'rejected';
+  status: 'active' | 'repaid' | 'overdue' | 'pending_repayment' | 'pending' | 'rejected' | 'blk' | 'ftp';
   borrowedDate: string;
   dueDate: string;
   repaidDate?: string;
@@ -39,6 +40,8 @@ interface Loan {
   daysRemaining?: number;
   penaltyAmount?: number;
   overdueMonths?: number;
+  repaymentType?: 'full' | 'blk' | 'installment' | 'ftp' | null;
+  amountPaid?: number;
 }
 
 interface Card {
@@ -60,6 +63,9 @@ export default function LoanHistory() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [repaymentSuccess, setRepaymentSuccess] = useState(false);
   const [repayMethod, setRepayMethod] = useState<'card' | 'cash'>('card');
+  const [repaymentType, setRepaymentType] = useState<'full' | 'blk' | 'installment' | 'ftp'>('full');
+  const [installmentAmount, setInstallmentAmount] = useState('');
+  const [showRepayDropdown, setShowRepayDropdown] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
   const [profiles, setProfiles] = useState<any[]>([]);
@@ -112,7 +118,9 @@ export default function LoanHistory() {
           purpose: l.purpose,
           daysRemaining: l.daysRemaining,
           penaltyAmount: l.penaltyAmount || 0,
-          overdueMonths: l.overdueMonths || 0
+          overdueMonths: l.overdueMonths || 0,
+          repaymentType: l.repaymentType || null,
+          amountPaid: l.amountPaid || 0
         })));
       } catch (err) {
         console.error('Failed to load loan data', err);
@@ -132,12 +140,12 @@ export default function LoanHistory() {
     totalInterestPaid: profileLoans
       .filter(l => l.status === 'repaid')
       .reduce((sum, loan) => sum + loan.interest, 0),
-    activeLoans: profileLoans.filter(l => l.status === 'active').length,
+    activeLoans: profileLoans.filter(l => ['active', 'blk', 'ftp'].includes(l.status)).length,
     totalBorrowed: profileLoans.reduce((sum, loan) => sum + loan.amount, 0),
     totalRepaid: profileLoans.filter(l => l.status === 'repaid').reduce((sum, loan) => sum + loan.totalRepayable, 0),
     overdueLoans: profileLoans.filter(l => l.status === 'overdue').length,
     activeLoanTotal: profileLoans
-      .filter(l => l.status === 'active')
+      .filter(l => ['active', 'blk', 'ftp'].includes(l.status))
       .reduce((sum, loan) => sum + loan.totalRepayable, 0)
   };
 
@@ -151,6 +159,10 @@ export default function LoanHistory() {
         return <Clock className="w-5 h-5 text-blue-600" />;
       case 'pending_repayment':
         return <Clock className="w-5 h-5 text-amber-600" />;
+      case 'blk':
+        return <Clock className="w-5 h-5 text-purple-600" />;
+      case 'ftp':
+        return <AlertCircle className="w-5 h-5 text-red-600" />;
       case 'pending':
         return <Clock className="w-5 h-5 text-yellow-600" />;
       case 'rejected':
@@ -178,6 +190,10 @@ export default function LoanHistory() {
         );
       case 'pending_repayment':
         return <span className="px-2 py-1 bg-amber-100 text-amber-700 text-xs rounded-full">Cash Pending</span>;
+      case 'blk':
+        return <span className="px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded-full">BLK</span>;
+      case 'ftp':
+        return <span className="px-2 py-1 bg-red-100 text-red-700 text-xs rounded-full font-bold">FTP</span>;
       case 'pending':
         return <span className="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs rounded-full">Pending Approval</span>;
       case 'rejected':
@@ -199,12 +215,15 @@ export default function LoanHistory() {
     );
   };
 
-  const handleRepay = (loan: Loan) => {
+  const handleRepay = (loan: Loan, type: 'full' | 'blk' | 'installment' | 'ftp' = 'full') => {
     setShowRepayModal(loan);
+    setRepaymentType(type);
+    setInstallmentAmount('');
     const defaultCard = cards.find(c => c.isDefault) || cards[0];
     if (defaultCard) setSelectedCard(defaultCard.id);
     setRepaymentSuccess(false);
     setRepayMethod('card');
+    setShowRepayDropdown(null);
   };
 
   const confirmRepayment = async () => {
@@ -213,27 +232,63 @@ export default function LoanHistory() {
     setIsProcessing(true);
     
     try {
-      await loanApi.repay(showRepayModal.id, repayMethod === 'card' && selectedCard ? Number(selectedCard) : undefined, repayMethod);
+      const instAmt = repaymentType === 'installment' ? parseFloat(installmentAmount) : undefined;
+      if (repaymentType === 'installment' && (!instAmt || instAmt <= 0)) {
+        showToast.error('Please enter a valid installment amount.');
+        setIsProcessing(false);
+        return;
+      }
+
+      await loanApi.repay(
+        showRepayModal.id,
+        repayMethod === 'card' && selectedCard ? Number(selectedCard) : undefined,
+        repayMethod,
+        repaymentType,
+        instAmt
+      );
       
       if (repayMethod === 'cash') {
         showToast.success('Cash repayment submitted! Pending admin confirmation.');
+      } else if (repaymentType === 'blk') {
+        showToast.success('BLK applied! Loan renewed for 28 days.');
+      } else if (repaymentType === 'ftp') {
+        showToast.success('Loan marked as FTP. 30% interest charged monthly.');
+      } else if (repaymentType === 'installment') {
+        showToast.success(`Installment of R${instAmt?.toFixed(2)} recorded.`);
       }
       
-      // Update loan status locally
+      // Update loan status locally based on repayment type
       setLoans(prevLoans => 
-        prevLoans.map(loan => 
-          loan.id === showRepayModal.id 
-            ? { 
-                ...loan, 
-                status: repayMethod === 'cash' ? ('active' as const) : ('repaid' as const), 
-                repaidDate: repayMethod === 'card' ? new Date().toLocaleDateString('en-ZA', { 
-                  day: 'numeric', 
-                  month: 'short', 
-                  year: 'numeric' 
-                }) : undefined
-              } 
-            : loan
-        )
+        prevLoans.map(loan => {
+          if (loan.id !== showRepayModal.id) return loan;
+          
+          if (repaymentType === 'blk') {
+            return { ...loan, status: 'blk' as const, repaymentType: 'blk' as const };
+          }
+          if (repaymentType === 'ftp') {
+            return { ...loan, status: 'ftp' as const, repaymentType: 'ftp' as const };
+          }
+          if (repaymentType === 'installment' && instAmt) {
+            const newPaid = (loan.amountPaid || 0) + instAmt;
+            const fullyPaid = newPaid >= loan.amount + loan.interest;
+            return {
+              ...loan,
+              status: fullyPaid ? ('repaid' as const) : loan.status,
+              repaymentType: 'installment' as const,
+              amountPaid: newPaid,
+              repaidDate: fullyPaid ? new Date().toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : undefined
+            };
+          }
+          return { 
+            ...loan, 
+            status: repayMethod === 'cash' ? ('active' as const) : ('repaid' as const), 
+            repaidDate: repayMethod === 'card' ? new Date().toLocaleDateString('en-ZA', { 
+              day: 'numeric', 
+              month: 'short', 
+              year: 'numeric' 
+            }) : undefined
+          };
+        })
       );
       
       setRepaymentSuccess(true);
@@ -332,9 +387,7 @@ export default function LoanHistory() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
-          </div>
+          <LoadingScreen message="Loading loan history..." />
         ) : (<>
         {/* Page Title */}
         <div className="mb-6">
@@ -450,7 +503,7 @@ export default function LoanHistory() {
         {/* Loans List */}
         <div className="space-y-4">
           {filteredLoans.map((loan) => (
-            <div key={loan.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div key={loan.id} className="bg-white rounded-xl shadow-sm border border-gray-100">
               {/* Loan Header */}
               <div 
                 className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
@@ -495,19 +548,52 @@ export default function LoanHistory() {
                   </div>
                 )}
 
-                {/* Quick action for active loans */}
-                {loan.status === 'active' && (
-                  <div className="mt-3 flex justify-end">
+                {/* Quick action for active/blk/ftp/overdue loans */}
+                {['active', 'overdue', 'blk', 'ftp'].includes(loan.status) && (
+                  <div className="mt-3 flex justify-end relative">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleRepay(loan);
+                        setShowRepayDropdown(showRepayDropdown === loan.id ? null : loan.id);
                       }}
                       className="px-4 py-2 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700 transition-colors flex items-center space-x-2"
                     >
                       <CreditCard className="w-4 h-4" />
                       <span>Repay Now</span>
+                      <ChevronDown className="w-3 h-3" />
                     </button>
+                    {showRepayDropdown === loan.id && (
+                      <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-xl shadow-xl border border-gray-200 z-50">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleRepay(loan, 'full'); }}
+                          className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-100"
+                        >
+                          <span className="font-semibold text-gray-800 text-sm">Full Repayment</span>
+                          <p className="text-xs text-gray-500 mt-0.5">Pay full amount now</p>
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleRepay(loan, 'blk'); }}
+                          className="w-full px-4 py-3 text-left hover:bg-purple-50 transition-colors border-b border-gray-100"
+                        >
+                          <span className="font-semibold text-purple-700 text-sm">BLK</span>
+                          <p className="text-xs text-gray-500 mt-0.5">Pay 30% interest to renew 28 days</p>
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleRepay(loan, 'installment'); }}
+                          className="w-full px-4 py-3 text-left hover:bg-blue-50 transition-colors border-b border-gray-100"
+                        >
+                          <span className="font-semibold text-blue-700 text-sm">PAY INSTALLMENT</span>
+                          <p className="text-xs text-gray-500 mt-0.5">Pay in installments (30% charged if unpaid in 28 days)</p>
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleRepay(loan, 'ftp'); }}
+                          className="w-full px-4 py-3 text-left hover:bg-red-50 transition-colors"
+                        >
+                          <span className="font-semibold text-red-700 text-sm">FTP</span>
+                          <p className="text-xs text-gray-500 mt-0.5">Failure to pay - 30% charged monthly</p>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -651,12 +737,18 @@ export default function LoanHistory() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
             <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CreditCard className="w-8 h-8 text-primary-600" />
+              <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
+                repaymentType === 'blk' ? 'bg-purple-100' : repaymentType === 'ftp' ? 'bg-red-100' : repaymentType === 'installment' ? 'bg-blue-100' : 'bg-primary-100'
+              }`}>
+                <CreditCard className={`w-8 h-8 ${
+                  repaymentType === 'blk' ? 'text-purple-600' : repaymentType === 'ftp' ? 'text-red-600' : repaymentType === 'installment' ? 'text-blue-600' : 'text-primary-600'
+                }`} />
               </div>
-              <h3 className="text-xl font-semibold text-gray-800 mb-2">Confirm Repayment</h3>
+              <h3 className="text-xl font-semibold text-gray-800 mb-2">
+                {repaymentType === 'blk' ? 'BLK - Renew Loan' : repaymentType === 'ftp' ? 'FTP - Failure To Pay' : repaymentType === 'installment' ? 'Pay Installment' : 'Confirm Repayment'}
+              </h3>
               <p className="text-gray-500 text-sm">
-                You are about to repay this loan
+                {repaymentType === 'blk' ? 'Pay 30% interest to renew for 28 more days' : repaymentType === 'ftp' ? '30% interest will be charged monthly until fully repaid' : repaymentType === 'installment' ? 'Pay a partial amount towards your loan' : 'You are about to repay this loan in full'}
               </p>
             </div>
 
@@ -665,49 +757,130 @@ export default function LoanHistory() {
                 <span className="text-gray-600">Loan Amount:</span>
                 <span className="font-bold text-gray-800">{formatCurrency(showRepayModal.amount)}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Interest ({showRepayModal.interestRate}%):</span>
-                <span className="font-bold text-secondary-600">{formatCurrency(showRepayModal.interest)}</span>
-              </div>
-              <div className="flex justify-between pt-2 border-t border-gray-200">
-                <span className="font-medium">Total to Pay:</span>
-                <span className="font-bold text-primary-700">{formatCurrency(showRepayModal.totalRepayable)}</span>
-              </div>
+              {(showRepayModal.amountPaid || 0) > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Already Paid:</span>
+                  <span className="font-bold text-green-600">{formatCurrency(showRepayModal.amountPaid || 0)}</span>
+                </div>
+              )}
+              {repaymentType === 'blk' ? (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Remaining Principal:</span>
+                    <span className="font-bold text-gray-800">{formatCurrency(showRepayModal.amount - (showRepayModal.amountPaid || 0))}</span>
+                  </div>
+                  <div className="flex justify-between pt-2 border-t border-gray-200">
+                    <span className="font-medium">Interest to Pay (30%):</span>
+                    <span className="font-bold text-purple-700">{formatCurrency((showRepayModal.amount - (showRepayModal.amountPaid || 0)) * 0.3)}</span>
+                  </div>
+                </>
+              ) : repaymentType === 'ftp' ? (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Monthly Charge (30%):</span>
+                    <span className="font-bold text-red-600">{formatCurrency((showRepayModal.amount - (showRepayModal.amountPaid || 0)) * 0.3)}</span>
+                  </div>
+                  <div className="flex justify-between pt-2 border-t border-gray-200">
+                    <span className="font-medium">Outstanding Balance:</span>
+                    <span className="font-bold text-red-700">{formatCurrency(showRepayModal.amount - (showRepayModal.amountPaid || 0))}</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Interest ({showRepayModal.interestRate}%):</span>
+                    <span className="font-bold text-secondary-600">{formatCurrency(showRepayModal.interest)}</span>
+                  </div>
+                  <div className="flex justify-between pt-2 border-t border-gray-200">
+                    <span className="font-medium">{repaymentType === 'installment' ? 'Total Remaining:' : 'Total to Pay:'}</span>
+                    <span className="font-bold text-primary-700">{formatCurrency(showRepayModal.totalRepayable - (showRepayModal.amountPaid || 0))}</span>
+                  </div>
+                </>
+              )}
             </div>
 
-            {/* Payment Method Toggle */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Payment Method</label>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setRepayMethod('card')}
-                  className={`flex items-center justify-center space-x-2 p-3 rounded-lg border-2 transition-all ${
-                    repayMethod === 'card'
-                      ? 'border-green-500 bg-green-50 ring-2 ring-green-200'
-                      : 'border-gray-200 bg-white hover:border-gray-300'
-                  }`}
-                >
-                  <CreditCard className={`w-5 h-5 ${repayMethod === 'card' ? 'text-green-600' : 'text-gray-400'}`} />
-                  <span className={`text-sm font-medium ${repayMethod === 'card' ? 'text-green-700' : 'text-gray-600'}`}>Card</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRepayMethod('cash')}
-                  className={`flex items-center justify-center space-x-2 p-3 rounded-lg border-2 transition-all ${
-                    repayMethod === 'cash'
-                      ? 'border-amber-500 bg-amber-50 ring-2 ring-amber-200'
-                      : 'border-gray-200 bg-white hover:border-gray-300'
-                  }`}
-                >
-                  <Wallet className={`w-5 h-5 ${repayMethod === 'cash' ? 'text-amber-600' : 'text-gray-400'}`} />
-                  <span className={`text-sm font-medium ${repayMethod === 'cash' ? 'text-amber-700' : 'text-gray-600'}`}>Cash</span>
-                </button>
+            {/* Installment Amount Input */}
+            {repaymentType === 'installment' && !repaymentSuccess && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Installment Amount (R)</label>
+                <input
+                  type="number"
+                  min="1"
+                  max={showRepayModal.totalRepayable - (showRepayModal.amountPaid || 0)}
+                  value={installmentAmount}
+                  onChange={(e) => setInstallmentAmount(e.target.value)}
+                  placeholder={`Max: R${(showRepayModal.totalRepayable - (showRepayModal.amountPaid || 0)).toFixed(2)}`}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">If not fully repaid within 28 days, additional 30% interest will be charged.</p>
               </div>
-            </div>
+            )}
+
+            {/* FTP Warning */}
+            {repaymentType === 'ftp' && !repaymentSuccess && (
+              <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="flex items-start space-x-3">
+                  <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-red-800">Warning: FTP Status</p>
+                    <p className="text-xs text-red-700 mt-1">
+                      Your loan will be marked as <span className="font-semibold">Failure To Pay</span>. 30% interest will be charged every month on the outstanding balance until fully repaid.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* BLK Info */}
+            {repaymentType === 'blk' && !repaymentSuccess && (
+              <div className="mb-4 bg-purple-50 border border-purple-200 rounded-lg p-4">
+                <div className="flex items-start space-x-3">
+                  <Clock className="w-5 h-5 text-purple-600 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-purple-800">BLK Renewal</p>
+                    <p className="text-xs text-purple-700 mt-1">
+                      Pay only the 30% interest to extend your loan by <span className="font-semibold">28 days</span>. The principal remains unchanged.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Payment Method Toggle - only for full and installment */}
+            {['full', 'installment'].includes(repaymentType) && !repaymentSuccess && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Payment Method</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setRepayMethod('card')}
+                    className={`flex items-center justify-center space-x-2 p-3 rounded-lg border-2 transition-all ${
+                      repayMethod === 'card'
+                        ? 'border-green-500 bg-green-50 ring-2 ring-green-200'
+                        : 'border-gray-200 bg-white hover:border-gray-300'
+                    }`}
+                  >
+                    <CreditCard className={`w-5 h-5 ${repayMethod === 'card' ? 'text-green-600' : 'text-gray-400'}`} />
+                    <span className={`text-sm font-medium ${repayMethod === 'card' ? 'text-green-700' : 'text-gray-600'}`}>Card</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRepayMethod('cash')}
+                    className={`flex items-center justify-center space-x-2 p-3 rounded-lg border-2 transition-all ${
+                      repayMethod === 'cash'
+                        ? 'border-amber-500 bg-amber-50 ring-2 ring-amber-200'
+                        : 'border-gray-200 bg-white hover:border-gray-300'
+                    }`}
+                  >
+                    <Wallet className={`w-5 h-5 ${repayMethod === 'cash' ? 'text-amber-600' : 'text-gray-400'}`} />
+                    <span className={`text-sm font-medium ${repayMethod === 'cash' ? 'text-amber-700' : 'text-gray-600'}`}>Cash</span>
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Card Selection - only for card method */}
-            {repayMethod === 'card' ? (
+            {repayMethod === 'card' && repaymentType !== 'ftp' && !repaymentSuccess ? (
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Pay From</label>
                 <select 
@@ -736,7 +909,7 @@ export default function LoanHistory() {
                   <span className="text-xs text-gray-400">🔒 Secured payment</span>
                 </div>
               </div>
-            ) : (
+            ) : repayMethod === 'cash' && !repaymentSuccess ? (
               <div className="mb-6 bg-amber-50 border border-amber-200 rounded-lg p-4">
                 <div className="flex items-start space-x-3">
                   <Wallet className="w-5 h-5 text-amber-600 mt-0.5" />
@@ -748,17 +921,39 @@ export default function LoanHistory() {
                   </div>
                 </div>
               </div>
-            )}
+            ) : null}
 
             {/* Success State */}
             {repaymentSuccess ? (
-              <div className={`${repayMethod === 'cash' ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200'} border rounded-lg p-4 mb-4 text-center`}>
-                <CheckCircle className={`w-8 h-8 ${repayMethod === 'cash' ? 'text-amber-600' : 'text-green-600'} mx-auto mb-2`} />
-                <p className={`${repayMethod === 'cash' ? 'text-amber-700' : 'text-green-700'} font-medium`}>
-                  {repayMethod === 'cash' ? 'Cash Submitted!' : 'Payment Successful!'}
+              <div className={`${
+                repaymentType === 'blk' ? 'bg-purple-50 border-purple-200' : 
+                repaymentType === 'ftp' ? 'bg-red-50 border-red-200' : 
+                repayMethod === 'cash' ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200'
+              } border rounded-lg p-4 mb-4 text-center`}>
+                <CheckCircle className={`w-8 h-8 ${
+                  repaymentType === 'blk' ? 'text-purple-600' : 
+                  repaymentType === 'ftp' ? 'text-red-600' : 
+                  repayMethod === 'cash' ? 'text-amber-600' : 'text-green-600'
+                } mx-auto mb-2`} />
+                <p className={`${
+                  repaymentType === 'blk' ? 'text-purple-700' : 
+                  repaymentType === 'ftp' ? 'text-red-700' : 
+                  repayMethod === 'cash' ? 'text-amber-700' : 'text-green-700'
+                } font-medium`}>
+                  {repaymentType === 'blk' ? 'BLK Applied!' : 
+                   repaymentType === 'ftp' ? 'FTP Status Set' : 
+                   repaymentType === 'installment' ? 'Installment Recorded!' :
+                   repayMethod === 'cash' ? 'Cash Submitted!' : 'Payment Successful!'}
                 </p>
-                <p className={`text-xs ${repayMethod === 'cash' ? 'text-amber-600' : 'text-green-600'} mt-1`}>
-                  {repayMethod === 'cash' ? 'Pending admin confirmation at next meeting' : 'Your loan has been repaid'}
+                <p className={`text-xs ${
+                  repaymentType === 'blk' ? 'text-purple-600' : 
+                  repaymentType === 'ftp' ? 'text-red-600' : 
+                  repayMethod === 'cash' ? 'text-amber-600' : 'text-green-600'
+                } mt-1`}>
+                  {repaymentType === 'blk' ? 'Loan renewed for 28 days' : 
+                   repaymentType === 'ftp' ? '30% interest charged monthly' : 
+                   repaymentType === 'installment' ? 'Partial payment applied' :
+                   repayMethod === 'cash' ? 'Pending admin confirmation at next meeting' : 'Your loan has been repaid'}
                 </p>
               </div>
             ) : (
@@ -772,13 +967,32 @@ export default function LoanHistory() {
                 </button>
                 <button
                   onClick={confirmRepayment}
-                  disabled={isProcessing || (repayMethod === 'card' && cards.length === 0)}
-                  className={`flex-1 ${repayMethod === 'cash' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-primary-600 hover:bg-primary-700'} text-white py-2 rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center`}
+                  disabled={isProcessing || (repayMethod === 'card' && cards.length === 0 && repaymentType !== 'ftp')}
+                  className={`flex-1 ${
+                    repaymentType === 'blk' ? 'bg-purple-600 hover:bg-purple-700' : 
+                    repaymentType === 'ftp' ? 'bg-red-600 hover:bg-red-700' : 
+                    repayMethod === 'cash' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-primary-600 hover:bg-primary-700'
+                  } text-white py-2 rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center`}
                 >
                   {isProcessing ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin mr-2" />
                       Processing...
+                    </>
+                  ) : repaymentType === 'blk' ? (
+                    <>
+                      <Clock className="w-4 h-4 mr-2" />
+                      Apply BLK
+                    </>
+                  ) : repaymentType === 'ftp' ? (
+                    <>
+                      <AlertTriangle className="w-4 h-4 mr-2" />
+                      Confirm FTP
+                    </>
+                  ) : repaymentType === 'installment' ? (
+                    <>
+                      <DollarSign className="w-4 h-4 mr-2" />
+                      Pay Installment
                     </>
                   ) : repayMethod === 'cash' ? (
                     <>

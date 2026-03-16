@@ -26,5 +26,10 @@ export const getCurrentUser = () => {
 
 export const isAdmin = (): boolean => {
   const user = getCurrentUser();
-  return user?.role === 'admin';
+  return user?.role === 'admin' || user?.role === 'superadmin';
+};
+
+export const isSuperAdmin = (): boolean => {
+  const user = getCurrentUser();
+  return user?.role === 'superadmin';
 };

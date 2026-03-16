@@ -68,7 +68,7 @@ export default function Terms() {
                   <ul className="list-disc list-inside text-gray-600 space-y-2 ml-4">
                     <li>Maximum loan amount: 50% of total contributions</li>
                     <li>Interest rate: 30% flat rate</li>
-                    <li>Repayment period: 30 days</li>
+                    <li>Repayment period: 28 days</li>
                     <li>Overdue penalty: Additional 30% (total 60%)</li>
                   </ul>
                 </div>
@@ -82,7 +82,7 @@ export default function Terms() {
               </h2>
               <ul className="list-disc list-inside text-gray-600 space-y-2 ml-4">
                 <li>Make timely contributions according to your stokvel's cycle</li>
-                <li>Repay loans within the specified 30-day period</li>
+                <li>Repay loans within the specified 28-day period</li>
                 <li>Participate in group voting when required</li>
                 <li>Maintain accurate personal information</li>
               </ul>

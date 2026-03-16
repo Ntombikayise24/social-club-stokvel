@@ -14,6 +14,9 @@ const FINE_AMOUNTS = {
   no_attendance: 20,
   sending: 30,
   late_coming: 20,
+  vulgar: 50,
+  misbehaving: 20,
+  madala_non_payment: 50,
 };
 
 const FINE_LABELS = {
@@ -21,6 +24,9 @@ const FINE_LABELS = {
   no_attendance: 'No Attendance',
   sending: 'Sending',
   late_coming: 'Late Coming',
+  vulgar: 'Vulgar Language',
+  misbehaving: 'Misbehaving',
+  madala_non_payment: 'Madala Non-Payment',
 };
 
 // ────────────────── LIST MY FINES ──────────────────

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import LoadingScreen from '../../components/common/LoadingScreen';
 import { 
   User, 
   Mail, 
@@ -151,9 +152,7 @@ export default function MemberProfile() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
-          </div>
+          <LoadingScreen message="Loading profile..." />
         ) : error ? (
           <ErrorState message="Failed to load your profile." onRetry={() => window.location.reload()} />
         ) : (<>

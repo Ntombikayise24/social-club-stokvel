@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { userApi, loanApi, cardApi, contributionApi } from '../../api';
 import { showToast } from '../../utils/toast';
+import LoadingScreen from '../../components/common/LoadingScreen';
 
 export default function LoanRequest() {
   const navigate = useNavigate();
@@ -23,7 +24,7 @@ export default function LoanRequest() {
   const [loanAmount, setLoanAmount] = useState('');
   const [purpose, setPurpose] = useState('');
   const [selectedCard, setSelectedCard] = useState('');
-  const [loanTarget, setLoanTarget] = useState<'your-target' | 'madala-side'>('your-target');
+  const [loanTarget, setLoanTarget] = useState<'your-target'>('your-target');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
@@ -117,8 +118,8 @@ export default function LoanRequest() {
   const totalOutstandingInterest = allActiveLoans
     .reduce((sum: number, l: any) => sum + (l.interest || 0), 0);
   const interestCapReached = totalOutstandingInterest >= 2000;
-  // Use madala-side savings when borrowing against madala-side, otherwise use profile savedAmount
-  const currentSavings = loanTarget === 'madala-side' ? madalaSideSavings : currentProfile.savedAmount;
+  // Use profile savedAmount (loans only allowed on Your Target, not madala)
+  const currentSavings = currentProfile.savedAmount;
   const totalContributions = currentSavings + activeLoanAmount;
   const maxLoanAmount = Math.floor(totalContributions * 0.5);
   const previouslyBorrowed = activeLoanAmount;
@@ -130,14 +131,14 @@ export default function LoanRequest() {
   const totalRepayable = requestedAmount + interestAmount;
   
   const dueDate = new Date();
-  dueDate.setDate(dueDate.getDate() + 30);
+  dueDate.setDate(dueDate.getDate() + 28);
   const formattedDueDate = dueDate.toLocaleDateString('en-ZA', {
     day: 'numeric',
     month: 'short',
     year: 'numeric'
   });
   
-  const isValidAmount = requestedAmount >= 1 && requestedAmount <= remainingToBorrow;
+  const isValidAmount = requestedAmount >= 100 && requestedAmount <= remainingToBorrow;
   const isFormValid = isValidAmount && acceptTerms && selectedCard !== 'new' && !interestCapReached;
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -201,9 +202,7 @@ export default function LoanRequest() {
 
       <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
-          </div>
+          <LoadingScreen message="Loading loan details..." />
         ) : (<>
         {/* Page Title */}
         <div className="mb-6">
@@ -283,14 +282,10 @@ export default function LoanRequest() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Borrowing Against *
               </label>
-              <select
-                value={loanTarget}
-                onChange={(e) => setLoanTarget(e.target.value as 'your-target' | 'madala-side')}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
-              >
-                <option value="your-target">🎯 Your Target (Collective Pot)</option>
-                <option value="madala-side">🌱 Madala Side</option>
-              </select>
+              <div className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-700">
+                🎯 Your Target (Collective Pot)
+              </div>
+              <p className="mt-1 text-xs text-gray-500">Loans are only available against Your Target. Madala Side loans are not permitted.</p>
             </div>
 
             {/* Profile Info */}
@@ -325,8 +320,8 @@ export default function LoanRequest() {
                   className={`w-full pl-8 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 ${
                     loanAmount && !isValidAmount ? 'border-red-500' : 'border-gray-300'
                   }`}
-                  placeholder="Enter amount"
-                  min="1"
+                  placeholder="Enter amount (min R100)"
+                  min="100"
                   max={remainingToBorrow}
                   step="0.01"
                 />
@@ -348,11 +343,11 @@ export default function LoanRequest() {
                   <AlertCircle className="w-4 h-4 mr-1" />
                   {requestedAmount > remainingToBorrow 
                     ? `You can only borrow up to ${formatCurrency(remainingToBorrow)}` 
-                    : 'Minimum loan amount is R 1'}
+                    : 'Minimum loan amount is R100'}
                 </p>
               )}
               <p className="mt-1 text-xs text-gray-500">
-                Min: R1 | Max available: {formatCurrency(remainingToBorrow)}
+                Min: R100 | Max available: {formatCurrency(remainingToBorrow)}
               </p>
             </div>
 
@@ -469,7 +464,7 @@ export default function LoanRequest() {
                 className="mt-1 w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500"
               />
               <span className="ml-2 text-sm text-gray-600">
-                I understand that I have <span className="font-bold">30 days</span> to repay this loan with{' '}
+                I understand that I have <span className="font-bold">28 days</span> to repay this loan with{' '}
                 <span className="font-bold">{interestRate}% interest</span>. If I fail to repay on time, an additional{' '}
                 <span className="font-bold">{interestRate}% interest</span> will be charged (total {overdueInterestRate}%).
               </span>
@@ -497,12 +492,20 @@ export default function LoanRequest() {
               <span><span className="font-bold">Admin approval required</span> - Loan requests are reviewed by admin</span>
             </li>
             <li className="flex items-start">
+              <AlertCircle className="w-4 h-4 text-red-600 mr-2 flex-shrink-0 mt-0.5" />
+              <span><span className="font-bold">Minimum R100</span> — Loans must be at least R100</span>
+            </li>
+            <li className="flex items-start">
+              <AlertCircle className="w-4 h-4 text-red-600 mr-2 flex-shrink-0 mt-0.5" />
+              <span><span className="font-bold">Your Target only</span> — Loans are not allowed on Madala Side</span>
+            </li>
+            <li className="flex items-start">
               <Percent className="w-4 h-4 text-secondary-600 mr-2 flex-shrink-0 mt-0.5" />
               <span><span className="font-bold">{interestRate}% interest</span> charged upfront</span>
             </li>
             <li className="flex items-start">
               <Clock className="w-4 h-4 text-blue-600 mr-2 flex-shrink-0 mt-0.5" />
-              <span><span className="font-bold">30 days</span> to repay once approved</span>
+              <span><span className="font-bold">28 days</span> to repay once approved</span>
             </li>
             <li className="flex items-start">
               <AlertTriangle className="w-4 h-4 text-yellow-600 mr-2 flex-shrink-0 mt-0.5" />

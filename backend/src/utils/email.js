@@ -552,6 +552,68 @@ export async function sendLoanApprovalEmail(email, fullName, loanDetails = {}) {
 }
 
 /**
+ * Send a madala side payment reminder email (5 days before month end).
+ */
+export async function sendMadalaReminderEmail(email, fullName, monthName, amountDue) {
+  const loginUrl = `${FRONTEND_URL}/dashboard`;
+
+  const html = `
+  <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
+    <!-- Header -->
+    <div style="background:linear-gradient(135deg,#f59e0b,#d97706);padding:32px 24px;text-align:center;">
+      <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;">Madala Side Payment Reminder ⚠️</h1>
+    </div>
+
+    <!-- Body -->
+    <div style="padding:32px 24px;">
+      <p style="margin:0 0 16px;color:#374151;font-size:16px;">
+        Hi <strong>${fullName}</strong>,
+      </p>
+      <p style="margin:0 0 16px;color:#374151;font-size:16px;">
+        This is a reminder that your <strong>Madala Side</strong> payment of <strong style="color:#d97706;">R${amountDue}</strong> for <strong>${monthName}</strong> has not yet been received.
+      </p>
+      <p style="margin:0 0 16px;color:#374151;font-size:16px;">
+        The deadline is the <strong>end of ${monthName}</strong>. If you do not pay by then, a fine of <strong style="color:#dc2626;">R50</strong> will be charged.
+      </p>
+
+      <!-- CTA Button -->
+      <div style="text-align:center;margin:32px 0;">
+        <a href="${loginUrl}" style="display:inline-block;background:#f59e0b;color:#ffffff;text-decoration:none;padding:14px 40px;border-radius:8px;font-size:16px;font-weight:600;letter-spacing:0.5px;">
+          Pay Now
+        </a>
+      </div>
+
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;" />
+
+      <p style="margin:0;color:#9ca3af;font-size:13px;text-align:center;">
+        Please make your payment before month end to avoid the R50 fine.
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <div style="background:#f9fafb;padding:16px 24px;text-align:center;">
+      <p style="margin:0;color:#9ca3af;font-size:12px;">
+        &copy; ${new Date().getFullYear()} Fund Mate. All rights reserved.
+      </p>
+    </div>
+  </div>`;
+
+  const mailOptions = {
+    from: `"Fund Mate" <${process.env.SMTP_USER || 'noreply@fundmate.co.za'}>`,
+    to: email,
+    subject: `⚠️ Madala Side Payment Reminder — R${amountDue} due for ${monthName}`,
+    html,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`📧 Madala reminder email sent to ${email}`);
+  } catch (err) {
+    console.error(`⚠️  Failed to send madala reminder email to ${email}:`, err.message);
+  }
+}
+
+/**
  * Send a password reset code via email.
  */
 export async function sendPasswordResetEmail(email, code) {

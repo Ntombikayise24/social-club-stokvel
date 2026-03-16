@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { notificationApi } from '../../api';
 import ErrorState from '../../components/ErrorState';
+import LoadingScreen from '../../components/common/LoadingScreen';
 
 // Remove "export default" from here - just "interface"
 interface Notification {
@@ -141,9 +142,7 @@ export default function Notifications() {
 
       <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
-          </div>
+          <LoadingScreen message="Loading notifications..." />
         ) : error ? (
           <ErrorState message="Failed to load notifications." onRetry={() => window.location.reload()} />
         ) : (<>

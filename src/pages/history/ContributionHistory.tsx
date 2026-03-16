@@ -13,6 +13,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import { contributionApi, userApi } from '../../api';
+import LoadingScreen from '../../components/common/LoadingScreen';
 import ErrorState from '../../components/ErrorState';
 import { downloadBlob, getExtension } from '../../utils/download';
 
@@ -223,9 +224,7 @@ export default function ContributionHistory() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
-          </div>
+          <LoadingScreen message="Loading contribution history..." />
         ) : error ? (
           <ErrorState message="Failed to load contribution history." onRetry={() => window.location.reload()} />
         ) : (<>

@@ -9,6 +9,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '../.env') });
 
 import pool from './database/connection.js';
+import { runMadalaChecks } from './utils/madalaScheduler.js';
 
 // Route imports
 import authRoutes from './routes/auth.js';
@@ -94,6 +95,12 @@ app.listen(PORT, () => {
   console.log(`\n🚀 Stokvel API server running on http://localhost:${PORT}`);
   console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🔗 Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:5173'}\n`);
+
+  // Run Madala Side checks on startup then every 24 hours
+  runMadalaChecks().catch(err => console.error('Madala checks error:', err));
+  setInterval(() => {
+    runMadalaChecks().catch(err => console.error('Madala checks error:', err));
+  }, 24 * 60 * 60 * 1000);
 });
 
 export default app;

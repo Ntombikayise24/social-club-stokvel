@@ -47,7 +47,7 @@ function App() {
       const res = await authApi.login({ email: adminEmail, password: adminPassword });
       const { token, user } = res.data;
 
-      if (user.role !== 'admin') {
+      if (user.role !== 'admin' && user.role !== 'superadmin') {
         setLoginError('This account does not have admin access');
         return;
       }

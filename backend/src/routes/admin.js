@@ -2,7 +2,7 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { body } from 'express-validator';
 import { validate } from '../middleware/validate.js';
-import { authenticate, requireAdmin } from '../middleware/auth.js';
+import { authenticate, requireAdmin, requireSuperAdmin } from '../middleware/auth.js';
 import pool from '../database/connection.js';
 import { sendApprovalEmail, sendJoinRequestApprovedEmail, sendStokvelAssignmentEmail, sendStokvelUnassignmentEmail, sendAccountDeletionEmail, sendWelcomeEmail, sendLoanApprovalEmail } from '../utils/email.js';
 import { generatePDF, generateExcel, generateCSV, REPORT_COLUMNS, formatRowData } from '../utils/reports.js';
@@ -278,6 +278,11 @@ router.post(
     try {
       const { fullName, email, phone, status = 'active', role = 'member', stokvelIds = [] } = req.body;
 
+      // Only superadmin can create admin users
+      if (role === 'admin' && req.user.role !== 'superadmin') {
+        return res.status(403).json({ error: 'Only superadmin can create admin users' });
+      }
+
       const [existing] = await pool.query('SELECT id FROM users WHERE email = ?', [email]);
       if (existing.length > 0) {
         return res.status(409).json({ error: 'Email already registered' });
@@ -359,6 +364,11 @@ router.put(
     try {
       const userId = req.params.id;
       const { fullName, email, phone, status, role, stokvelIds } = req.body;
+
+      // Only superadmin can change role to admin
+      if (role === 'admin' && req.user.role !== 'superadmin') {
+        return res.status(403).json({ error: 'Only superadmin can assign admin role' });
+      }
 
       const [users] = await pool.query('SELECT id, status AS currentStatus FROM users WHERE id = ?', [userId]);
       if (users.length === 0) {
@@ -797,7 +807,7 @@ router.get('/stokvels', async (_req, res) => {
   }
 });
 
-// ── Create stokvel ──
+// ── Create stokvel (superadmin only) ──
 router.post(
   '/stokvels',
   [
@@ -814,6 +824,9 @@ router.post(
     validate,
   ],
   async (req, res) => {
+    if (req.user.role !== 'superadmin') {
+      return res.status(403).json({ error: 'Only superadmin can create stokvels' });
+    }
     try {
       const {
         name, type, description, targetAmount, maxMembers,
@@ -837,8 +850,11 @@ router.post(
   }
 );
 
-// ── Update stokvel ──
+// ── Update stokvel (superadmin only) ──
 router.put('/stokvels/:id', async (req, res) => {
+  if (req.user.role !== 'superadmin') {
+    return res.status(403).json({ error: 'Only superadmin can edit stokvels' });
+  }
   try {
     const stokvelId = req.params.id;
     const {
@@ -876,8 +892,11 @@ router.put('/stokvels/:id', async (req, res) => {
   }
 });
 
-// ── Delete stokvel ──
+// ── Delete stokvel (superadmin only) ──
 router.delete('/stokvels/:id', async (req, res) => {
+  if (req.user.role !== 'superadmin') {
+    return res.status(403).json({ error: 'Only superadmin can delete stokvels' });
+  }
   try {
     const stokvelId = req.params.id;
 
@@ -1176,9 +1195,14 @@ router.post('/loans/:id/approve', async (req, res) => {
 
     const loan = loans[0];
 
-    // Set due date to 30 days from now (approval date)
+    // Block approval of madala-side loans
+    if (loan.loan_target === 'madala-side') {
+      return res.status(400).json({ error: 'Loans on Madala Side are not allowed. Please reject this loan.' });
+    }
+
+    // Set due date to 28 days from now (approval date)
     const dueDate = new Date();
-    dueDate.setDate(dueDate.getDate() + 30);
+    dueDate.setDate(dueDate.getDate() + 28);
 
     // Approve the loan
     await pool.query(
@@ -1647,6 +1671,9 @@ const FINE_AMOUNTS = {
   no_attendance: 20,
   sending: 30,
   late_coming: 20,
+  vulgar: 50,
+  misbehaving: 20,
+  madala_non_payment: 50,
 };
 
 const FINE_LABELS = {
@@ -1654,6 +1681,9 @@ const FINE_LABELS = {
   no_attendance: 'No Attendance',
   sending: 'Sending',
   late_coming: 'Late Coming',
+  vulgar: 'Vulgar Language',
+  misbehaving: 'Misbehaving',
+  madala_non_payment: 'Madala Non-Payment',
 };
 
 // List all fines
@@ -1711,7 +1741,7 @@ router.get('/fines', async (_req, res) => {
 // Issue a fine to a member
 router.post('/fines', [
   body('userId').isInt().withMessage('User is required'),
-  body('fineType').isIn(['no_banking', 'no_attendance', 'sending', 'late_coming']).withMessage('Invalid fine type'),
+  body('fineType').isIn(['no_banking', 'no_attendance', 'sending', 'late_coming', 'vulgar', 'misbehaving', 'madala_non_payment']).withMessage('Invalid fine type'),
   body('reason').optional().trim(),
   validate,
 ], async (req, res) => {
@@ -1799,6 +1829,132 @@ router.post('/fines/:id/confirm', async (req, res) => {
   } catch (err) {
     console.error('Confirm fine error:', err);
     res.status(500).json({ error: 'Failed to confirm fine' });
+  }
+});
+
+// ══════════════════════════════════════════════════
+//  SUPERADMIN: ADMIN-STOKVEL ASSIGNMENT
+// ══════════════════════════════════════════════════
+
+// List admin-stokvel assignments
+router.get('/admin-assignments', async (req, res) => {
+  if (req.user.role !== 'superadmin') {
+    return res.status(403).json({ error: 'Superadmin access required' });
+  }
+  try {
+    const [assignments] = await pool.query(
+      `SELECT asa.id, asa.admin_id, asa.stokvel_id, u.full_name AS admin_name, u.email AS admin_email,
+              s.name AS stokvel_name, asa.created_at
+       FROM admin_stokvel_assignments asa
+       JOIN users u ON u.id = asa.admin_id
+       JOIN stokvels s ON s.id = asa.stokvel_id
+       ORDER BY asa.created_at DESC`
+    );
+    res.json(assignments);
+  } catch (err) {
+    console.error('List admin assignments error:', err);
+    res.status(500).json({ error: 'Failed to fetch admin assignments' });
+  }
+});
+
+// Assign admin to stokvel (superadmin only)
+router.post('/admin-assignments', [
+  body('adminId').isInt().withMessage('Admin ID is required'),
+  body('stokvelId').isInt().withMessage('Stokvel ID is required'),
+  validate,
+], async (req, res) => {
+  if (req.user.role !== 'superadmin') {
+    return res.status(403).json({ error: 'Superadmin access required' });
+  }
+  try {
+    const { adminId, stokvelId } = req.body;
+
+    // Verify this is an admin user
+    const [users] = await pool.query("SELECT id, full_name, role FROM users WHERE id = ? AND role = 'admin'", [adminId]);
+    if (users.length === 0) {
+      return res.status(404).json({ error: 'Admin user not found' });
+    }
+
+    // Verify stokvel exists
+    const [stokvels] = await pool.query('SELECT id, name FROM stokvels WHERE id = ?', [stokvelId]);
+    if (stokvels.length === 0) {
+      return res.status(404).json({ error: 'Stokvel not found' });
+    }
+
+    // Check if already assigned
+    const [existing] = await pool.query(
+      'SELECT id FROM admin_stokvel_assignments WHERE admin_id = ? AND stokvel_id = ?',
+      [adminId, stokvelId]
+    );
+    if (existing.length > 0) {
+      return res.status(409).json({ error: 'Admin is already assigned to this stokvel' });
+    }
+
+    await pool.query(
+      'INSERT INTO admin_stokvel_assignments (admin_id, stokvel_id, assigned_by) VALUES (?, ?, ?)',
+      [adminId, stokvelId, req.user.id]
+    );
+
+    // Notify the admin
+    await pool.query(
+      'INSERT INTO notifications (user_id, type, title, message) VALUES (?, ?, ?, ?)',
+      [adminId, 'info', 'Stokvel Assignment', `You have been assigned to manage ${stokvels[0].name} by the superadmin.`]
+    );
+
+    res.status(201).json({ message: `${users[0].full_name} assigned to ${stokvels[0].name}` });
+  } catch (err) {
+    console.error('Assign admin error:', err);
+    res.status(500).json({ error: 'Failed to assign admin' });
+  }
+});
+
+// Remove admin from stokvel (superadmin only)
+router.delete('/admin-assignments/:id', async (req, res) => {
+  if (req.user.role !== 'superadmin') {
+    return res.status(403).json({ error: 'Superadmin access required' });
+  }
+  try {
+    const [assignments] = await pool.query('SELECT * FROM admin_stokvel_assignments WHERE id = ?', [req.params.id]);
+    if (assignments.length === 0) {
+      return res.status(404).json({ error: 'Assignment not found' });
+    }
+
+    await pool.query('DELETE FROM admin_stokvel_assignments WHERE id = ?', [req.params.id]);
+    res.json({ message: 'Admin assignment removed' });
+  } catch (err) {
+    console.error('Remove admin assignment error:', err);
+    res.status(500).json({ error: 'Failed to remove assignment' });
+  }
+});
+
+// List all admins (superadmin only)
+router.get('/admins', async (req, res) => {
+  if (req.user.role !== 'superadmin') {
+    return res.status(403).json({ error: 'Superadmin access required' });
+  }
+  try {
+    const [admins] = await pool.query(
+      `SELECT u.id, u.full_name, u.email, u.phone, u.status, u.created_at,
+              GROUP_CONCAT(s.name SEPARATOR ', ') AS assigned_stokvels
+       FROM users u
+       LEFT JOIN admin_stokvel_assignments asa ON asa.admin_id = u.id
+       LEFT JOIN stokvels s ON s.id = asa.stokvel_id
+       WHERE u.role = 'admin' AND u.status != 'deleted'
+       GROUP BY u.id
+       ORDER BY u.full_name`
+    );
+    res.json(admins.map(a => ({
+      id: a.id,
+      name: a.full_name,
+      email: a.email,
+      phone: a.phone,
+      status: a.status,
+      assignedStokvels: a.assigned_stokvels || 'None',
+      createdAt: a.created_at,
+    })));
+  } catch (err) {
+    console.error('List admins error:', err);
+    res.status(500).json({ error: 'Failed to fetch admins' });
   }
 });
 

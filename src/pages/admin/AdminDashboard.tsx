@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { adminApi } from '../../api';
+import { getCurrentUser } from '../../utils/auth';
+import LoadingScreen from '../../components/common/LoadingScreen';
 import { 
   Users,
   DollarSign,
@@ -29,7 +31,8 @@ import {
   Archive,
   RotateCcw,
   UserCheck,
-  XCircle
+  XCircle,
+  Link as LinkIcon
 } from 'lucide-react';
 
 // Types
@@ -38,7 +41,7 @@ interface User {
   name: string;
   email: string;
   phone: string;
-  role: 'member' | 'admin';
+  role: 'member' | 'admin' | 'superadmin';
   status: 'active' | 'inactive' | 'pending' | 'deleted';
   joinedDate: string;
   lastActive?: string;
@@ -50,7 +53,7 @@ interface Profile {
   id: string;
   stokvelId: number;
   stokvelName: string;
-  role: 'member' | 'admin';
+  role: 'member' | 'admin' | 'superadmin';
   targetAmount: number;
   savedAmount: number;
   joinedDate: string;
@@ -110,14 +113,16 @@ interface AddUserModalProps {
   onClose: () => void;
   onAdd: (user: any) => void;
   stokvels: Stokvel[];
+  isSuperAdmin?: boolean;
 }
 
-function AddUserModal({ onClose, onAdd, stokvels }: AddUserModalProps) {
+function AddUserModal({ onClose, onAdd, stokvels, isSuperAdmin: canCreateAdmin }: AddUserModalProps) {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     phone: '',
     status: 'pending' as 'active' | 'pending',
+    role: 'member' as 'member' | 'admin',
     selectedStokvels: [] as number[]
   });
 
@@ -171,6 +176,7 @@ function AddUserModal({ onClose, onAdd, stokvels }: AddUserModalProps) {
       email: formData.email,
       phone: formData.phone,
       status: formData.status,
+      role: formData.role,
       joinedDate: new Date().toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }),
       lastActive: formData.status === 'active' ? 'Just now' : 'Never',
       profiles: formData.selectedStokvels.map(stokvelId => {
@@ -266,6 +272,20 @@ function AddUserModal({ onClose, onAdd, stokvels }: AddUserModalProps) {
                 <option value="active">Active (Immediate Access)</option>
               </select>
             </div>
+
+            {canCreateAdmin && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                <select
+                  value={formData.role}
+                  onChange={(e) => setFormData({...formData, role: e.target.value as 'member' | 'admin'})}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="member">Member</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+            )}
           </div>
 
           <div className="space-y-4">
@@ -2323,6 +2343,16 @@ export default function AdminDashboard() {
   const [fineTypes, setFineTypes] = useState<any[]>([]);
   const [showIssueFineModal, setShowIssueFineModal] = useState(false);
 
+  // Superadmin state
+  const currentUser = getCurrentUser();
+  const isSuperAdmin = currentUser?.role === 'superadmin';
+  const [adminsList, setAdminsList] = useState<any[]>([]);
+  const [adminAssignments, setAdminAssignments] = useState<any[]>([]);
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [assignAdminId, setAssignAdminId] = useState('');
+  const [assignStokvelId, setAssignStokvelId] = useState('');
+  const [adminMgmtLoading, setAdminMgmtLoading] = useState(false);
+
   // ── Load all data from backend ──
   const fetchData = useCallback(async () => {
     try {
@@ -2459,6 +2489,54 @@ export default function AdminDashboard() {
     fetchData();
   }, [fetchData]);
 
+  // Fetch superadmin data
+  const fetchAdminMgmtData = useCallback(async () => {
+    if (!isSuperAdmin) return;
+    setAdminMgmtLoading(true);
+    try {
+      const [adminsRes, assignmentsRes] = await Promise.all([
+        adminApi.listAdmins(),
+        adminApi.listAdminAssignments(),
+      ]);
+      setAdminsList(adminsRes.data || []);
+      setAdminAssignments(assignmentsRes.data || []);
+    } catch (err) {
+      console.error('Failed to load admin management data:', err);
+    } finally {
+      setAdminMgmtLoading(false);
+    }
+  }, [isSuperAdmin]);
+
+  useEffect(() => {
+    if (isSuperAdmin && activeTab === 'admin-mgmt') {
+      fetchAdminMgmtData();
+    }
+  }, [isSuperAdmin, activeTab, fetchAdminMgmtData]);
+
+  const handleAssignAdmin = async () => {
+    if (!assignAdminId || !assignStokvelId) return;
+    try {
+      await adminApi.assignAdminToStokvel({ adminId: Number(assignAdminId), stokvelId: Number(assignStokvelId) });
+      setShowAssignModal(false);
+      setAssignAdminId('');
+      setAssignStokvelId('');
+      setShowSuccessMessage('Admin assigned to stokvel successfully');
+      fetchAdminMgmtData();
+    } catch (err: any) {
+      setShowErrorMessage(err.response?.data?.error || 'Failed to assign admin');
+    }
+  };
+
+  const handleRemoveAssignment = async (id: number) => {
+    try {
+      await adminApi.removeAdminAssignment(id);
+      setShowSuccessMessage('Admin assignment removed');
+      fetchAdminMgmtData();
+    } catch (err: any) {
+      setShowErrorMessage(err.response?.data?.error || 'Failed to remove assignment');
+    }
+  };
+
   const stats = apiStats
     ? {
         totalUsers: apiStats.totalMembers + (apiStats.pendingApprovals || 0),
@@ -2502,13 +2580,13 @@ export default function AdminDashboard() {
   const showSuccess = (msg: string) => {
     setShowErrorMessage('');  // Clear any existing error
     setShowSuccessMessage(msg);
-    setTimeout(() => setShowSuccessMessage(''), 3000);
+    setTimeout(() => setShowSuccessMessage(''), 5000);
   };
 
   const showError = (msg: string) => {
     setShowSuccessMessage('');  // Clear any existing success
     setShowErrorMessage(msg);
-    setTimeout(() => setShowErrorMessage(''), 4000);
+    setTimeout(() => setShowErrorMessage(''), 5000);
   };
 
   const handleAddUser = async (newUser: any) => {
@@ -2518,6 +2596,7 @@ export default function AdminDashboard() {
         email: newUser.email,
         phone: newUser.phone,
         status: newUser.status,
+        role: newUser.role || 'member',
         stokvelIds: newUser.profiles?.map((p: any) => p.stokvelId) || [],
       });
       setShowAddUserModal(false);
@@ -2899,7 +2978,7 @@ export default function AdminDashboard() {
               <Shield className="w-8 h-8 text-primary-200" />
               <div>
                 <h1 className="text-2xl font-bold">FUND MATE</h1>
-                <p className="text-sm text-primary-200">Admin Dashboard</p>
+                <p className="text-sm text-primary-200">{isSuperAdmin ? 'Super Admin Dashboard' : 'Admin Dashboard'}</p>
               </div>
             </div>
             <div className="flex items-center space-x-4">
@@ -2915,7 +2994,7 @@ export default function AdminDashboard() {
                   </span>
                 )}
               </button>
-              <span className="text-sm bg-primary-700 px-3 py-1 rounded-full">Admin</span>
+              <span className="text-sm bg-primary-700 px-3 py-1 rounded-full">{isSuperAdmin ? 'Super Admin' : 'Admin'}</span>
               <button 
                 onClick={() => setShowSettingsModal(true)}
                 className="p-2 hover:bg-primary-700 rounded-lg transition-colors"
@@ -3018,18 +3097,28 @@ export default function AdminDashboard() {
                 </span>
               )}
             </button>
+            {isSuperAdmin && (
+              <button
+                onClick={() => setActiveTab('admin-mgmt')}
+                className={`px-4 py-3 font-medium text-sm transition-colors border-b-2 relative ${
+                  activeTab === 'admin-mgmt'
+                    ? 'border-red-600 text-red-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <span className="flex items-center gap-1">
+                  <Shield className="w-4 h-4" />
+                  Admin Management
+                </span>
+              </button>
+            )}
           </div>
         </div>
       </div>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {isLoading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="text-center">
-              <div className="w-12 h-12 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin mx-auto mb-4" />
-              <p className="text-gray-500">Loading admin data...</p>
-            </div>
-          </div>
+          <LoadingScreen message="Loading admin data..." />
         ) : activeTab === 'overview' && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
@@ -3284,7 +3373,7 @@ export default function AdminDashboard() {
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <button
                 onClick={() => setShowAddUserModal(true)}
                 className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary-300 transition-colors text-left"
@@ -3292,15 +3381,6 @@ export default function AdminDashboard() {
                 <UserPlus className="w-8 h-8 text-primary-600 mb-3" />
                 <h3 className="font-semibold text-gray-800">Add New User</h3>
                 <p className="text-sm text-gray-500 mt-1">Create a new member account</p>
-              </button>
-              
-              <button
-                onClick={() => setShowAddStokvelModal(true)}
-                className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary-300 transition-colors text-left"
-              >
-                <PlusCircle className="w-8 h-8 text-primary-600 mb-3" />
-                <h3 className="font-semibold text-gray-800">Create Stokvel</h3>
-                <p className="text-sm text-gray-500 mt-1">Start a new savings group</p>
               </button>
               
               <button
@@ -3598,13 +3678,15 @@ export default function AdminDashboard() {
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-lg font-semibold text-gray-800">Stokvel Management</h3>
                 <div className="flex space-x-2">
-                  <button
-                    onClick={() => setShowAddStokvelModal(true)}
-                    className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors flex items-center space-x-2"
-                  >
-                    <PlusCircle className="w-5 h-5" />
-                    <span>New Stokvel</span>
-                  </button>
+                  {isSuperAdmin && (
+                    <button
+                      onClick={() => setShowAddStokvelModal(true)}
+                      className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors flex items-center space-x-2"
+                    >
+                      <PlusCircle className="w-5 h-5" />
+                      <span>New Stokvel</span>
+                    </button>
+                  )}
                   <button
                     onClick={() => setShowReportModal(true)}
                     className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-2"
@@ -3645,22 +3727,24 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                     
-                    <div className="flex justify-end space-x-2 mt-3 pt-3 border-t border-gray-200">
-                      <button
-                        onClick={() => setShowEditStokvelModal(stokvel)}
-                        className="text-blue-600 hover:text-blue-800 p-1"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => setShowDeleteStokvelConfirm(stokvel.id)}
-                        className="text-red-600 hover:text-red-800 p-1"
-                        disabled={stokvel.currentMembers > 0}
-                        title={stokvel.currentMembers > 0 ? "Cannot delete stokvel with members" : ""}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+                    {isSuperAdmin && (
+                      <div className="flex justify-end space-x-2 mt-3 pt-3 border-t border-gray-200">
+                        <button
+                          onClick={() => setShowEditStokvelModal(stokvel)}
+                          className="text-blue-600 hover:text-blue-800 p-1"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setShowDeleteStokvelConfirm(stokvel.id)}
+                          className="text-red-600 hover:text-red-800 p-1"
+                          disabled={stokvel.currentMembers > 0}
+                          title={stokvel.currentMembers > 0 ? "Cannot delete stokvel with members" : ""}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -3956,6 +4040,137 @@ export default function AdminDashboard() {
             )}
           </div>
         )}
+
+        {/* ── Admin Management Tab (Superadmin only) ── */}
+        {activeTab === 'admin-mgmt' && isSuperAdmin && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                    <Shield className="w-5 h-5 text-red-600" />
+                    Admin Management
+                  </h3>
+                  <p className="text-sm text-gray-500 mt-1">Manage admin users and their stokvel assignments</p>
+                </div>
+                <button
+                  onClick={() => setShowAssignModal(true)}
+                  className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors flex items-center space-x-2"
+                >
+                  <LinkIcon className="w-5 h-5" />
+                  <span>Assign Admin to Stokvel</span>
+                </button>
+              </div>
+
+              {adminMgmtLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="w-8 h-8 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin" />
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Admin Users Table */}
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-700 uppercase tracking-wider mb-3">Admin Users</h4>
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead className="bg-gray-50 border-b border-gray-200">
+                            <tr>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned Stokvels</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200">
+                            {adminsList.length === 0 ? (
+                              <tr>
+                                <td colSpan={5} className="px-6 py-8 text-center text-gray-400">No admin users found</td>
+                              </tr>
+                            ) : (
+                              adminsList.map((admin: any) => (
+                                <tr key={admin.id} className="hover:bg-gray-50">
+                                  <td className="px-6 py-4">
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-semibold text-sm">
+                                        {admin.name?.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
+                                      </div>
+                                      <span className="font-medium text-gray-800">{admin.name}</span>
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4 text-sm text-gray-600">{admin.email}</td>
+                                  <td className="px-6 py-4 text-sm text-gray-600">{admin.phone}</td>
+                                  <td className="px-6 py-4 text-sm text-gray-600">{admin.assignedStokvels}</td>
+                                  <td className="px-6 py-4">
+                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                      admin.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                                    }`}>
+                                      {admin.status}
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Admin–Stokvel Assignments Table */}
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-700 uppercase tracking-wider mb-3">Admin–Stokvel Assignments</h4>
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead className="bg-gray-50 border-b border-gray-200">
+                            <tr>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Admin</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stokvel</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned On</th>
+                              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200">
+                            {adminAssignments.length === 0 ? (
+                              <tr>
+                                <td colSpan={4} className="px-6 py-8 text-center text-gray-400">No assignments yet</td>
+                              </tr>
+                            ) : (
+                              adminAssignments.map((a: any) => (
+                                <tr key={a.id} className="hover:bg-gray-50">
+                                  <td className="px-6 py-4">
+                                    <div>
+                                      <p className="font-medium text-gray-800">{a.admin_name}</p>
+                                      <p className="text-xs text-gray-400">{a.admin_email}</p>
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4 text-sm text-gray-700">{a.stokvel_name}</td>
+                                  <td className="px-6 py-4 text-sm text-gray-500">
+                                    {a.created_at ? new Date(a.created_at).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                                  </td>
+                                  <td className="px-6 py-4 text-right">
+                                    <button
+                                      onClick={() => handleRemoveAssignment(a.id)}
+                                      className="text-red-600 hover:text-red-800 text-sm font-medium"
+                                    >
+                                      Remove
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </main>
 
       {/* Issue Fine Modal */}
@@ -4012,11 +4227,62 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      {/* Assign Admin Modal */}
+      {showAssignModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">Assign Admin to Stokvel</h3>
+              <button onClick={() => setShowAssignModal(false)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Select Admin</label>
+                <select
+                  value={assignAdminId}
+                  onChange={e => setAssignAdminId(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="">Choose admin...</option>
+                  {adminsList.map((a: any) => (
+                    <option key={a.id} value={a.id}>{a.name} ({a.email})</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Select Stokvel</label>
+                <select
+                  value={assignStokvelId}
+                  onChange={e => setAssignStokvelId(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="">Choose stokvel...</option>
+                  {stokvels.map((s: any) => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button onClick={() => setShowAssignModal(false)} className="px-4 py-2 text-gray-600 hover:text-gray-800">Cancel</button>
+                <button
+                  onClick={handleAssignAdmin}
+                  disabled={!assignAdminId || !assignStokvelId}
+                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium disabled:opacity-50"
+                >
+                  Assign
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showAddUserModal && (
         <AddUserModal
           onClose={() => setShowAddUserModal(false)}
           onAdd={handleAddUser}
           stokvels={stokvels}
+          isSuperAdmin={isSuperAdmin}
         />
       )}
 

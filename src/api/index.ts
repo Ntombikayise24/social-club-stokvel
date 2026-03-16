@@ -111,8 +111,8 @@ export const loanApi = {
     loanTarget?: string;
   }) => api.post('/loans/request', data),
 
-  repay: (id: number, cardId?: number, paymentMethod?: string) =>
-    api.post(`/loans/${id}/repay`, { cardId, paymentMethod }),
+  repay: (id: number, cardId?: number, paymentMethod?: string, repaymentType?: string, installmentAmount?: number) =>
+    api.post(`/loans/${id}/repay`, { cardId, paymentMethod, repaymentType, installmentAmount }),
 
   download: (params: { profileId?: number; format: string }) =>
     api.get('/loans/download', { params, responseType: 'blob' }),
@@ -291,6 +291,17 @@ export const adminApi = {
   deleteFine: (id: number) => api.delete(`/admin/fines/${id}`),
 
   confirmFine: (id: number) => api.post(`/admin/fines/${id}/confirm`),
+
+  // Superadmin: Admin management
+  listAdmins: () => api.get('/admin/admins'),
+
+  listAdminAssignments: () => api.get('/admin/admin-assignments'),
+
+  assignAdminToStokvel: (data: { adminId: number; stokvelId: number }) =>
+    api.post('/admin/admin-assignments', data),
+
+  removeAdminAssignment: (id: number) =>
+    api.delete(`/admin/admin-assignments/${id}`),
 };
 
 // ══════════════════════════════════════════

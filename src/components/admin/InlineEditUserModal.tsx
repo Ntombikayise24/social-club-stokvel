@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, Save, Mail, Phone, User, Shield, AlertCircle, CheckCircle } from 'lucide-react';
+import { isSuperAdmin } from '../../utils/auth';
 
 interface InlineEditUserModalProps {
   user: any;
@@ -200,11 +201,12 @@ export default function InlineEditUserModal({ user, onClose, onSave }: InlineEdi
               >
                 <option value="member">Member</option>
                 <option value="treasurer">Treasurer</option>
-                <option value="admin">Admin</option>
+                {isSuperAdmin() && <option value="admin">Admin</option>}
               </select>
             </div>
             <p className="mt-1 text-xs text-gray-500">
               {formData.role === 'admin' && 'Full access to all features and settings'}
+              {formData.role === 'superadmin' && 'System-wide access — can manage admins and assign stokvels'}
               {formData.role === 'treasurer' && 'Can manage payments and contributions'}
               {formData.role === 'member' && 'Basic access to stokvel features'}
             </p>

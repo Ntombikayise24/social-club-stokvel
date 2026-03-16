@@ -5,6 +5,7 @@ import {
   Book, DollarSign, Users, Target, HelpCircle, Shield
 } from 'lucide-react';
 import { helpApi } from '../../api';
+import LoadingScreen from '../../components/common/LoadingScreen';
 
 interface FaqItem {
   question: string;
@@ -20,6 +21,7 @@ interface FaqCategory {
 export default function FAQ() {
   const [searchQuery, setSearchQuery] = useState('');
   const [openItems, setOpenItems] = useState<Record<string, boolean>>({});
+  const [loading, setLoading] = useState(true);
 
   const defaultFaqs: FaqCategory[] = [
     {
@@ -45,7 +47,7 @@ export default function FAQ() {
       items: [
         { question: 'How much can I borrow?', answer: 'You can borrow up to 50% of your total savings in a stokvel. The amount depends on your contribution history and standing in the group.' },
         { question: 'What is the interest rate on loans?', answer: 'The standard interest rate is 30% flat on the borrowed amount. Overdue loans incur an additional 30% penalty (60% total).' },
-        { question: 'What is the repayment period?', answer: 'All loans must be repaid within 30 days from the date of borrowing. Early repayment is encouraged and welcomed.' },
+        { question: 'What is the repayment period?', answer: 'All loans must be repaid within 28 days from the date of borrowing. Early repayment is encouraged and welcomed.' },
       ]
     },
     {
@@ -71,6 +73,7 @@ export default function FAQ() {
   useEffect(() => {
     const fetchFaqs = async () => {
       try {
+        setLoading(true);
         const res = await helpApi.getFaqs();
         const data = res.data;
         if (Array.isArray(data) && data.length > 0) {
@@ -89,6 +92,8 @@ export default function FAQ() {
         }
       } catch {
         // Use defaults
+      } finally {
+        setLoading(false);
       }
     };
     fetchFaqs();
@@ -147,7 +152,9 @@ export default function FAQ() {
 
       {/* FAQ Content */}
       <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {filteredFaqs.length === 0 ? (
+        {loading ? (
+          <LoadingScreen message="Loading FAQs..." />
+        ) : filteredFaqs.length === 0 ? (
           <div className="text-center py-12">
             <HelpCircle className="w-12 h-12 text-gray-300 mx-auto mb-4" />
             <p className="text-gray-500">No questions match your search. Try different keywords.</p>
