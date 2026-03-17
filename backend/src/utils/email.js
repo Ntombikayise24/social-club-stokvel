@@ -10,10 +10,9 @@ dotenv.config({ path: path.join(__dirname, '../../.env') });
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
 // ── Email transport setup ──
-// Primary: Mailjet HTTP API (works on all hosting, no domain verification needed)
+// Primary: Elastic Email HTTP API (works on all hosting, no domain verification needed)
 // Fallback: SMTP (for local development)
-const mailjetApiKey = process.env.MAILJET_API_KEY;
-const mailjetSecretKey = process.env.MAILJET_SECRET_KEY;
+const elasticEmailApiKey = process.env.ELASTIC_EMAIL_API_KEY;
 
 const FROM_EMAIL = process.env.SMTP_USER || 'noreply@fundmate.co.za';
 const FROM_NAME = 'Fund Mate';
@@ -31,34 +30,32 @@ const transporter = nodemailer.createTransport({
 });
 
 /**
- * Send an email using Mailjet HTTP API or SMTP fallback
+ * Send an email using Elastic Email HTTP API or SMTP fallback
  */
 async function sendEmail({ to, subject, html }) {
-  if (mailjetApiKey && mailjetSecretKey) {
-    // Use Mailjet HTTP API — no SMTP ports, no domain verification needed
-    const auth = Buffer.from(`${mailjetApiKey}:${mailjetSecretKey}`).toString('base64');
-    const response = await fetch('https://api.mailjet.com/v3.1/send', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Basic ${auth}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        Messages: [{
-          From: { Email: FROM_EMAIL, Name: FROM_NAME },
-          To: [{ Email: to }],
-          Subject: subject,
-          HTMLPart: html,
-        }],
-      }),
+  if (elasticEmailApiKey) {
+    // Use Elastic Email HTTP API — works on Render, no SMTP ports needed
+    const params = new URLSearchParams({
+      apikey: elasticEmailApiKey,
+      subject,
+      from: FROM_EMAIL,
+      fromName: FROM_NAME,
+      to,
+      bodyHtml: html,
+      isTransactional: 'true',
     });
 
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
-      const errMsg = errData?.Messages?.[0]?.Errors?.[0]?.ErrorMessage || response.statusText;
-      throw new Error(`Mailjet error: ${errMsg}`);
+    const response = await fetch('https://api.elasticemail.com/v2/email/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString(),
+    });
+
+    const data = await response.json();
+    if (!data.success) {
+      throw new Error(`Elastic Email error: ${data.error || 'Unknown error'}`);
     }
-    console.log(`📧 Email sent via Mailjet to ${to}`);
+    console.log(`📧 Email sent via Elastic Email to ${to}`);
     return true;
   }
 
