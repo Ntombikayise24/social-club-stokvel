@@ -154,14 +154,14 @@ export default function Cards() {
           <ErrorState message="Could not load your cards. Please try again." onRetry={() => window.location.reload()} />
         ) : (<>
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <div>
-            <h2 className="text-2xl font-semibold text-gray-800">Your Cards</h2>
+            <h2 className="text-xl sm:text-2xl font-semibold text-gray-800">Your Cards</h2>
             <p className="text-gray-500 text-sm mt-1">Manage your payment methods</p>
           </div>
           <button
             onClick={() => setShowAddCard(true)}
-            className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors flex items-center space-x-2"
+            className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors flex items-center justify-center space-x-2 w-full sm:w-auto"
           >
             <PlusCircle className="w-5 h-5" />
             <span>Add New Card</span>
@@ -190,16 +190,16 @@ export default function Cards() {
             >
               {/* Card Preview */}
               <div className="p-6">
-                <div className="flex items-start justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                   <div className="flex items-start space-x-4">
                     {/* Card Art */}
-                    <div className={`w-16 h-16 rounded-xl bg-gradient-to-br ${getCardColor(card.cardType)} flex items-center justify-center text-white font-bold text-lg shadow-lg`}>
+                    <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-xl bg-gradient-to-br ${getCardColor(card.cardType)} flex items-center justify-center text-white font-bold text-base sm:text-lg shadow-lg flex-shrink-0`}>
                       {card.cardType === 'visa' ? 'V' : card.cardType === 'mastercard' ? 'MC' : 'AMEX'}
                     </div>
 
                     {/* Card Details */}
                     <div>
-                      <div className="flex items-center space-x-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <h3 className="font-semibold text-gray-800">
                           {getCardIcon(card.cardType)} •••• {card.last4}
                         </h3>
@@ -211,11 +211,11 @@ export default function Cards() {
                         )}
                       </div>
                       
-                      <div className="flex items-center space-x-4 mt-2">
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2">
                         <p className="text-sm text-gray-600">
                           Expires {String(card.expiryMonth).padStart(2, '0')}/{String(card.expiryYear).slice(-2)}
                         </p>
-                        <span className="text-gray-300">|</span>
+                        <span className="text-gray-300 hidden sm:inline">|</span>
                         <p className="text-sm text-gray-600">
                           {card.cardholderName}
                         </p>
@@ -224,7 +224,7 @@ export default function Cards() {
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-2 ml-16 sm:ml-0">
                     {!card.isDefault && (
                       <button
                         onClick={() => handleSetDefault(card.id)}

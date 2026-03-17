@@ -632,21 +632,21 @@ export default function MainDashboard() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white shadow-sm border-b sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-4">
           <div className="flex justify-between items-center">
             {/* Logo and Brand */}
-            <div className="flex items-center space-x-4">
-              <div className="w-10 h-10 bg-primary-600 rounded-xl flex items-center justify-center">
-                <Users className="w-6 h-6 text-white" />
+            <div className="flex items-center space-x-2 sm:space-x-4">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-primary-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                <Users className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-primary-800">FUND MATE</h1>
-                <p className="text-xs text-gray-500">Member Dashboard</p>
+                <h1 className="text-base sm:text-xl font-bold text-primary-800">FUND MATE</h1>
+                <p className="text-[10px] sm:text-xs text-gray-500">Member Dashboard</p>
               </div>
             </div>
 
             {/* Right Side - Notifications, Profile Switcher & 3-Dots Menu */}
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-1 sm:space-x-3">
               {/* Notifications */}
               <div className="relative">
                 <button 
@@ -663,7 +663,7 @@ export default function MainDashboard() {
                 {showNotifications && (
                   <>
                   <div className="fixed inset-0 z-10" onClick={() => setShowNotifications(false)} />
-                  <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-lg border border-gray-200 z-20">
+                  <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] sm:w-80 bg-white rounded-xl shadow-lg border border-gray-200 z-20">
                     <div className="p-3 border-b border-gray-100 flex justify-between items-center">
                       <h3 className="font-semibold text-gray-700">Notifications</h3>
                       {unreadCount > 0 && (
@@ -975,7 +975,7 @@ export default function MainDashboard() {
             </div>
 
             {/* Monthly dots grid - based on total / R200 */}
-            <div className="grid grid-cols-11 gap-1 mb-3">
+            <div className="grid grid-cols-6 sm:grid-cols-11 gap-1.5 sm:gap-1 mb-3">
               {['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N'].map((month, idx) => {
                 const fullMonthsPaid = Math.floor(madalaSideTotal / MADALA_SIDE_MONTHLY);
                 const partialFraction = (madalaSideTotal % MADALA_SIDE_MONTHLY) / MADALA_SIDE_MONTHLY;
@@ -1267,7 +1267,7 @@ export default function MainDashboard() {
 
         {/* Quick Actions Bar */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-6">
-          <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
             <button 
               onClick={() => setShowAddContribution(true)}
               className="flex flex-col items-center p-3 bg-primary-50 hover:bg-primary-100 rounded-xl transition-all group hover:shadow-sm"
@@ -1301,11 +1301,11 @@ export default function MainDashboard() {
         {showDiscoverStokvels && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
-              <div className="p-6 border-b border-gray-200">
-                <div className="flex justify-between items-center">
+              <div className="p-4 sm:p-6 border-b border-gray-200">
+                <div className="flex justify-between items-start gap-3">
                   <div>
-                    <h3 className="text-2xl font-semibold text-gray-800">Discover Groups</h3>
-                    <p className="text-sm text-gray-500 mt-1">Browse and join savings groups in the system</p>
+                    <h3 className="text-lg sm:text-2xl font-semibold text-gray-800">Discover Groups</h3>
+                    <p className="text-xs sm:text-sm text-gray-500 mt-1">Browse and join savings groups in the system</p>
                   </div>
                   <button 
                     onClick={() => setShowDiscoverStokvels(false)}

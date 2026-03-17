@@ -204,18 +204,18 @@ export default function ContributionHistory() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Link to={`/dashboard?profile=${profileId}`} className="text-gray-600 hover:text-primary-600">
+            <div className="flex items-center space-x-2 sm:space-x-4 min-w-0">
+              <Link to={`/dashboard?profile=${profileId}`} className="text-gray-600 hover:text-primary-600 flex-shrink-0">
                 <ArrowLeft className="w-5 h-5" />
               </Link>
-              <h1 className="text-2xl font-bold text-primary-800">FUND MATE</h1>
+              <h1 className="text-base sm:text-2xl font-bold text-primary-800 truncate">FUND MATE</h1>
             </div>
-            <div className="flex items-center space-x-2">
-              <div className="flex items-center space-x-2 bg-primary-50 px-3 py-1 rounded-full">
-                <Users className="w-4 h-4 text-primary-600" />
-                <span className="text-sm font-medium text-primary-700">{activeProfile.stokvelName}</span>
+            <div className="flex items-center">
+              <div className="flex items-center space-x-1 sm:space-x-2 bg-primary-50 px-2 sm:px-3 py-1 rounded-full">
+                <Users className="w-3 h-3 sm:w-4 sm:h-4 text-primary-600" />
+                <span className="text-xs sm:text-sm font-medium text-primary-700 truncate max-w-[100px] sm:max-w-none">{activeProfile.stokvelName}</span>
               </div>
             </div>
           </div>
@@ -237,7 +237,7 @@ export default function ContributionHistory() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-8">
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
             <p className="text-sm text-gray-500 mb-1">Total Collected</p>
             <p className="text-2xl font-bold text-primary-800">{formatCurrency(stats.totalCollected)}</p>
@@ -260,7 +260,7 @@ export default function ContributionHistory() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6">
           <div className="flex flex-col md:flex-row gap-4">
             {/* Status Filter Tabs */}
-            <div className="flex space-x-2">
+            <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => setFilter('all')}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${

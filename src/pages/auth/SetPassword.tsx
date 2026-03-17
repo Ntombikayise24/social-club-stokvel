@@ -59,7 +59,7 @@ export default function SetPassword() {
   if (success) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-primary-50 to-primary-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-8 text-center">
+        <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-4 sm:p-8 text-center">
           <div className="flex justify-center mb-6">
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
               <CheckCircle className="w-8 h-8 text-green-600" />
@@ -82,7 +82,7 @@ export default function SetPassword() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 to-primary-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-8">
+      <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-4 sm:p-8">
         {/* Logo */}
         <div className="flex justify-center mb-6">
           <div className="w-16 h-16 bg-primary-600 rounded-xl flex items-center justify-center">

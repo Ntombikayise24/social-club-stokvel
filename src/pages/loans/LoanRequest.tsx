@@ -289,7 +289,7 @@ export default function LoanRequest() {
             </div>
 
             {/* Profile Info */}
-            <div className={`${loanTarget === 'madala-side' ? 'bg-green-50' : `bg-${currentProfile.color}-50`} rounded-lg p-4 flex items-center justify-between`}>
+            <div className={`${loanTarget === 'madala-side' ? 'bg-green-50' : `bg-${currentProfile.color}-50`} rounded-lg p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3`}>
               <div className="flex items-center space-x-3">
                 <Users className={`w-5 h-5 ${loanTarget === 'madala-side' ? 'text-green-600' : `text-${currentProfile.color}-600`}`} />
                 <div>

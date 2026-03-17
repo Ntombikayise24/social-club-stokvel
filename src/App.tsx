@@ -348,7 +348,7 @@ function App() {
                 <span className="text-sm font-medium">Trusted by 100+ members</span>
               </div>
 
-              <h1 className="text-5xl md:text-6xl font-bold">
+              <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold">
                 <span className="text-gray-900">Save Together,</span>
                 <br />
                 <span className="bg-gradient-to-r from-primary-600 to-primary-500 bg-clip-text text-transparent">
@@ -592,9 +592,9 @@ function App() {
             <div>
               <h4 className="text-white font-semibold mb-4">Newsletter</h4>
               <p className="text-sm mb-3">Get updates on new features and financial tips</p>
-              <div className="flex">
-                <input type="email" placeholder="Your email" className="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-l-lg focus:outline-none focus:border-primary-500 text-white" />
-                <button className="px-4 py-2 bg-primary-600 text-white rounded-r-lg hover:bg-primary-700 transition-colors">Subscribe</button>
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-0">
+                <input type="email" placeholder="Your email" className="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg sm:rounded-l-lg sm:rounded-r-none focus:outline-none focus:border-primary-500 text-white" />
+                <button className="px-4 py-2 bg-primary-600 text-white rounded-lg sm:rounded-r-lg sm:rounded-l-none hover:bg-primary-700 transition-colors">Subscribe</button>
               </div>
             </div>
           </div>

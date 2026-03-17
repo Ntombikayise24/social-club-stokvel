@@ -158,38 +158,38 @@ export default function MemberProfile() {
         ) : (<>
         {/* Profile Header with Single Edit Button */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
             <div className="flex items-center space-x-4">
-              <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center">
-                <span className="text-2xl font-bold text-primary-700">
+              <div className="w-14 h-14 sm:w-16 sm:h-16 bg-primary-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <span className="text-xl sm:text-2xl font-bold text-primary-700">
                   {userData.fullName.split(' ').map(n => n[0]).join('')}
                 </span>
               </div>
               <div>
-                <h2 className="text-2xl font-semibold text-gray-800">{userData.fullName}</h2>
-                <p className="text-gray-500">Member since {userData.mainMemberSince}</p>
+                <h2 className="text-xl sm:text-2xl font-semibold text-gray-800">{userData.fullName}</h2>
+                <p className="text-sm sm:text-base text-gray-500">Member since {userData.mainMemberSince}</p>
               </div>
             </div>
             {!isEditing ? (
               <button
                 onClick={() => setIsEditing(true)}
-                className="flex items-center space-x-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+                className="flex items-center justify-center space-x-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors w-full sm:w-auto"
               >
                 <Edit2 className="w-4 h-4" />
                 <span>Edit Profile</span>
               </button>
             ) : (
-              <div className="flex space-x-2">
+              <div className="flex space-x-2 w-full sm:w-auto">
                 <button
                   onClick={handleSave}
-                  className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  className="flex-1 sm:flex-none flex items-center justify-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                 >
                   <Save className="w-4 h-4" />
                   <span>Save</span>
                 </button>
                 <button
                   onClick={handleCancel}
-                  className="flex items-center space-x-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors"
+                  className="flex-1 sm:flex-none flex items-center justify-center space-x-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors"
                 >
                   <X className="w-4 h-4" />
                   <span>Cancel</span>
@@ -315,10 +315,10 @@ export default function MemberProfile() {
                 key={profile.id}
                 className="border border-gray-200 rounded-xl p-4 hover:border-gray-300 transition-all"
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="flex items-start space-x-3 sm:space-x-4 min-w-0">
                     {/* Profile Icon */}
-                    <div className={`w-12 h-12 bg-${profile.color}-100 rounded-xl flex items-center justify-center text-2xl`}>
+                    <div className={`w-10 h-10 sm:w-12 sm:h-12 bg-${profile.color}-100 rounded-xl flex items-center justify-center text-xl sm:text-2xl flex-shrink-0`}>
                       {profile.icon}
                     </div>
                     
@@ -330,16 +330,16 @@ export default function MemberProfile() {
                           {profile.role}
                         </span>
                       </div>
-                      <div className="flex items-center space-x-4 mt-2 text-sm">
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-sm">
                         <span className="text-gray-600">Saved: <span className="font-medium">{formatCurrency(profile.savedAmount)}</span></span>
-                        <span className="text-gray-300">|</span>
+                        <span className="text-gray-300 hidden sm:inline">|</span>
                         <span className="text-gray-600">Target: <span className="font-medium">{formatCurrency(profile.targetAmount)}</span></span>
-                        <span className="text-gray-300">|</span>
+                        <span className="text-gray-300 hidden sm:inline">|</span>
                         <span className="text-gray-600">Joined: <span className="font-medium">{profile.joinedDate}</span></span>
                       </div>
                       
                       {/* Progress Bar */}
-                      <div className="mt-3 w-64">
+                      <div className="mt-3 w-full max-w-[16rem]">
                         <div className="flex justify-between text-xs mb-1">
                           <span className="text-gray-500">Progress</span>
                           <span className={`font-medium text-${profile.color}-600`}>{profile.progress}%</span>

@@ -2963,11 +2963,11 @@ export default function AdminDashboard() {
             <div className="flex items-center space-x-4">
               <Shield className="w-8 h-8 text-primary-200" />
               <div>
-                <h1 className="text-2xl font-bold">FUND MATE</h1>
-                <p className="text-sm text-primary-200">{isSuperAdmin ? 'Super Admin Dashboard' : 'Admin Dashboard'}</p>
+                <h1 className="text-lg sm:text-2xl font-bold">FUND MATE</h1>
+                <p className="text-xs sm:text-sm text-primary-200 hidden sm:block">{isSuperAdmin ? 'Super Admin Dashboard' : 'Admin Dashboard'}</p>
               </div>
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 sm:space-x-4">
               <button
                 onClick={() => setShowDeletedUsersModal(true)}
                 className="p-2 hover:bg-primary-700 rounded-lg transition-colors relative"
@@ -2980,7 +2980,7 @@ export default function AdminDashboard() {
                   </span>
                 )}
               </button>
-              <span className="text-sm bg-primary-700 px-3 py-1 rounded-full">{isSuperAdmin ? 'Super Admin' : 'Admin'}</span>
+              <span className="hidden sm:inline text-sm bg-primary-700 px-3 py-1 rounded-full">{isSuperAdmin ? 'Super Admin' : 'Admin'}</span>
               <button 
                 onClick={() => setShowSettingsModal(true)}
                 className="p-2 hover:bg-primary-700 rounded-lg transition-colors"
@@ -2997,7 +2997,7 @@ export default function AdminDashboard() {
 
       <div className="bg-white shadow-sm border-b sticky top-[73px] z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex space-x-1 overflow-x-auto">
+          <div className="flex space-x-1 overflow-x-auto scrollbar-hide pb-px -mb-px">
             <button
               onClick={() => setActiveTab('overview')}
               className={`px-4 py-3 font-medium text-sm transition-colors border-b-2 ${
