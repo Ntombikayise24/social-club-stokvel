@@ -8,13 +8,8 @@ export const authApi = {
   login: (data: { email: string; password: string; rememberMe?: boolean }) =>
     api.post('/auth/login', data),
 
-  register: (data: {
-    fullName: string;
-    email: string;
-    phone: string;
-    password: string;
-    selectedStokvel?: number;
-  }) => api.post('/auth/register', data),
+  setPassword: (data: { email: string; token: string; password: string }) =>
+    api.post('/auth/set-password', data),
 
   forgotPassword: (email: string) =>
     api.post('/auth/forgot-password', { email }),

@@ -9,66 +9,41 @@ import { sendPasswordResetEmail } from '../utils/email.js';
 
 const router = Router();
 
-// ────────────────── REGISTER ──────────────────
+// ────────────────── SET PASSWORD (for admin-created users) ──────────────────
 router.post(
-  '/register',
+  '/set-password',
   [
-    body('fullName').trim().notEmpty().withMessage('Full name is required'),
     body('email').isEmail().withMessage('Valid email is required'),
-    body('phone').trim().notEmpty().withMessage('Phone number is required'),
+    body('token').isLength({ min: 6, max: 6 }).withMessage('Invalid token'),
     body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
-    body('selectedStokvel').optional().isInt(),
     validate,
   ],
   async (req, res) => {
     try {
-      const { fullName, email, phone, password, selectedStokvel } = req.body;
+      const { email, token, password } = req.body;
 
-      // Check if email exists
-      const [existing] = await pool.query('SELECT id FROM users WHERE email = ?', [email]);
-      if (existing.length > 0) {
-        return res.status(409).json({ error: 'Email already registered' });
+      // Verify the token
+      const [tokens] = await pool.query(
+        `SELECT prt.id, prt.user_id FROM password_reset_tokens prt
+         JOIN users u ON u.id = prt.user_id
+         WHERE u.email = ? AND prt.token = ? AND prt.used = FALSE AND prt.expires_at > NOW()`,
+        [email, token]
+      );
+
+      if (tokens.length === 0) {
+        return res.status(400).json({ error: 'Invalid or expired setup token. Please contact your administrator.' });
       }
 
       const passwordHash = await bcrypt.hash(password, 12);
 
-      const [result] = await pool.query(
-        'INSERT INTO users (full_name, email, phone, password_hash, role, status) VALUES (?, ?, ?, ?, ?, ?)',
-        [fullName, email, phone, passwordHash, 'member', 'pending']
-      );
+      // Set the password and ensure user is active
+      await pool.query('UPDATE users SET password_hash = ?, status = ? WHERE id = ?', [passwordHash, 'active', tokens[0].user_id]);
+      await pool.query('UPDATE password_reset_tokens SET used = TRUE WHERE id = ?', [tokens[0].id]);
 
-      const userId = result.insertId;
-
-      // Create default settings
-      await pool.query('INSERT INTO user_settings (user_id) VALUES (?)', [userId]);
-
-      // If stokvel selected, create join request
-      if (selectedStokvel) {
-        await pool.query(
-          'INSERT INTO join_requests (user_id, stokvel_id, status) VALUES (?, ?, ?)',
-          [userId, selectedStokvel, 'pending']
-        );
-      }
-
-      // Notify admins and superadmins
-      const [admins] = await pool.query('SELECT id FROM users WHERE role IN (?, ?) AND status = ?', ['admin', 'superadmin', 'active']);
-      for (const admin of admins) {
-        await pool.query(
-          'INSERT INTO notifications (user_id, type, title, message, actionable, action_link, action_text) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          [admin.id, 'approval', 'New Registration', `${fullName} has registered and is awaiting approval.`, true, '/admin', 'Review']
-        );
-      }
-
-      res.status(201).json({
-        message: 'Registration successful. Awaiting admin approval.',
-        userId,
-      });
+      res.json({ message: 'Password set successfully. You can now log in.' });
     } catch (err) {
-      console.error('Register error:', err.message || err);
-      if (err.code === 'ECONNREFUSED' || err.code === 'ER_ACCESS_DENIED_ERROR' || err.code === 'ER_BAD_DB_ERROR') {
-        return res.status(503).json({ error: 'Database unavailable. Please try again later.' });
-      }
-      res.status(500).json({ error: 'Registration failed' });
+      console.error('Set password error:', err);
+      res.status(500).json({ error: 'Failed to set password' });
     }
   }
 );
@@ -101,7 +76,7 @@ router.post(
       }
 
       if (user.status === 'pending') {
-        return res.status(403).json({ error: 'Your account is pending approval. Please wait for admin confirmation.' });
+        return res.status(403).json({ error: 'Your account is not yet activated. Please check your email to set your password.' });
       }
 
       if (user.status === 'inactive') {

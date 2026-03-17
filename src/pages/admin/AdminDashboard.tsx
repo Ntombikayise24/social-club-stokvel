@@ -121,7 +121,6 @@ function AddUserModal({ onClose, onAdd, stokvels, isSuperAdmin: canCreateAdmin }
     name: '',
     email: '',
     phone: '',
-    status: 'pending' as 'active' | 'pending',
     role: 'member' as 'member' | 'admin',
     selectedStokvels: [] as number[]
   });
@@ -175,10 +174,10 @@ function AddUserModal({ onClose, onAdd, stokvels, isSuperAdmin: canCreateAdmin }
       name: formData.name,
       email: formData.email,
       phone: formData.phone,
-      status: formData.status,
+      status: 'active',
       role: formData.role,
       joinedDate: new Date().toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }),
-      lastActive: formData.status === 'active' ? 'Just now' : 'Never',
+      lastActive: 'Never',
       profiles: formData.selectedStokvels.map(stokvelId => {
         const stokvel = stokvels.find(s => s.id === stokvelId);
         return {
@@ -259,18 +258,6 @@ function AddUserModal({ onClose, onAdd, stokvels, isSuperAdmin: canCreateAdmin }
                 placeholder="082 123 4567"
               />
               {errors.phone && <p className="mt-1 text-xs text-red-600">{errors.phone}</p>}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-              <select
-                value={formData.status}
-                onChange={(e) => setFormData({...formData, status: e.target.value as 'active' | 'pending'})}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-              >
-                <option value="pending">Pending (Requires Approval)</option>
-                <option value="active">Active (Immediate Access)</option>
-              </select>
             </div>
 
             {canCreateAdmin && (
@@ -2595,12 +2582,11 @@ export default function AdminDashboard() {
         fullName: newUser.name,
         email: newUser.email,
         phone: newUser.phone,
-        status: newUser.status,
         role: newUser.role || 'member',
         stokvelIds: newUser.profiles?.map((p: any) => p.stokvelId) || [],
       });
       setShowAddUserModal(false);
-      showSuccess(`User ${newUser.name} created successfully!`);
+      showSuccess(`User ${newUser.name} created successfully! A password setup email has been sent.`);
       fetchData();
     } catch (err: any) {
       const msg = err.response?.data?.error || 'Failed to create user';

@@ -379,10 +379,10 @@ function App() {
 
               <div className="flex flex-col sm:flex-row items-start gap-4">
                 <Link 
-                  to="/register" 
+                  to="/login" 
                   className="group inline-flex items-center justify-center px-8 py-4 bg-gradient-to-r from-primary-600 to-primary-500 text-white rounded-xl hover:from-primary-700 hover:to-primary-600 transition-all shadow-lg shadow-primary-200 font-semibold text-lg"
                 >
-                  Get Started
+                  Sign In
                   <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
                 </Link>
                 {!isPwaInstalled && (
@@ -541,10 +541,10 @@ function App() {
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">Ready to Start Saving?</h2>
           <p className="text-white/90 text-lg mb-8 max-w-2xl mx-auto">Join FUND MATE today and take control of your financial future with our trusted community</p>
           <Link
-            to="/register"
+            to="/login"
             className="inline-flex items-center space-x-2 bg-white text-primary-600 px-8 py-4 rounded-xl hover:bg-gray-100 transition-all shadow-xl font-bold text-lg"
           >
-            <span>Join Now</span>
+            <span>Sign In</span>
             <ArrowRight className="w-5 h-5" />
           </Link>
         </div>

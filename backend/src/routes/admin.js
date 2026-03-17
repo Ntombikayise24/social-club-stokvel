@@ -4,7 +4,7 @@ import { body } from 'express-validator';
 import { validate } from '../middleware/validate.js';
 import { authenticate, requireAdmin, requireSuperAdmin } from '../middleware/auth.js';
 import pool from '../database/connection.js';
-import { sendApprovalEmail, sendJoinRequestApprovedEmail, sendStokvelAssignmentEmail, sendStokvelUnassignmentEmail, sendAccountDeletionEmail, sendWelcomeEmail, sendLoanApprovalEmail } from '../utils/email.js';
+import { sendApprovalEmail, sendJoinRequestApprovedEmail, sendStokvelAssignmentEmail, sendStokvelUnassignmentEmail, sendAccountDeletionEmail, sendSetPasswordEmail, sendWelcomeEmail, sendLoanApprovalEmail } from '../utils/email.js';
 import { generatePDF, generateExcel, generateCSV, REPORT_COLUMNS, formatRowData } from '../utils/reports.js';
 
 const router = Router();
@@ -269,14 +269,13 @@ router.post(
     body('fullName').trim().notEmpty(),
     body('email').isEmail(),
     body('phone').trim().notEmpty(),
-    body('status').optional().isIn(['active', 'pending', 'inactive']),
     body('role').optional().isIn(['member', 'admin']),
     body('stokvelIds').optional().isArray(),
     validate,
   ],
   async (req, res) => {
     try {
-      const { fullName, email, phone, status = 'active', role = 'member', stokvelIds = [] } = req.body;
+      const { fullName, email, phone, role = 'member', stokvelIds = [] } = req.body;
 
       // Only superadmin can create admin users
       if (role === 'admin' && req.user.role !== 'superadmin') {
@@ -288,13 +287,12 @@ router.post(
         return res.status(409).json({ error: 'Email already registered' });
       }
 
-      // Generate temporary password
-      const tempPassword = `Temp@${Math.random().toString(36).slice(-8)}`;
-      const passwordHash = await bcrypt.hash(tempPassword, 12);
+      // Create user with placeholder password (user will set their own via email link)
+      const placeholderHash = await bcrypt.hash(`placeholder-${Date.now()}`, 12);
 
       const [result] = await pool.query(
         'INSERT INTO users (full_name, email, phone, password_hash, role, status) VALUES (?, ?, ?, ?, ?, ?)',
-        [fullName, email, phone, passwordHash, role, status]
+        [fullName, email, phone, placeholderHash, role, 'active']
       );
 
       const userId = result.insertId;
@@ -316,7 +314,17 @@ router.post(
       // Welcome notification
       await pool.query(
         'INSERT INTO notifications (user_id, type, title, message) VALUES (?, ?, ?, ?)',
-        [userId, 'info', 'Welcome!', 'Your account has been created. Welcome to the Stokvel Management System!']
+        [userId, 'info', 'Welcome!', 'Your account has been created. Welcome to Fund Mate!']
+      );
+
+      // Generate a password-setup token (6-digit code, 72 hours expiry)
+      const { randomInt } = await import('crypto');
+      const setupToken = randomInt(100000, 999999).toString();
+      const expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000); // 72 hours
+
+      await pool.query(
+        'INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES (?, ?, ?)',
+        [userId, setupToken, expiresAt]
       );
 
       // Get stokvel names for email
@@ -329,17 +337,18 @@ router.post(
         stokvelNames = stokvels.map(s => s.name);
       }
 
-      // Send welcome email with credentials and stokvel assignments
+      // Send "Set Your Password" email
       try {
-        await sendWelcomeEmail(email, fullName, tempPassword, stokvelNames);
+        await sendSetPasswordEmail(email, fullName, setupToken, stokvelNames);
       } catch (emailErr) {
-        console.error('Welcome email failed:', emailErr.message);
+        console.error('Set-password email failed:', emailErr.message);
       }
 
+      console.log(`📧 Setup token for ${email}: ${setupToken}`);
+
       res.status(201).json({
-        message: 'User created successfully',
+        message: 'User created successfully. A password setup email has been sent.',
         userId,
-        tempPassword, // Also sent via email
       });
     } catch (err) {
       console.error('Create user error:', err);

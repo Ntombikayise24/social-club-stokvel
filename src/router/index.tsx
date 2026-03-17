@@ -1,8 +1,7 @@
 import { createBrowserRouter } from "react-router-dom";
 import App from "../App";
 import Login from "../pages/auth/Login";
-import Register from "../pages/auth/Register";
-import RegistrationSuccess from "../pages/auth/RegistrationSuccess";
+import SetPassword from "../pages/auth/SetPassword";
 import MainDashboard from "../pages/dashboard/MainDashboard";
 import MemberProfile from "../pages/profile/MemberProfile";
 import ContributionHistory from "../pages/history/ContributionHistory";
@@ -33,12 +32,8 @@ const router = createBrowserRouter([
     element: <Login />,
   },
   {
-    path: "/register",
-    element: <Register />,
-  },
-  {
-    path: "/registration-success",
-    element: <RegistrationSuccess />,
+    path: "/set-password",
+    element: <SetPassword />,
   },
   {
     path: "/dashboard",

@@ -1,11 +1,12 @@
 // src/pages/auth/Login.tsx
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Mail, Lock, Eye, EyeOff, LogIn, Users, AlertCircle, ArrowLeft } from 'lucide-react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Mail, Lock, Eye, EyeOff, LogIn, Users, AlertCircle, ArrowLeft, CheckCircle } from 'lucide-react';
 import { authApi } from '../../api';
 
 export default function Login() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -60,6 +61,18 @@ export default function Login() {
 
         <h2 className="text-2xl font-bold text-center text-gray-800 mb-2">Welcome Back</h2>
         <p className="text-center text-gray-500 mb-8">Sign in to your account</p>
+
+        {/* Setup Success Message */}
+        {(searchParams.get('setup') === 'success' || searchParams.get('reset') === 'success') && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6 flex items-start space-x-3">
+            <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-green-700">
+              {searchParams.get('setup') === 'success'
+                ? 'Your password has been set successfully. You can now sign in.'
+                : 'Your password has been reset successfully. You can now sign in.'}
+            </p>
+          </div>
+        )}
 
         {/* Error Message */}
         {error && (
@@ -149,16 +162,6 @@ export default function Login() {
             )}
           </button>
         </form>
-
-        {/* Sign Up Link */}
-        <div className="mt-6 text-center">
-          <p className="text-sm text-gray-600">
-            Don't have an account?{' '}
-            <Link to="/register" className="text-primary-600 hover:text-primary-700 font-medium">
-              Join a Stokvel
-            </Link>
-          </p>
-        </div>
 
         {/* Powered by line */}
         <div className="mt-6 pt-4 border-t border-gray-200">

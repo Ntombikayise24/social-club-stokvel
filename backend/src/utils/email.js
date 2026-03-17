@@ -671,3 +671,94 @@ export async function sendPasswordResetEmail(email, code) {
     console.error(`⚠️  Failed to send password reset email to ${email}:`, err.message);
   }
 }
+
+/**
+ * Send a "Set Your Password" email to a new user created by an admin.
+ */
+export async function sendSetPasswordEmail(email, fullName, token, stokvelNames = []) {
+  const setPasswordUrl = `${FRONTEND_URL}/set-password?email=${encodeURIComponent(email)}&token=${token}`;
+
+  const stokvelList = stokvelNames.length > 0
+    ? `<p style="margin:0 0 8px;font-weight:600;color:#374151;">You've been assigned to:</p>
+       <ul style="margin:0 0 24px;padding-left:20px;color:#374151;font-size:15px;">
+         ${stokvelNames.map(n => `<li style="margin-bottom:4px;">${n}</li>`).join('')}
+       </ul>`
+    : '';
+
+  const html = `
+  <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
+    <!-- Header -->
+    <div style="background:linear-gradient(135deg,#16a34a,#15803d);padding:32px 24px;text-align:center;">
+      <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;">Welcome to Fund Mate! 🎉</h1>
+    </div>
+
+    <!-- Body -->
+    <div style="padding:32px 24px;">
+      <p style="margin:0 0 16px;color:#374151;font-size:16px;">
+        Hi <strong>${fullName}</strong>,
+      </p>
+      <p style="margin:0 0 16px;color:#374151;font-size:16px;">
+        Your account has been created by an administrator. To get started, please set your password using the link below.
+      </p>
+
+      <!-- Code Box -->
+      <div style="text-align:center;margin:24px 0;">
+        <div style="display:inline-block;background:#f0fdf4;border:2px dashed #86efac;border-radius:12px;padding:20px 40px;">
+          <p style="margin:0 0 4px;color:#6b7280;font-size:13px;font-weight:500;text-transform:uppercase;letter-spacing:1px;">Your Setup Code</p>
+          <p style="margin:0;color:#111827;font-size:36px;font-weight:700;letter-spacing:8px;">${token}</p>
+        </div>
+      </div>
+
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px;margin:0 0 24px;">
+        <p style="margin:0;color:#374151;font-size:15px;">Your email: <strong>${email}</strong></p>
+      </div>
+
+      ${stokvelList}
+
+      <!-- CTA Button -->
+      <div style="text-align:center;margin:32px 0;">
+        <a href="${setPasswordUrl}" style="display:inline-block;background:#16a34a;color:#ffffff;text-decoration:none;padding:14px 40px;border-radius:8px;font-size:16px;font-weight:600;letter-spacing:0.5px;">
+          Set Your Password
+        </a>
+      </div>
+
+      <p style="margin:0 0 8px;color:#6b7280;font-size:14px;">
+        Or copy and paste this link into your browser:
+      </p>
+      <p style="margin:0 0 24px;word-break:break-all;">
+        <a href="${setPasswordUrl}" style="color:#16a34a;font-size:14px;">${setPasswordUrl}</a>
+      </p>
+
+      <p style="margin:0 0 16px;color:#dc2626;font-size:14px;font-weight:500;">
+        ⚠️ This link expires in 72 hours. If it expires, contact your administrator.
+      </p>
+
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;" />
+
+      <p style="margin:0;color:#9ca3af;font-size:13px;text-align:center;">
+        If you did not expect this email, please contact your administrator.
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <div style="background:#f9fafb;padding:16px 24px;text-align:center;">
+      <p style="margin:0;color:#9ca3af;font-size:12px;">
+        &copy; ${new Date().getFullYear()} Fund Mate. All rights reserved.
+      </p>
+    </div>
+  </div>`;
+
+  const mailOptions = {
+    from: `"Fund Mate" <${process.env.SMTP_USER || 'noreply@fundmate.co.za'}>`,
+    to: email,
+    subject: '🎉 Welcome to Fund Mate — Set Your Password',
+    html,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`📧 Set-password email sent to ${email}`);
+  } catch (err) {
+    console.error(`⚠️  Failed to send set-password email to ${email}:`, err.message);
+  }
+}
