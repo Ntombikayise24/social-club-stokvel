@@ -1,5 +1,4 @@
 import nodemailer from 'nodemailer';
-import { Resend } from 'resend';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import path from 'path';
@@ -11,10 +10,9 @@ dotenv.config({ path: path.join(__dirname, '../../.env') });
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
 // ── Email transport setup ──
-// Primary: Resend HTTP API (works on all hosting including Render)
+// Primary: Brevo HTTP API (works on all hosting, no domain verification needed)
 // Fallback: SMTP (for local development)
-const resendApiKey = process.env.RESEND_API_KEY;
-const resend = resendApiKey ? new Resend(resendApiKey) : null;
+const brevoApiKey = process.env.BREVO_API_KEY;
 
 const FROM_EMAIL = process.env.SMTP_USER || 'noreply@fundmate.co.za';
 const FROM_NAME = 'Fund Mate';
@@ -32,21 +30,31 @@ const transporter = nodemailer.createTransport({
 });
 
 /**
- * Send an email using Resend (HTTP) or SMTP fallback
+ * Send an email using Brevo HTTP API or SMTP fallback
  */
 async function sendEmail({ to, subject, html }) {
-  if (resend) {
-    // Use Resend HTTP API — works on Render, no SMTP ports needed
-    const { error } = await resend.emails.send({
-      from: `${FROM_NAME} <onboarding@resend.dev>`,
-      to: [to],
-      subject,
-      html,
+  if (brevoApiKey) {
+    // Use Brevo (Sendinblue) HTTP API — no SMTP ports, no domain verification
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'api-key': brevoApiKey,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify({
+        sender: { name: FROM_NAME, email: FROM_EMAIL },
+        to: [{ email: to }],
+        subject,
+        htmlContent: html,
+      }),
     });
-    if (error) {
-      throw new Error(`Resend error: ${error.message}`);
+
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(`Brevo error: ${errData.message || response.statusText}`);
     }
-    console.log(`📧 Email sent via Resend to ${to}`);
+    console.log(`📧 Email sent via Brevo to ${to}`);
     return true;
   }
 
