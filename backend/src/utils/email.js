@@ -10,9 +10,10 @@ dotenv.config({ path: path.join(__dirname, '../../.env') });
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
 // ── Email transport setup ──
-// Primary: Brevo HTTP API (works on all hosting, no domain verification needed)
+// Primary: Mailjet HTTP API (works on all hosting, no domain verification needed)
 // Fallback: SMTP (for local development)
-const brevoApiKey = process.env.BREVO_API_KEY;
+const mailjetApiKey = process.env.MAILJET_API_KEY;
+const mailjetSecretKey = process.env.MAILJET_SECRET_KEY;
 
 const FROM_EMAIL = process.env.SMTP_USER || 'noreply@fundmate.co.za';
 const FROM_NAME = 'Fund Mate';
@@ -30,31 +31,34 @@ const transporter = nodemailer.createTransport({
 });
 
 /**
- * Send an email using Brevo HTTP API or SMTP fallback
+ * Send an email using Mailjet HTTP API or SMTP fallback
  */
 async function sendEmail({ to, subject, html }) {
-  if (brevoApiKey) {
-    // Use Brevo (Sendinblue) HTTP API — no SMTP ports, no domain verification
-    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+  if (mailjetApiKey && mailjetSecretKey) {
+    // Use Mailjet HTTP API — no SMTP ports, no domain verification needed
+    const auth = Buffer.from(`${mailjetApiKey}:${mailjetSecretKey}`).toString('base64');
+    const response = await fetch('https://api.mailjet.com/v3.1/send', {
       method: 'POST',
       headers: {
-        'api-key': brevoApiKey,
+        'Authorization': `Basic ${auth}`,
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
       },
       body: JSON.stringify({
-        sender: { name: FROM_NAME, email: FROM_EMAIL },
-        to: [{ email: to }],
-        subject,
-        htmlContent: html,
+        Messages: [{
+          From: { Email: FROM_EMAIL, Name: FROM_NAME },
+          To: [{ Email: to }],
+          Subject: subject,
+          HTMLPart: html,
+        }],
       }),
     });
 
     if (!response.ok) {
       const errData = await response.json().catch(() => ({}));
-      throw new Error(`Brevo error: ${errData.message || response.statusText}`);
+      const errMsg = errData?.Messages?.[0]?.Errors?.[0]?.ErrorMessage || response.statusText;
+      throw new Error(`Mailjet error: ${errMsg}`);
     }
-    console.log(`📧 Email sent via Brevo to ${to}`);
+    console.log(`📧 Email sent via Mailjet to ${to}`);
     return true;
   }
 
