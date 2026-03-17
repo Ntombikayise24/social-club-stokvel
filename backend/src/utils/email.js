@@ -10,14 +10,12 @@ dotenv.config({ path: path.join(__dirname, '../../.env') });
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
 // ── Email transport setup ──
-// Primary: Elastic Email HTTP API (works on all hosting, no domain verification needed)
-// Fallback: SMTP (for local development)
-const elasticEmailApiKey = process.env.ELASTIC_EMAIL_API_KEY;
-
+// Uses nodemailer SMTP. Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS in env.
+// For Render: use SendGrid SMTP on port 2525 (Render blocks 465/587 but allows 2525)
+// For local dev: use Gmail SMTP on port 465
 const FROM_EMAIL = process.env.SMTP_USER || 'noreply@fundmate.co.za';
 const FROM_NAME = 'Fund Mate';
 
-// SMTP fallback for local dev
 const smtpPort = parseInt(process.env.SMTP_PORT || '465');
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'smtp.gmail.com',
@@ -30,43 +28,16 @@ const transporter = nodemailer.createTransport({
 });
 
 /**
- * Send an email using Elastic Email HTTP API or SMTP fallback
+ * Send an email via nodemailer SMTP
  */
 async function sendEmail({ to, subject, html }) {
-  if (elasticEmailApiKey) {
-    // Use Elastic Email HTTP API — works on Render, no SMTP ports needed
-    const params = new URLSearchParams({
-      apikey: elasticEmailApiKey,
-      subject,
-      from: FROM_EMAIL,
-      fromName: FROM_NAME,
-      to,
-      bodyHtml: html,
-      isTransactional: 'true',
-    });
-
-    const response = await fetch('https://api.elasticemail.com/v2/email/send', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: params.toString(),
-    });
-
-    const data = await response.json();
-    if (!data.success) {
-      throw new Error(`Elastic Email error: ${data.error || 'Unknown error'}`);
-    }
-    console.log(`📧 Email sent via Elastic Email to ${to}`);
-    return true;
-  }
-
-  // Fallback: SMTP
   await transporter.sendMail({
     from: `"${FROM_NAME}" <${FROM_EMAIL}>`,
     to,
     subject,
     html,
   });
-  console.log(`📧 Email sent via SMTP to ${to}`);
+  console.log(`📧 Email sent to ${to}`);
   return true;
 }
 
