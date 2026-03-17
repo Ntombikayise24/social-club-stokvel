@@ -205,11 +205,12 @@ router.post(
     body('stokvelId').optional().isInt(),
     body('cardId').optional().isInt(),
     body('paymentMethod').optional().isIn(['card', 'bank', 'cash']),
+    body('contributionType').optional().isIn(['your-target', 'madala-side']),
     validate,
   ],
   async (req, res) => {
     try {
-      const { amount, profileId, stokvelId, cardId, paymentMethod = 'card' } = req.body;
+      const { amount, profileId, stokvelId, cardId, paymentMethod = 'card', contributionType = 'your-target' } = req.body;
 
       // Verify profile belongs to user
       let [profiles] = await pool.query(
@@ -262,9 +263,9 @@ router.post(
       const reference = `CON-${Date.now()}-${uuidv4().slice(0, 6).toUpperCase()}`;
 
       const [result] = await pool.query(
-        `INSERT INTO contributions (user_id, profile_id, stokvel_id, amount, payment_method, reference, status, card_id)
-         VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)`,
-        [req.user.id, profileId, profiles[0].stokvel_id, amount, paymentMethod, reference, cardId || null]
+        `INSERT INTO contributions (user_id, profile_id, stokvel_id, amount, payment_method, reference, status, card_id, contribution_type)
+         VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
+        [req.user.id, profileId, profiles[0].stokvel_id, amount, paymentMethod, reference, cardId || null, contributionType]
       );
 
       // Create notification

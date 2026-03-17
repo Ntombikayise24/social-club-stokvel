@@ -82,9 +82,9 @@ export default function Settings() {
           phone: user.phone || ''
         });
 
-        // Set member since from created_at
-        if (user.createdAt || user.created_at) {
-          const d = new Date(user.createdAt || user.created_at);
+        // Set member since from joinedDate (backend returns created_at as joinedDate)
+        if (user.joinedDate || user.createdAt || user.created_at) {
+          const d = new Date(user.joinedDate || user.createdAt || user.created_at);
           setMemberSince(d.toLocaleDateString('en-ZA', { month: 'short', year: 'numeric' }));
         }
 
