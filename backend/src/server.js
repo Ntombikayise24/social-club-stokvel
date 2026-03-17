@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import path from 'path';
 
@@ -103,13 +104,15 @@ app.get('/api/health', async (_req, res) => {
   }
 });
 
-// ── Serve frontend in production ──
+// ── Serve frontend in production (only if dist exists) ──
 if (process.env.NODE_ENV === 'production') {
   const frontendPath = path.join(__dirname, '../../dist');
-  app.use(express.static(frontendPath));
-  app.get('*', (_req, res) => {
-    res.sendFile(path.join(frontendPath, 'index.html'));
-  });
+  if (fs.existsSync(frontendPath)) {
+    app.use(express.static(frontendPath));
+    app.get('*', (_req, res) => {
+      res.sendFile(path.join(frontendPath, 'index.html'));
+    });
+  }
 }
 
 // ── 404 handler ──
