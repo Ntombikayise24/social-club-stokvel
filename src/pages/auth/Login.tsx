@@ -27,7 +27,7 @@ export default function Login() {
       sessionStorage.setItem('token', token);
       sessionStorage.setItem('user', JSON.stringify(user));
 
-      if (user.role === 'admin') {
+      if (user.role === 'admin' || user.role === 'superadmin') {
         navigate('/admin');
       } else {
         navigate('/dashboard');
