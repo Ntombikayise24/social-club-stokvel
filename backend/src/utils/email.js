@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import path from 'path';
@@ -9,8 +10,16 @@ dotenv.config({ path: path.join(__dirname, '../../.env') });
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
-// Create reusable transporter
-// Use port 465 with SSL (secure:true) — Render blocks outbound port 587
+// ── Email transport setup ──
+// Primary: Resend HTTP API (works on all hosting including Render)
+// Fallback: SMTP (for local development)
+const resendApiKey = process.env.RESEND_API_KEY;
+const resend = resendApiKey ? new Resend(resendApiKey) : null;
+
+const FROM_EMAIL = process.env.SMTP_USER || 'noreply@fundmate.co.za';
+const FROM_NAME = 'Fund Mate';
+
+// SMTP fallback for local dev
 const smtpPort = parseInt(process.env.SMTP_PORT || '465');
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'smtp.gmail.com',
@@ -21,6 +30,36 @@ const transporter = nodemailer.createTransport({
     pass: process.env.SMTP_PASS,
   },
 });
+
+/**
+ * Send an email using Resend (HTTP) or SMTP fallback
+ */
+async function sendEmail({ to, subject, html }) {
+  if (resend) {
+    // Use Resend HTTP API — works on Render, no SMTP ports needed
+    const { error } = await resend.emails.send({
+      from: `${FROM_NAME} <onboarding@resend.dev>`,
+      to: [to],
+      subject,
+      html,
+    });
+    if (error) {
+      throw new Error(`Resend error: ${error.message}`);
+    }
+    console.log(`📧 Email sent via Resend to ${to}`);
+    return true;
+  }
+
+  // Fallback: SMTP
+  await transporter.sendMail({
+    from: `"${FROM_NAME}" <${FROM_EMAIL}>`,
+    to,
+    subject,
+    html,
+  });
+  console.log(`📧 Email sent via SMTP to ${to}`);
+  return true;
+}
 
 /**
  * Send an approval email to a user after admin approves their account.
@@ -82,18 +121,9 @@ export async function sendApprovalEmail(email, fullName, stokvelNames = []) {
     </div>
   </div>`;
 
-  const mailOptions = {
-    from: `"Fund Mate" <${process.env.SMTP_USER || 'noreply@fundmate.co.za'}>`,
-    to: email,
-    subject: '🎉 Your Account Has Been Approved!',
-    html,
-  };
-
   try {
-    await transporter.sendMail(mailOptions);
-    console.log(`📧 Approval email sent to ${email}`);
+    await sendEmail({ to: email, subject: '🎉 Your Account Has Been Approved!', html });
   } catch (err) {
-    // Log but don't throw — email failure shouldn't block the approval flow
     console.error(`⚠️  Failed to send approval email to ${email}:`, err.message);
   }
 }
@@ -149,16 +179,8 @@ export async function sendJoinRequestApprovedEmail(email, fullName, stokvelName)
     </div>
   </div>`;
 
-  const mailOptions = {
-    from: `"Fund Mate" <${process.env.SMTP_USER || 'noreply@fundmate.co.za'}>`,
-    to: email,
-    subject: `🎉 You've been added to ${stokvelName}!`,
-    html,
-  };
-
   try {
-    await transporter.sendMail(mailOptions);
-    console.log(`📧 Join-approved email sent to ${email}`);
+    await sendEmail({ to: email, subject: `🎉 You've been added to ${stokvelName}!`, html });
   } catch (err) {
     console.error(`⚠️  Failed to send join-approved email to ${email}:`, err.message);
   }
@@ -222,16 +244,8 @@ export async function sendStokvelAssignmentEmail(email, fullName, stokvelNames =
     </div>
   </div>`;
 
-  const mailOptions = {
-    from: `"Fund Mate" <${process.env.SMTP_USER || 'noreply@fundmate.co.za'}>`,
-    to: email,
-    subject: `🎉 You've been assigned to ${stokvelNames.length === 1 ? stokvelNames[0] : 'new groups'}!`,
-    html,
-  };
-
   try {
-    await transporter.sendMail(mailOptions);
-    console.log(`📧 group assignment email sent to ${email}`);
+    await sendEmail({ to: email, subject: `🎉 You've been assigned to ${stokvelNames.length === 1 ? stokvelNames[0] : 'new groups'}!`, html });
   } catch (err) {
     console.error(`⚠️  Failed to send group assignment email to ${email}:`, err.message);
   }
@@ -293,16 +307,8 @@ export async function sendStokvelUnassignmentEmail(email, fullName, stokvelNames
     </div>
   </div>`;
 
-  const mailOptions = {
-    from: `"Fund Mate" <${process.env.SMTP_USER || 'noreply@fundmate.co.za'}>`,
-    to: email,
-    subject: `Group Membership Removed — ${stokvelNames.join(', ')}`,
-    html,
-  };
-
   try {
-    await transporter.sendMail(mailOptions);
-    console.log(`📧 group unassignment email sent to ${email}`);
+    await sendEmail({ to: email, subject: `Group Membership Removed — ${stokvelNames.join(', ')}`, html });
   } catch (err) {
     console.error(`⚠️  Failed to send group unassignment email to ${email}:`, err.message);
   }
@@ -356,16 +362,8 @@ export async function sendAccountDeletionEmail(email, fullName, reason = 'Remove
     </div>
   </div>`;
 
-  const mailOptions = {
-    from: `"Fund Mate" <${process.env.SMTP_USER || 'noreply@fundmate.co.za'}>`,
-    to: email,
-    subject: 'Your Account Has Been Removed',
-    html,
-  };
-
   try {
-    await transporter.sendMail(mailOptions);
-    console.log(`📧 Account deletion email sent to ${email}`);
+    await sendEmail({ to: email, subject: 'Your Account Has Been Removed', html });
   } catch (err) {
     console.error(`⚠️  Failed to send account deletion email to ${email}:`, err.message);
   }
@@ -441,16 +439,8 @@ export async function sendWelcomeEmail(email, fullName, tempPassword, stokvelNam
     </div>
   </div>`;
 
-  const mailOptions = {
-    from: `"Fund Mate" <${process.env.SMTP_USER || 'noreply@fundmate.co.za'}>`,
-    to: email,
-    subject: '🎉 Welcome to Stokvel Management — Your Account is Ready!',
-    html,
-  };
-
   try {
-    await transporter.sendMail(mailOptions);
-    console.log(`📧 Welcome email sent to ${email}`);
+    await sendEmail({ to: email, subject: '🎉 Welcome to Stokvel Management — Your Account is Ready!', html });
   } catch (err) {
     console.error(`⚠️  Failed to send welcome email to ${email}:`, err.message);
   }
@@ -538,16 +528,8 @@ export async function sendLoanApprovalEmail(email, fullName, loanDetails = {}) {
     </div>
   </div>`;
 
-  const mailOptions = {
-    from: `"Fund Mate" <${process.env.SMTP_USER || 'noreply@fundmate.co.za'}>`,
-    to: email,
-    subject: `✅ Loan of R ${parseFloat(amount).toFixed(2)} Approved — ${stokvelName}`,
-    html,
-  };
-
   try {
-    await transporter.sendMail(mailOptions);
-    console.log(`📧 Loan approval email sent to ${email}`);
+    await sendEmail({ to: email, subject: `✅ Loan of R ${parseFloat(amount).toFixed(2)} Approved — ${stokvelName}`, html });
   } catch (err) {
     console.error(`⚠️  Failed to send loan approval email to ${email}:`, err.message);
   }
@@ -600,16 +582,8 @@ export async function sendMadalaReminderEmail(email, fullName, monthName, amount
     </div>
   </div>`;
 
-  const mailOptions = {
-    from: `"Fund Mate" <${process.env.SMTP_USER || 'noreply@fundmate.co.za'}>`,
-    to: email,
-    subject: `⚠️ Madala Side Payment Reminder — R${amountDue} due for ${monthName}`,
-    html,
-  };
-
   try {
-    await transporter.sendMail(mailOptions);
-    console.log(`📧 Madala reminder email sent to ${email}`);
+    await sendEmail({ to: email, subject: `⚠️ Madala Side Payment Reminder — R${amountDue} due for ${monthName}`, html });
   } catch (err) {
     console.error(`⚠️  Failed to send madala reminder email to ${email}:`, err.message);
   }
@@ -659,16 +633,8 @@ export async function sendPasswordResetEmail(email, code) {
     </div>
   </div>`;
 
-  const mailOptions = {
-    from: `"Fund Mate" <${process.env.SMTP_USER || 'noreply@fundmate.co.za'}>`,
-    to: email,
-    subject: '🔐 Password Reset Code',
-    html,
-  };
-
   try {
-    await transporter.sendMail(mailOptions);
-    console.log(`📧 Password reset email sent to ${email}`);
+    await sendEmail({ to: email, subject: '🔐 Password Reset Code', html });
   } catch (err) {
     console.error(`⚠️  Failed to send password reset email to ${email}:`, err.message);
   }
@@ -750,16 +716,8 @@ export async function sendSetPasswordEmail(email, fullName, token, stokvelNames 
     </div>
   </div>`;
 
-  const mailOptions = {
-    from: `"Fund Mate" <${process.env.SMTP_USER || 'noreply@fundmate.co.za'}>`,
-    to: email,
-    subject: '🎉 Welcome to Fund Mate — Set Your Password',
-    html,
-  };
-
   try {
-    await transporter.sendMail(mailOptions);
-    console.log(`📧 Set-password email sent to ${email}`);
+    await sendEmail({ to: email, subject: '🎉 Welcome to Fund Mate — Set Your Password', html });
     return true;
   } catch (err) {
     console.error(`⚠️  Failed to send set-password email to ${email}:`, err.message);
