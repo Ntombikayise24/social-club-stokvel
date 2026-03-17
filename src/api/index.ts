@@ -20,9 +20,6 @@ export const authApi = {
   resetPassword: (data: { email: string; code: string; newPassword: string }) =>
     api.post('/auth/reset-password', data),
 
-  register: (data: { fullName: string; email: string; phone?: string; password: string; selectedStokvel: number }) =>
-    api.post('/auth/register', data),
-
   getMe: () => api.get('/auth/me'),
 };
 

@@ -19,8 +19,6 @@ import Cards from "../pages/payments/Cards";
 import NotFound from "../pages/NotFound";
 import AuthGuard from "../components/AuthGuard";
 import AboutUs from "../pages/about/AboutUs";
-import Register from "../pages/auth/Register";
-import RegistrationSuccess from "../pages/auth/RegistrationSuccess";
 import Blog from "../pages/blog/Blog";
 import FAQ from "../pages/faq/FAQ";
 
@@ -36,14 +34,6 @@ const router = createBrowserRouter([
   {
     path: "/set-password",
     element: <SetPassword />,
-  },
-  {
-    path: "/register",
-    element: <Register />,
-  },
-  {
-    path: "/registration-success",
-    element: <RegistrationSuccess />,
   },
   {
     path: "/dashboard",
