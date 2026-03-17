@@ -3107,32 +3107,32 @@ export default function AdminDashboard() {
           <LoadingScreen message="Loading admin data..." />
         ) : activeTab === 'overview' && (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
               <button
                 onClick={() => setActiveTab('users')}
-                className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 text-left hover:border-primary-300 hover:shadow-md transition-all cursor-pointer"
+                className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6 text-left hover:border-primary-300 hover:shadow-md transition-all cursor-pointer"
               >
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-sm text-gray-500">Total Users</p>
                   <Users className="w-5 h-5 text-primary-600" />
                 </div>
-                <p className="text-3xl font-bold text-gray-800">{stats.totalUsers}</p>
-                <div className="flex items-center mt-2 text-sm">
+                <p className="text-2xl sm:text-3xl font-bold text-gray-800">{stats.totalUsers}</p>
+                <div className="flex items-center mt-2 text-xs sm:text-sm">
                   <span className="text-green-600">{stats.activeUsers} active</span>
-                  <span className="mx-2 text-gray-300">•</span>
+                  <span className="mx-1 sm:mx-2 text-gray-300">•</span>
                   <span className="text-yellow-600">{stats.pendingUsers} pending</span>
                 </div>
               </button>
 
               <button
                 onClick={() => setShowDeletedUsersModal(true)}
-                className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 text-left hover:border-orange-300 hover:shadow-md transition-all cursor-pointer"
+                className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6 text-left hover:border-orange-300 hover:shadow-md transition-all cursor-pointer"
               >
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-sm text-gray-500">Deleted Users</p>
                   <Archive className="w-5 h-5 text-orange-600" />
                 </div>
-                <p className="text-3xl font-bold text-gray-800">{stats.deletedUsers}</p>
+                <p className="text-2xl sm:text-3xl font-bold text-gray-800">{stats.deletedUsers}</p>
                 <p className="text-xs text-orange-600 hover:text-orange-700 mt-2">
                   View Archive →
                 </p>
@@ -3140,29 +3140,29 @@ export default function AdminDashboard() {
 
               <button
                 onClick={() => setActiveTab('stokvels')}
-                className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 text-left hover:border-blue-300 hover:shadow-md transition-all cursor-pointer"
+                className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6 text-left hover:border-blue-300 hover:shadow-md transition-all cursor-pointer"
               >
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-sm text-gray-500">Stokvels</p>
                   <Target className="w-5 h-5 text-blue-600" />
                 </div>
-                <p className="text-3xl font-bold text-gray-800">{stats.totalStokvels}</p>
-                <div className="flex items-center mt-2 text-sm">
+                <p className="text-2xl sm:text-3xl font-bold text-gray-800">{stats.totalStokvels}</p>
+                <div className="flex items-center mt-2 text-xs sm:text-sm">
                   <span className="text-green-600">{stats.activeStokvels} active</span>
-                  <span className="mx-2 text-gray-300">•</span>
+                  <span className="mx-1 sm:mx-2 text-gray-300">•</span>
                   <span className="text-blue-600">{stats.upcomingStokvels} upcoming</span>
                 </div>
               </button>
 
               <button
                 onClick={() => setActiveTab('contributions')}
-                className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 text-left hover:border-green-300 hover:shadow-md transition-all cursor-pointer"
+                className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6 text-left hover:border-green-300 hover:shadow-md transition-all cursor-pointer"
               >
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-sm text-gray-500">Contributions</p>
                   <DollarSign className="w-5 h-5 text-green-600" />
                 </div>
-                <p className="text-3xl font-bold text-gray-800">{formatCurrency(stats.totalContributions)}</p>
+                <p className="text-2xl sm:text-3xl font-bold text-gray-800">{formatCurrency(stats.totalContributions)}</p>
                 <div className="flex items-center mt-2 text-sm">
                   <span className="text-yellow-600">{stats.pendingContributions} pending</span>
                 </div>
@@ -3170,13 +3170,13 @@ export default function AdminDashboard() {
 
               <button
                 onClick={() => setActiveTab('contributions')}
-                className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 text-left hover:border-purple-300 hover:shadow-md transition-all cursor-pointer"
+                className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6 text-left hover:border-purple-300 hover:shadow-md transition-all cursor-pointer"
               >
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-sm text-gray-500">Total Saved</p>
                   <RefreshCw className="w-5 h-5 text-purple-600" />
                 </div>
-                <p className="text-3xl font-bold text-gray-800">{formatCurrency(stats.totalSaved)}</p>
+                <p className="text-2xl sm:text-3xl font-bold text-gray-800">{formatCurrency(stats.totalSaved)}</p>
                 <p className="text-xs text-gray-500 mt-2">Across all stokvels</p>
               </button>
             </div>
@@ -3214,30 +3214,30 @@ export default function AdminDashboard() {
 
             {/* All Members Section */}
             {apiStats?.allMembers && apiStats.allMembers.length > 0 && (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <h3 className="font-semibold text-gray-800 mb-4 flex items-center">
-                  <Users className="w-5 h-5 text-primary-600 mr-2" />
-                  All Members — Savings Progress
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
+                <h3 className="font-semibold text-gray-800 mb-4 flex items-center text-sm sm:text-base">
+                  <Users className="w-5 h-5 text-primary-600 mr-2 flex-shrink-0" />
+                  <span className="truncate">All Members — Savings Progress</span>
                   <span className="ml-2 bg-primary-100 text-primary-700 text-xs font-medium px-2 py-0.5 rounded-full">
                     {apiStats.allMembers.length}
                   </span>
                 </h3>
                 <div className="space-y-3">
                   {apiStats.allMembers.map((member: any) => (
-                    <div key={member.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div key={member.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 bg-gray-50 rounded-lg gap-2">
                       <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
+                        <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center flex-shrink-0">
                           <span className="text-xs font-medium text-primary-700">
                             {member.name.split(' ').map((n: string) => n[0]).join('').toUpperCase()}
                           </span>
                         </div>
-                        <div>
-                          <p className="font-medium text-gray-800">{member.name}</p>
-                          <p className="text-xs text-gray-500">{member.stokvelName}</p>
+                        <div className="min-w-0">
+                          <p className="font-medium text-gray-800 truncate">{member.name}</p>
+                          <p className="text-xs text-gray-500 truncate">{member.stokvelName}</p>
                         </div>
                       </div>
-                      <div className="flex items-center space-x-4">
-                        <div className="w-32">
+                      <div className="flex items-center space-x-3 sm:space-x-4 ml-11 sm:ml-0">
+                        <div className="flex-1 sm:w-32 sm:flex-none">
                           <div className="flex justify-between text-xs mb-1">
                             <span className="text-gray-500">{member.progress}%</span>
                           </div>
@@ -3245,8 +3245,8 @@ export default function AdminDashboard() {
                             <div className="bg-primary-600 h-1.5 rounded-full" style={{ width: `${Math.min(100, member.progress)}%` }}></div>
                           </div>
                         </div>
-                        <div className="text-right min-w-[100px]">
-                          <p className="font-semibold text-gray-800">{formatCurrency(member.savedAmount)}</p>
+                        <div className="text-right flex-shrink-0">
+                          <p className="font-semibold text-gray-800 text-sm sm:text-base">{formatCurrency(member.savedAmount)}</p>
                           <p className="text-xs text-gray-500">of {formatCurrency(member.targetAmount)}</p>
                         </div>
                       </div>
@@ -3258,30 +3258,30 @@ export default function AdminDashboard() {
 
             {/* Madala Side — Savings Progress */}
             {apiStats?.madalaSideMembers && apiStats.madalaSideMembers.length > 0 && (
-              <div className="bg-white rounded-xl shadow-sm border border-green-200 p-6">
-                <h3 className="font-semibold text-gray-800 mb-4 flex items-center">
+              <div className="bg-white rounded-xl shadow-sm border border-green-200 p-4 sm:p-6">
+                <h3 className="font-semibold text-gray-800 mb-4 flex items-center text-sm sm:text-base">
                   🌱
-                  <span className="ml-2">Madala Side — Savings Progress</span>
+                  <span className="ml-2 truncate">Madala Side — Savings Progress</span>
                   <span className="ml-2 bg-green-100 text-green-700 text-xs font-medium px-2 py-0.5 rounded-full">
                     R2,200 target
                   </span>
                 </h3>
                 <div className="space-y-3">
                   {apiStats.madalaSideMembers.map((member: any) => (
-                    <div key={`madala-${member.id}`} className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                    <div key={`madala-${member.id}`} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 bg-green-50 rounded-lg gap-2">
                       <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                        <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
                           <span className="text-xs font-medium text-green-700">
                             {member.name.split(' ').map((n: string) => n[0]).join('').toUpperCase()}
                           </span>
                         </div>
-                        <div>
-                          <p className="font-medium text-gray-800">{member.name}</p>
-                          <p className="text-xs text-gray-500">{member.stokvelName}</p>
+                        <div className="min-w-0">
+                          <p className="font-medium text-gray-800 truncate">{member.name}</p>
+                          <p className="text-xs text-gray-500 truncate">{member.stokvelName}</p>
                         </div>
                       </div>
-                      <div className="flex items-center space-x-4">
-                        <div className="w-32">
+                      <div className="flex items-center space-x-3 sm:space-x-4 ml-11 sm:ml-0">
+                        <div className="flex-1 sm:w-32 sm:flex-none">
                           <div className="flex justify-between text-xs mb-1">
                             <span className="text-gray-500">{Math.min(100, member.progress)}%</span>
                           </div>
@@ -3289,8 +3289,8 @@ export default function AdminDashboard() {
                             <div className="bg-green-600 h-1.5 rounded-full" style={{ width: `${Math.min(100, member.progress)}%` }}></div>
                           </div>
                         </div>
-                        <div className="text-right min-w-[100px]">
-                          <p className="font-semibold text-gray-800">{formatCurrency(member.madalaSaved)}</p>
+                        <div className="text-right flex-shrink-0">
+                          <p className="font-semibold text-gray-800 text-sm sm:text-base">{formatCurrency(member.madalaSaved)}</p>
                           <p className="text-xs text-gray-500">of {formatCurrency(member.madalaTarget)}</p>
                         </div>
                       </div>
