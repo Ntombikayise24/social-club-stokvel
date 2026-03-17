@@ -758,7 +758,9 @@ export async function sendSetPasswordEmail(email, fullName, token, stokvelNames 
   try {
     await transporter.sendMail(mailOptions);
     console.log(`📧 Set-password email sent to ${email}`);
+    return true;
   } catch (err) {
     console.error(`⚠️  Failed to send set-password email to ${email}:`, err.message);
+    throw err;
   }
 }

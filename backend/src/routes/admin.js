@@ -338,8 +338,10 @@ router.post(
       }
 
       // Send "Set Your Password" email
+      let emailSent = false;
       try {
         await sendSetPasswordEmail(email, fullName, setupToken, stokvelNames);
+        emailSent = true;
       } catch (emailErr) {
         console.error('Set-password email failed:', emailErr.message);
       }
@@ -347,8 +349,12 @@ router.post(
       console.log(`📧 Setup token for ${email}: ${setupToken}`);
 
       res.status(201).json({
-        message: 'User created successfully. A password setup email has been sent.',
+        message: emailSent
+          ? 'User created successfully. A password setup email has been sent.'
+          : 'User created successfully. Email delivery failed — share the setup code manually.',
         userId,
+        emailSent,
+        setupToken: emailSent ? undefined : setupToken,
       });
     } catch (err) {
       console.error('Create user error:', err);

@@ -2578,7 +2578,7 @@ export default function AdminDashboard() {
 
   const handleAddUser = async (newUser: any) => {
     try {
-      await adminApi.createUser({
+      const res = await adminApi.createUser({
         fullName: newUser.name,
         email: newUser.email,
         phone: newUser.phone,
@@ -2586,7 +2586,12 @@ export default function AdminDashboard() {
         stokvelIds: newUser.profiles?.map((p: any) => p.stokvelId) || [],
       });
       setShowAddUserModal(false);
-      showSuccess(`User ${newUser.name} created successfully! A password setup email has been sent.`);
+      const data = res.data;
+      if (data.emailSent === false && data.setupToken) {
+        showSuccess(`User ${newUser.name} created! Email failed to send. Share this setup code manually: ${data.setupToken}`);
+      } else {
+        showSuccess(`User ${newUser.name} created successfully! A password setup email has been sent.`);
+      }
       fetchData();
     } catch (err: any) {
       const msg = err.response?.data?.error || 'Failed to create user';
