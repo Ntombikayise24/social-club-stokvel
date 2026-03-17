@@ -181,7 +181,6 @@ export default function Settings() {
     try {
       await userApi.deleteAccount(deletePassword);
       // Clear all stored data and redirect to login
-      localStorage.clear();
       sessionStorage.clear();
       navigate('/login');
     } catch (err: any) {

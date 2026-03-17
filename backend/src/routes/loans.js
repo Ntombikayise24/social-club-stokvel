@@ -13,7 +13,9 @@ router.use(updateLastActive);
 // ────────────────── LIST LOANS ──────────────────
 router.get('/', async (req, res) => {
   try {
-    const { profileId, status, page = 1, limit = 20 } = req.query;
+    const { profileId, status } = req.query;
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
     const offset = (page - 1) * limit;
 
     let where = 'WHERE l.user_id = ?';
@@ -39,12 +41,13 @@ router.get('/', async (req, res) => {
       [...params, parseInt(limit), parseInt(offset)]
     );
 
-    // Auto-mark overdue loans in the database
+    // Mark overdue loans in the response (status update is handled by scheduled checks)
     const overdueIds = loans
       .filter(l => l.status === 'active' && l.due_date && new Date(l.due_date) < new Date())
       .map(l => l.id);
     if (overdueIds.length > 0) {
-      await pool.query('UPDATE loans SET status = ? WHERE id IN (?)', ['overdue', overdueIds]);
+      // Update overdue status in background — does not affect current response
+      pool.query('UPDATE loans SET status = ? WHERE id IN (?)', ['overdue', overdueIds]).catch(() => {});
     }
 
     res.json({

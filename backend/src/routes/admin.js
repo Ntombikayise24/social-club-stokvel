@@ -989,93 +989,112 @@ router.get('/contributions', async (req, res) => {
 
 // ── Confirm contribution ──
 router.post('/contributions/:id/confirm', async (req, res) => {
+  const conn = await pool.getConnection();
   try {
     const contributionId = req.params.id;
 
-    const [contributions] = await pool.query(
+    const [contributions] = await conn.query(
       "SELECT * FROM contributions WHERE id = ? AND status = 'pending'",
       [contributionId]
     );
 
     if (contributions.length === 0) {
+      conn.release();
       return res.status(404).json({ error: 'Pending contribution not found' });
     }
 
     const contribution = contributions[0];
 
+    await conn.beginTransaction();
+
     // Confirm the contribution
-    await pool.query(
+    await conn.query(
       'UPDATE contributions SET status = ?, confirmed_by = ?, confirmed_at = NOW() WHERE id = ?',
       ['confirmed', req.user.id, contributionId]
     );
 
-    // Update profile saved amount
-    await pool.query(
-      'UPDATE profiles SET saved_amount = saved_amount + ? WHERE id = ?',
-      [contribution.amount, contribution.profile_id]
-    );
+    // Only update saved_amount for 'your-target', not 'madala-side'
+    if (contribution.contribution_type !== 'madala-side') {
+      await conn.query(
+        'UPDATE profiles SET saved_amount = saved_amount + ? WHERE id = ?',
+        [contribution.amount, contribution.profile_id]
+      );
+    }
 
     // Notify user
-    const [stokvel] = await pool.query('SELECT name FROM stokvels WHERE id = ?', [contribution.stokvel_id]);
-    await pool.query(
+    const [stokvel] = await conn.query('SELECT name FROM stokvels WHERE id = ?', [contribution.stokvel_id]);
+    await conn.query(
       'INSERT INTO notifications (user_id, type, title, message) VALUES (?, ?, ?, ?)',
       [contribution.user_id, 'success', 'Contribution Confirmed',
         `Your R${parseFloat(contribution.amount).toLocaleString()} contribution to ${stokvel[0].name} has been confirmed.`]
     );
 
+    await conn.commit();
     res.json({ message: 'Contribution confirmed' });
   } catch (err) {
+    await conn.rollback();
     console.error('Confirm contribution error:', err);
     res.status(500).json({ error: 'Failed to confirm contribution' });
+  } finally {
+    conn.release();
   }
 });
 
 // ── Confirm contribution with adjusted amount ──
 router.post('/contributions/:id/confirm-adjusted', async (req, res) => {
+  const conn = await pool.getConnection();
   try {
     const contributionId = req.params.id;
     const { adjustedAmount } = req.body;
 
     if (!adjustedAmount || adjustedAmount <= 0) {
+      conn.release();
       return res.status(400).json({ error: 'Adjusted amount must be greater than 0' });
     }
 
-    const [contributions] = await pool.query(
+    const [contributions] = await conn.query(
       "SELECT * FROM contributions WHERE id = ? AND status = 'pending'",
       [contributionId]
     );
 
     if (contributions.length === 0) {
+      conn.release();
       return res.status(404).json({ error: 'Pending contribution not found' });
     }
 
     const contribution = contributions[0];
 
+    await conn.beginTransaction();
+
     // Update with adjusted amount and confirm
-    await pool.query(
+    await conn.query(
       'UPDATE contributions SET amount = ?, status = ?, confirmed_by = ?, confirmed_at = NOW() WHERE id = ?',
       [adjustedAmount, 'confirmed', req.user.id, contributionId]
     );
 
     // Only update saved_amount if not madala-side
     if (contribution.contribution_type !== 'madala-side') {
-      await pool.query(
+      await conn.query(
         'UPDATE profiles SET saved_amount = saved_amount + ? WHERE id = ?',
         [adjustedAmount, contribution.profile_id]
       );
     }
 
-    const [stokvel] = await pool.query('SELECT name FROM stokvels WHERE id = ?', [contribution.stokvel_id]);
-    await pool.query(
+    const [stokvel] = await conn.query('SELECT name FROM stokvels WHERE id = ?', [contribution.stokvel_id]);
+    await conn.query(
       'INSERT INTO notifications (user_id, type, title, message) VALUES (?, ?, ?, ?)',
       [contribution.user_id, 'success', 'Contribution Confirmed',
         `Your cash contribution of R${parseFloat(adjustedAmount).toLocaleString()} to ${stokvel[0].name} has been confirmed by admin.`]
     );
 
+    await conn.commit();
     res.json({ message: 'Contribution confirmed with adjusted amount' });
   } catch (err) {
+    await conn.rollback();
     console.error('Confirm adjusted contribution error:', err);
     res.status(500).json({ error: 'Failed to confirm contribution' });
+  } finally {
+    conn.release();
   }
 });
 

@@ -244,7 +244,7 @@ async function migrate() {
     CREATE TABLE IF NOT EXISTS password_reset_tokens (
       id INT AUTO_INCREMENT PRIMARY KEY,
       user_id INT NOT NULL,
-      token VARCHAR(10) NOT NULL,
+      token VARCHAR(64) NOT NULL,
       expires_at DATETIME NOT NULL,
       used BOOLEAN DEFAULT FALSE,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -427,8 +427,12 @@ async function migrate() {
       await connection.query('ALTER TABLE stokvels ADD UNIQUE INDEX uk_name (name)');
       console.log('✅ Added unique constraint on stokvels.name');
     }
+
+    // Widen password_reset_tokens.token column for more secure tokens
+    await connection.query(`ALTER TABLE password_reset_tokens MODIFY COLUMN token VARCHAR(64) NOT NULL`);
+    console.log('✅ Widened password_reset_tokens.token to VARCHAR(64)');
   } catch (cleanupErr) {
-    console.warn('⚠️ Duplicate cleanup skipped:', cleanupErr.message);
+    console.warn('⚠️ Cleanup step skipped:', cleanupErr.message);
   }
 
   console.log('\n🌱 Starting database seeding...\n');

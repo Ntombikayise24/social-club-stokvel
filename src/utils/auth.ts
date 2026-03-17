@@ -1,23 +1,20 @@
 // Shared authentication utilities
 
 export const logout = () => {
-  localStorage.removeItem('token');
-  localStorage.removeItem('currentUser');
-  localStorage.removeItem('user');
-  localStorage.removeItem('activeProfileId');
   sessionStorage.removeItem('token');
   sessionStorage.removeItem('user');
+  sessionStorage.removeItem('activeProfileId');
   window.location.href = '/login';
 };
 
 export const isAuthenticated = (): boolean => {
-  const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+  const token = sessionStorage.getItem('token');
   return !!token;
 };
 
 export const getCurrentUser = () => {
   try {
-    const user = localStorage.getItem('currentUser') || localStorage.getItem('user') || sessionStorage.getItem('user');
+    const user = sessionStorage.getItem('user');
     return user ? JSON.parse(user) : null;
   } catch {
     return null;

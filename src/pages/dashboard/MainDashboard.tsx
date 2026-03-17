@@ -255,7 +255,7 @@ export default function MainDashboard() {
       const found = profiles.find(p => p.id === profileIdFromUrl);
       if (found) return found;
     }
-    const savedProfileId = localStorage.getItem('activeProfileId');
+    const savedProfileId = sessionStorage.getItem('activeProfileId');
     if (savedProfileId) {
       const found = profiles.find(p => p.id === savedProfileId);
       if (found) return found;
@@ -387,7 +387,7 @@ export default function MainDashboard() {
   const handleProfileSwitch = (profile: Profile) => {
     setActiveProfile(profile);
     setSearchParams({ profile: profile.id });
-    localStorage.setItem('activeProfileId', profile.id);
+    sessionStorage.setItem('activeProfileId', profile.id);
   };
 
   const handlePayFine = async (fine: any) => {

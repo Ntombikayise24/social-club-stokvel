@@ -13,7 +13,9 @@ router.use(updateLastActive);
 // ────────────────── LIST CONTRIBUTIONS ──────────────────
 router.get('/', async (req, res) => {
   try {
-    const { stokvelId, status, profileId, page = 1, limit = 20 } = req.query;
+    const { stokvelId, status, profileId } = req.query;
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
     const offset = (page - 1) * limit;
 
     let where = 'WHERE c.user_id = ?';

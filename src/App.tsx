@@ -83,8 +83,6 @@ function App() {
         return;
       }
 
-      localStorage.setItem('token', token);
-      localStorage.setItem('currentUser', JSON.stringify(user));
       sessionStorage.setItem('token', token);
       sessionStorage.setItem('user', JSON.stringify(user));
 

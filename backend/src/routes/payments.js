@@ -29,37 +29,48 @@ router.post('/webhook', async (req, res) => {
 
     if (event.event === 'charge.success') {
       const { reference } = event.data;
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
 
-      const [contributions] = await pool.query(
-        "SELECT id, profile_id, amount, stokvel_id, user_id, contribution_type FROM contributions WHERE reference = ? AND status = 'pending'",
-        [reference]
-      );
-
-      if (contributions.length > 0) {
-        const contrib = contributions[0];
-
-        await pool.query(
-          "UPDATE contributions SET status = 'confirmed', confirmed_at = NOW() WHERE id = ?",
-          [contrib.id]
+        const [contributions] = await conn.query(
+          "SELECT id, profile_id, amount, stokvel_id, user_id, contribution_type FROM contributions WHERE reference = ? AND status = 'pending'",
+          [reference]
         );
-        // Only update saved_amount for 'your-target', not 'madala-side'
-        if (contrib.contribution_type !== 'madala-side') {
-          await pool.query(
-            'UPDATE profiles SET saved_amount = saved_amount + ? WHERE id = ?',
-            [contrib.amount, contrib.profile_id]
+
+        if (contributions.length > 0) {
+          const contrib = contributions[0];
+
+          await conn.query(
+            "UPDATE contributions SET status = 'confirmed', confirmed_at = NOW() WHERE id = ?",
+            [contrib.id]
+          );
+          // Only update saved_amount for 'your-target', not 'madala-side'
+          if (contrib.contribution_type !== 'madala-side') {
+            await conn.query(
+              'UPDATE profiles SET saved_amount = saved_amount + ? WHERE id = ?',
+              [contrib.amount, contrib.profile_id]
+            );
+          }
+
+          const [stokvel] = await conn.query('SELECT name FROM stokvels WHERE id = ?', [contrib.stokvel_id]);
+          await conn.query(
+            'INSERT INTO notifications (user_id, type, title, message) VALUES (?, ?, ?, ?)',
+            [
+              contrib.user_id,
+              'contribution',
+              'Payment Confirmed ✅',
+              `Your R${parseFloat(contrib.amount).toLocaleString()} contribution to ${stokvel[0]?.name || 'your stokvel'} has been confirmed.`,
+            ]
           );
         }
 
-        const [stokvel] = await pool.query('SELECT name FROM stokvels WHERE id = ?', [contrib.stokvel_id]);
-        await pool.query(
-          'INSERT INTO notifications (user_id, type, title, message) VALUES (?, ?, ?, ?)',
-          [
-            contrib.user_id,
-            'contribution',
-            'Payment Confirmed ✅',
-            `Your R${parseFloat(contrib.amount).toLocaleString()} contribution to ${stokvel[0]?.name || 'your stokvel'} has been confirmed.`,
-          ]
-        );
+        await conn.commit();
+      } catch (txErr) {
+        await conn.rollback();
+        throw txErr;
+      } finally {
+        conn.release();
       }
     }
 
@@ -342,50 +353,61 @@ router.get('/verify/:reference', async (req, res) => {
     const paystackData = paystackRes.data.data;
 
     if (paystackData.status === 'success') {
-      // Update contribution status to confirmed
-      await pool.query(
-        "UPDATE contributions SET status = 'confirmed', confirmed_at = NOW() WHERE reference = ?",
-        [reference]
-      );
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
 
-      // Get the contribution to update profile saved_amount
-      const [contributions] = await pool.query(
-        'SELECT id, profile_id, amount, stokvel_id, contribution_type FROM contributions WHERE reference = ?',
-        [reference]
-      );
+        // Update contribution status to confirmed
+        await conn.query(
+          "UPDATE contributions SET status = 'confirmed', confirmed_at = NOW() WHERE reference = ?",
+          [reference]
+        );
 
-      if (contributions.length > 0) {
-        const contrib = contributions[0];
+        // Get the contribution to update profile saved_amount
+        const [contributions] = await conn.query(
+          'SELECT id, profile_id, amount, stokvel_id, contribution_type FROM contributions WHERE reference = ?',
+          [reference]
+        );
 
-        // Only update saved_amount for 'your-target', not 'madala-side'
-        if (contrib.contribution_type !== 'madala-side') {
-          // Cap saved_amount so it never exceeds target_amount
-          const [profileRows] = await pool.query(
-            'SELECT target_amount, saved_amount FROM profiles WHERE id = ?',
-            [contrib.profile_id]
-          );
-          const profileTarget = parseFloat(profileRows[0].target_amount);
-          const currentSaved = parseFloat(profileRows[0].saved_amount);
-          const addAmount = Math.min(parseFloat(contrib.amount), Math.max(profileTarget - currentSaved, 0));
+        if (contributions.length > 0) {
+          const contrib = contributions[0];
 
-          // Update saved amount on profile (capped at target)
-          await pool.query(
-            'UPDATE profiles SET saved_amount = LEAST(saved_amount + ?, target_amount) WHERE id = ?',
-            [addAmount, contrib.profile_id]
+          // Only update saved_amount for 'your-target', not 'madala-side'
+          if (contrib.contribution_type !== 'madala-side') {
+            // Cap saved_amount so it never exceeds target_amount
+            const [profileRows] = await conn.query(
+              'SELECT target_amount, saved_amount FROM profiles WHERE id = ?',
+              [contrib.profile_id]
+            );
+            const profileTarget = parseFloat(profileRows[0].target_amount);
+            const currentSaved = parseFloat(profileRows[0].saved_amount);
+            const addAmount = Math.min(parseFloat(contrib.amount), Math.max(profileTarget - currentSaved, 0));
+
+            await conn.query(
+              'UPDATE profiles SET saved_amount = LEAST(saved_amount + ?, target_amount) WHERE id = ?',
+              [addAmount, contrib.profile_id]
+            );
+          }
+
+          // Create success notification
+          const [stokvel] = await conn.query('SELECT name FROM stokvels WHERE id = ?', [contrib.stokvel_id]);
+          await conn.query(
+            'INSERT INTO notifications (user_id, type, title, message) VALUES (?, ?, ?, ?)',
+            [
+              req.user.id,
+              'contribution',
+              'Payment Confirmed ✅',
+              `Your R${parseFloat(contrib.amount).toLocaleString()} contribution to ${stokvel[0]?.name || 'your stokvel'} has been confirmed.`,
+            ]
           );
         }
 
-        // Create success notification
-        const [stokvel] = await pool.query('SELECT name FROM stokvels WHERE id = ?', [contrib.stokvel_id]);
-        await pool.query(
-          'INSERT INTO notifications (user_id, type, title, message) VALUES (?, ?, ?, ?)',
-          [
-            req.user.id,
-            'contribution',
-            'Payment Confirmed ✅',
-            `Your R${parseFloat(contrib.amount).toLocaleString()} contribution to ${stokvel[0]?.name || 'your stokvel'} has been confirmed.`,
-          ]
-        );
+        await conn.commit();
+      } catch (txErr) {
+        await conn.rollback();
+        throw txErr;
+      } finally {
+        conn.release();
       }
 
       res.json({

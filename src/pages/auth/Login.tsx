@@ -22,13 +22,9 @@ export default function Login() {
       const res = await authApi.login({ email, password, rememberMe });
       const { token, user } = res.data;
 
-      // Store token and user info
-      const storage = rememberMe ? localStorage : sessionStorage;
-      storage.setItem('token', token);
-      storage.setItem('user', JSON.stringify(user));
-      // Also keep in localStorage for the API client interceptor
-      localStorage.setItem('token', token);
-      localStorage.setItem('currentUser', JSON.stringify(user));
+      // Store token and user info in sessionStorage (per-window isolation)
+      sessionStorage.setItem('token', token);
+      sessionStorage.setItem('user', JSON.stringify(user));
 
       if (user.role === 'admin') {
         navigate('/admin');
