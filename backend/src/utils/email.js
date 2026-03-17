@@ -10,10 +10,12 @@ dotenv.config({ path: path.join(__dirname, '../../.env') });
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
 // Create reusable transporter
+// Use port 465 with SSL (secure:true) — Render blocks outbound port 587
+const smtpPort = parseInt(process.env.SMTP_PORT || '465');
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: parseInt(process.env.SMTP_PORT || '587'),
-  secure: false,
+  port: smtpPort,
+  secure: smtpPort === 465,
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
