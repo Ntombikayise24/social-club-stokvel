@@ -159,6 +159,18 @@ router.post('/:id/join-request', authenticate, async (req, res) => {
       return res.status(403).json({ error: 'Admin users cannot join stokvels' });
     }
 
+    // Check if stokvel has reached max_members
+    const [stokvelData] = await pool.query('SELECT max_members FROM stokvels WHERE id = ?', [stokvelId]);
+    if (stokvelData.length > 0 && stokvelData[0].max_members) {
+      const [memberCount] = await pool.query(
+        "SELECT COUNT(*) AS count FROM profiles WHERE stokvel_id = ? AND status = 'active'",
+        [stokvelId]
+      );
+      if (memberCount[0].count >= stokvelData[0].max_members) {
+        return res.status(400).json({ error: `This stokvel has reached its maximum capacity of ${stokvelData[0].max_members} members.` });
+      }
+    }
+
     // Check if already a member
     const [existing] = await pool.query(
       'SELECT id FROM profiles WHERE user_id = ? AND stokvel_id = ?',

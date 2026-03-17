@@ -442,7 +442,8 @@ export default function MainDashboard() {
 
   // Calculate remaining amount based on selected target
   const MADALA_SIDE_TARGET = 2200;
-  const MADALA_SIDE_MIN = 200;
+  const MADALA_SIDE_MIN = 100;
+  const MADALA_SIDE_MONTHLY = 200; // R200/month × 11 months = R2,200
   const madalaRemaining = Math.max(0, MADALA_SIDE_TARGET - madalaSideTotal);
   const remainingAmount = activeProfile
     ? contributionTarget === 'madala-side'
@@ -976,13 +977,13 @@ export default function MainDashboard() {
             {/* Monthly dots grid - based on total / R200 */}
             <div className="grid grid-cols-11 gap-1 mb-3">
               {['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N'].map((month, idx) => {
-                const fullMonthsPaid = Math.floor(madalaSideTotal / MADALA_SIDE_MIN);
-                const partialFraction = (madalaSideTotal % MADALA_SIDE_MIN) / MADALA_SIDE_MIN;
+                const fullMonthsPaid = Math.floor(madalaSideTotal / MADALA_SIDE_MONTHLY);
+                const partialFraction = (madalaSideTotal % MADALA_SIDE_MONTHLY) / MADALA_SIDE_MONTHLY;
                 const isPaid = idx < fullMonthsPaid;
                 const isPartial = idx === fullMonthsPaid && partialFraction > 0;
                 const partialPct = Math.round(partialFraction * 100);
                 return (
-                  <div key={idx} className="flex flex-col items-center" title={isPaid ? 'R200 Paid' : isPartial ? `R${(partialFraction * MADALA_SIDE_MIN).toFixed(0)} / R200` : 'Not paid'}>
+                  <div key={idx} className="flex flex-col items-center" title={isPaid ? 'R200 Paid' : isPartial ? `R${(partialFraction * MADALA_SIDE_MONTHLY).toFixed(0)} / R200` : 'Not paid'}>
                     <div className="relative w-6 h-6 rounded-full overflow-hidden">
                       {isPaid ? (
                         <div className="w-full h-full bg-green-500 flex items-center justify-center shadow-sm shadow-green-300">
@@ -1010,7 +1011,7 @@ export default function MainDashboard() {
             <div className="grid grid-cols-3 gap-2 text-xs">
               <div className="bg-white/60 p-2 rounded-lg text-center">
                 <p className="text-gray-400">Paid</p>
-                <p className="font-semibold text-green-700">{Math.floor(madalaSideTotal / MADALA_SIDE_MIN)} / 11</p>
+                <p className="font-semibold text-green-700">{Math.floor(madalaSideTotal / MADALA_SIDE_MONTHLY)} / 11</p>
               </div>
               <div className="bg-white/60 p-2 rounded-lg text-center">
                 <p className="text-gray-400">Monthly</p>

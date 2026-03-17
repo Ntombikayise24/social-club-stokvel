@@ -271,8 +271,8 @@ router.delete(
         return res.status(404).json({ error: 'User not found' });
       }
 
-      // Prevent admin from deleting themselves
-      if (users[0].role === 'admin') {
+      // Prevent admin/superadmin from deleting themselves
+      if (users[0].role === 'admin' || users[0].role === 'superadmin') {
         return res.status(403).json({ error: 'Admin accounts cannot be self-deleted. Contact another admin.' });
       }
 

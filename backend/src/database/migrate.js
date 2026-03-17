@@ -335,7 +335,8 @@ async function migrate() {
       stokvel_id INT NOT NULL,
       fine_type ENUM('no_banking', 'no_attendance', 'sending', 'late_coming', 'vulgar', 'misbehaving', 'madala_non_payment') NOT NULL,
       amount DECIMAL(15,2) NOT NULL,
-      status ENUM('unpaid', 'paid') DEFAULT 'unpaid',
+      status ENUM('unpaid', 'paid', 'pending') DEFAULT 'unpaid',
+      payment_method VARCHAR(20),
       reason TEXT,
       issued_by INT,
       paid_date DATETIME,
@@ -371,6 +372,16 @@ async function migrate() {
     await connection.query(`ALTER TABLE fines MODIFY COLUMN fine_type ENUM('no_banking', 'no_attendance', 'sending', 'late_coming', 'vulgar', 'misbehaving', 'madala_non_payment') NOT NULL`);
     console.log('✅ Updated fines.fine_type ENUM with new types');
   } catch (e) { /* already correct */ }
+
+  // Update fines status ENUM to include 'pending' and add payment_method column
+  try {
+    await connection.query(`ALTER TABLE fines MODIFY COLUMN status ENUM('unpaid', 'paid', 'pending') DEFAULT 'unpaid'`);
+    console.log('✅ Updated fines.status ENUM to include pending');
+  } catch (e) { /* already correct */ }
+  try {
+    await connection.query(`ALTER TABLE fines ADD COLUMN payment_method VARCHAR(20) AFTER paid_date`);
+    console.log('✅ Added fines.payment_method column');
+  } catch (e) { /* column already exists */ }
 
   // ───────────────── ADMIN STOKVEL ASSIGNMENTS TABLE ─────────────────
   await connection.query(`

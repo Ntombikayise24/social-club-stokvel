@@ -163,8 +163,9 @@ router.post(
         return res.json({ message: 'If an account exists with that email, a reset code has been sent.' });
       }
 
-      // Generate 6-digit code
-      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      // Generate 6-digit code (cryptographically secure)
+      const { randomInt } = await import('crypto');
+      const code = randomInt(100000, 999999).toString();
       const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
       // Invalidate previous tokens

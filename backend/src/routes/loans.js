@@ -56,15 +56,16 @@ router.get('/', async (req, res) => {
           ? Math.max(0, Math.ceil((new Date(l.due_date) - new Date()) / (1000 * 60 * 60 * 24)))
           : 0;
 
-        // Calculate overdue penalty: 30% of original loan amount per month overdue
+        // Calculate overdue penalty: 30% of remaining principal per month overdue
         let overdueMonths = 0;
         let penaltyAmount = 0;
+        const remainingPrincipal = parseFloat(l.amount) - parseFloat(l.amount_paid || 0);
         let currentTotalRepayable = parseFloat(l.total_repayable);
         if (l.due_date && (l.status === 'active' || l.status === 'overdue') && new Date(l.due_date) < new Date()) {
           const msOverdue = new Date() - new Date(l.due_date);
           overdueMonths = Math.ceil(msOverdue / (1000 * 60 * 60 * 24 * 28)); // each 28-day period counts
-          penaltyAmount = parseFloat(l.amount) * 0.3 * overdueMonths;
-          currentTotalRepayable = parseFloat(l.amount) + parseFloat(l.interest) + penaltyAmount;
+          penaltyAmount = remainingPrincipal * 0.3 * overdueMonths;
+          currentTotalRepayable = remainingPrincipal + parseFloat(l.interest) + penaltyAmount;
         }
 
         return {
@@ -398,8 +399,8 @@ router.post(
         newDueDate.setDate(newDueDate.getDate() + 28);
 
         await pool.query(
-          'UPDATE loans SET status = ?, repayment_type = ?, due_date = ?, interest = ? WHERE id = ?',
-          ['blk', 'blk', newDueDate, interestPayment, loanId]
+          'UPDATE loans SET status = ?, repayment_type = ?, due_date = ?, interest = ?, total_repayable = ? WHERE id = ?',
+          ['blk', 'blk', newDueDate, interestPayment, remainingPrincipal, loanId]
         );
 
         await pool.query(

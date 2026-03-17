@@ -55,8 +55,8 @@ router.post(
         [name, email, message]
       );
 
-      // Notify admins
-      const [admins] = await pool.query("SELECT id FROM users WHERE role = 'admin' AND status = 'active'");
+      // Notify admins and superadmins
+      const [admins] = await pool.query("SELECT id FROM users WHERE role IN ('admin', 'superadmin') AND status = 'active'");
       for (const admin of admins) {
         await pool.query(
           'INSERT INTO notifications (user_id, type, title, message) VALUES (?, ?, ?, ?)',

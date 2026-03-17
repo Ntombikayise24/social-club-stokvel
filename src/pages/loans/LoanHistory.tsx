@@ -263,7 +263,8 @@ export default function LoanHistory() {
           if (loan.id !== showRepayModal.id) return loan;
           
           if (repaymentType === 'blk') {
-            return { ...loan, status: 'blk' as const, repaymentType: 'blk' as const };
+            const remainingPrincipal = loan.amount - (loan.amountPaid || 0);
+            return { ...loan, status: 'blk' as const, repaymentType: 'blk' as const, totalRepayable: remainingPrincipal };
           }
           if (repaymentType === 'ftp') {
             return { ...loan, status: 'ftp' as const, repaymentType: 'ftp' as const };

@@ -603,8 +603,8 @@ router.delete('/users/:id', async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Prevent deleting other admin accounts
-    if (users[0].role === 'admin') {
+    // Prevent deleting other admin or superadmin accounts
+    if (users[0].role === 'admin' || users[0].role === 'superadmin') {
       return res.status(400).json({ error: 'Admin accounts cannot be deleted' });
     }
 
@@ -682,9 +682,18 @@ router.delete('/users/:id/permanent', async (req, res) => {
   try {
     const userId = req.params.id;
 
-    const [users] = await pool.query('SELECT id, full_name FROM users WHERE id = ?', [userId]);
+    const [users] = await pool.query('SELECT id, full_name, role FROM users WHERE id = ?', [userId]);
     if (users.length === 0) {
       return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Only superadmin can permanently delete
+    if (req.user.role !== 'superadmin') {
+      return res.status(403).json({ error: 'Only superadmin can permanently delete users' });
+    }
+
+    if (users[0].role === 'superadmin') {
+      return res.status(400).json({ error: 'Superadmin account cannot be deleted' });
     }
 
     // Cascading delete handled by foreign keys
@@ -1016,7 +1025,7 @@ router.post('/contributions/:id/confirm', async (req, res) => {
     // Only update saved_amount for 'your-target', not 'madala-side'
     if (contribution.contribution_type !== 'madala-side') {
       await conn.query(
-        'UPDATE profiles SET saved_amount = saved_amount + ? WHERE id = ?',
+        'UPDATE profiles SET saved_amount = LEAST(saved_amount + ?, target_amount) WHERE id = ?',
         [contribution.amount, contribution.profile_id]
       );
     }

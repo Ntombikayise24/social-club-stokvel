@@ -178,13 +178,14 @@ router.post(
       const [users] = await pool.query('SELECT email, full_name FROM users WHERE id = ?', [req.user.id]);
       const user = users[0];
 
+      const resolvedProfileId = profiles[0].id;
       const reference = `STK-${Date.now()}-${uuidv4().slice(0, 6).toUpperCase()}`;
 
       // Create pending contribution record
       const [result] = await pool.query(
         `INSERT INTO contributions (user_id, profile_id, stokvel_id, amount, payment_method, reference, status, contribution_type)
          VALUES (?, ?, ?, ?, 'paystack', ?, 'pending', ?)`,
-        [req.user.id, profileId, profiles[0].stokvel_id, amount, reference, contributionType || 'your-target']
+        [req.user.id, resolvedProfileId, profiles[0].stokvel_id, amount, reference, contributionType || 'your-target']
       );
 
       // Initialize Paystack transaction
@@ -309,7 +310,7 @@ router.post(
       await pool.query(
         `INSERT INTO contributions (user_id, profile_id, stokvel_id, amount, payment_method, reference, status, contribution_type)
          VALUES (?, ?, ?, ?, 'cash', ?, 'pending', ?)`,
-        [req.user.id, profileId, profile.stokvel_id, amount, reference, contributionType || 'your-target']
+        [req.user.id, profile.id, profile.stokvel_id, amount, reference, contributionType || 'your-target']
       );
 
       // Notify user
@@ -357,9 +358,9 @@ router.get('/verify/:reference', async (req, res) => {
       try {
         await conn.beginTransaction();
 
-        // Update contribution status to confirmed
-        await conn.query(
-          "UPDATE contributions SET status = 'confirmed', confirmed_at = NOW() WHERE reference = ?",
+        // Update contribution status to confirmed (only if still pending to prevent double-processing)
+        const [updateResult] = await conn.query(
+          "UPDATE contributions SET status = 'confirmed', confirmed_at = NOW() WHERE reference = ? AND status = 'pending'",
           [reference]
         );
 
@@ -369,7 +370,7 @@ router.get('/verify/:reference', async (req, res) => {
           [reference]
         );
 
-        if (contributions.length > 0) {
+        if (contributions.length > 0 && updateResult.affectedRows > 0) {
           const contrib = contributions[0];
 
           // Only update saved_amount for 'your-target', not 'madala-side'

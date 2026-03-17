@@ -12,7 +12,6 @@ import {
   LogOut,
   Mail,
   Phone,
-  Globe,
   CheckCircle,
   AlertCircle,
   ChevronRight,
@@ -34,20 +33,16 @@ export default function Settings() {
   const [profile, setProfile] = useState({
     name: '',
     email: '',
-    phone: '',
-    language: 'en'
+    phone: ''
   });
 
   const [isEditing, setIsEditing] = useState(false);
 
   // Notification Settings
   const [notifications, setNotifications] = useState({
-    emailAlerts: true,
-    smsAlerts: false,
-    loanReminders: true,
+    emailNotifications: true,
     contributionReminders: true,
-    groupAnnouncements: true,
-    marketingEmails: false
+    loanAlerts: true
   });
 
   // Password Change
@@ -84,8 +79,7 @@ export default function Settings() {
         setProfile({
           name: user.name || '',
           email: user.email || '',
-          phone: user.phone || '',
-          language: 'en'
+          phone: user.phone || ''
         });
 
         // Set member since from created_at
@@ -96,12 +90,9 @@ export default function Settings() {
 
         const s = settingsRes.data || {};
         setNotifications({
-          emailAlerts: s.emailNotifications ?? true,
-          smsAlerts: s.smsNotifications ?? false,
-          loanReminders: s.loanAlerts ?? true,
+          emailNotifications: s.emailNotifications ?? true,
           contributionReminders: s.contributionReminders ?? true,
-          groupAnnouncements: s.pushNotifications ?? true,
-          marketingEmails: false
+          loanAlerts: s.loanAlerts ?? true
         });
       } catch (err) {
         console.error('Failed to load settings', err);
@@ -130,11 +121,9 @@ export default function Settings() {
   const handleSaveNotifications = async () => {
     try {
       await settingsApi.update({
-        emailNotifications: notifications.emailAlerts,
-        smsNotifications: notifications.smsAlerts,
-        loanAlerts: notifications.loanReminders,
+        emailNotifications: notifications.emailNotifications,
         contributionReminders: notifications.contributionReminders,
-        pushNotifications: notifications.groupAnnouncements
+        loanAlerts: notifications.loanAlerts
       });
       setShowSuccessMessage('Notification preferences saved');
       setTimeout(() => setShowSuccessMessage(''), 3000);
@@ -354,33 +343,6 @@ export default function Settings() {
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Language
-                    </label>
-                    <div className="relative">
-                      {isEditing ? (
-                        <select 
-                          value={profile.language}
-                          onChange={(e) => setProfile({...profile, language: e.target.value})}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 appearance-none"
-                        >
-                          <option value="en">English</option>
-                          <option value="af">Afrikaans</option>
-                          <option value="zu">isiZulu</option>
-                          <option value="xh">isiXhosa</option>
-                        </select>
-                      ) : (
-                        <p className="text-gray-800 bg-gray-50 px-4 py-2 rounded-lg">
-                          {profile.language === 'en' ? 'English' : 
-                           profile.language === 'af' ? 'Afrikaans' :
-                           profile.language === 'zu' ? 'isiZulu' : 'isiXhosa'}
-                        </p>
-                      )}
-                      <Globe className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    </div>
-                  </div>
-
                   {isEditing && (
                     <button 
                       onClick={handleSaveProfile}
@@ -397,28 +359,63 @@ export default function Settings() {
             {/* Notification Preferences */}
             {activeTab === 'notifications' && (
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                <h3 className="text-lg font-semibold text-gray-800 mb-2 flex items-center">
                   <Bell className="w-5 h-5 mr-2 text-primary-600" />
                   Notification Preferences
                 </h3>
-                <div className="space-y-3">
-                  {Object.entries(notifications).map(([key, value]) => (
-                    <label key={key} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                      <span className="text-gray-700 capitalize">
-                        {key.replace(/([A-Z])/g, ' $1').trim()}
-                      </span>
-                      <input 
-                        type="checkbox" 
-                        checked={value}
-                        onChange={(e) => setNotifications({...notifications, [key]: e.target.checked})}
-                        className="w-5 h-5 text-primary-600 rounded focus:ring-primary-500"
-                      />
-                    </label>
-                  ))}
+                <p className="text-sm text-gray-500 mb-6">Choose which notifications you want to receive. These control the alerts shown in your notification inbox.</p>
+
+                <div className="space-y-1">
+                  {/* Email Notifications */}
+                  <label className="flex items-center justify-between p-4 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">
+                    <div className="flex-1 mr-4">
+                      <p className="font-medium text-gray-800">Email Notifications</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Receive email alerts when your contributions are confirmed, loans are approved, or fines are issued.</p>
+                    </div>
+                    <input 
+                      type="checkbox" 
+                      checked={notifications.emailNotifications}
+                      onChange={(e) => setNotifications({...notifications, emailNotifications: e.target.checked})}
+                      className="w-5 h-5 text-primary-600 rounded focus:ring-primary-500 flex-shrink-0"
+                    />
+                  </label>
+
+                  <div className="border-t border-gray-100" />
+
+                  {/* Contribution Reminders */}
+                  <label className="flex items-center justify-between p-4 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">
+                    <div className="flex-1 mr-4">
+                      <p className="font-medium text-gray-800">Contribution Reminders</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Get reminded when your monthly contribution is due or when your Madala Side payment is outstanding.</p>
+                    </div>
+                    <input 
+                      type="checkbox" 
+                      checked={notifications.contributionReminders}
+                      onChange={(e) => setNotifications({...notifications, contributionReminders: e.target.checked})}
+                      className="w-5 h-5 text-primary-600 rounded focus:ring-primary-500 flex-shrink-0"
+                    />
+                  </label>
+
+                  <div className="border-t border-gray-100" />
+
+                  {/* Loan Alerts */}
+                  <label className="flex items-center justify-between p-4 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">
+                    <div className="flex-1 mr-4">
+                      <p className="font-medium text-gray-800">Loan Alerts</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Get notified about loan approvals, upcoming due dates, overdue warnings, and repayment confirmations.</p>
+                    </div>
+                    <input 
+                      type="checkbox" 
+                      checked={notifications.loanAlerts}
+                      onChange={(e) => setNotifications({...notifications, loanAlerts: e.target.checked})}
+                      className="w-5 h-5 text-primary-600 rounded focus:ring-primary-500 flex-shrink-0"
+                    />
+                  </label>
                 </div>
+
                 <button
                   onClick={handleSaveNotifications}
-                  className="mt-4 flex items-center space-x-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                  className="mt-6 flex items-center space-x-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
                 >
                   <Save className="w-4 h-4" />
                   <span>Save Preferences</span>
@@ -536,25 +533,6 @@ export default function Settings() {
                     </form>
                   )}
 
-                  <div className="mt-4 pt-4 border-t border-gray-200">
-                    <button className="w-full flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
-                      <span className="text-gray-700">Two-Factor Authentication</span>
-                      <span className="text-green-600 text-sm font-medium">Enabled</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                  <h4 className="font-medium text-gray-800 mb-4">Login History</h4>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between text-sm">
-                      <div>
-                        <p className="font-medium">Current Session</p>
-                        <p className="text-gray-500">Active now</p>
-                      </div>
-                      <span className="text-green-600 text-xs bg-green-50 px-2 py-1 rounded-full">Active Now</span>
-                    </div>
-                  </div>
                 </div>
               </div>
             )}
