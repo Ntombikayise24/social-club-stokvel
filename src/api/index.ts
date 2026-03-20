@@ -110,6 +110,9 @@ export const loanApi = {
   repay: (id: number, cardId?: number, paymentMethod?: string, repaymentType?: string, installmentAmount?: number) =>
     api.post(`/loans/${id}/repay`, { cardId, paymentMethod, repaymentType, installmentAmount }),
 
+  repayVerify: (id: number, reference: string) =>
+    api.post(`/loans/${id}/repay/verify`, { reference }),
+
   download: (params: { profileId?: number; format: string }) =>
     api.get('/loans/download', { params, responseType: 'blob' }),
 };

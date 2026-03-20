@@ -5,8 +5,13 @@ import { authenticate, updateLastActive } from '../middleware/auth.js';
 import pool from '../database/connection.js';
 import { generatePDF, generateExcel, generateCSV, formatRowData } from '../utils/reports.js';
 import { sendLoanApprovalEmail } from '../utils/email.js';
+import axios from 'axios';
 
 const router = Router();
+
+const PAYSTACK_SECRET = () => process.env.PAYSTACK_SECRET_KEY || '';
+const PAYSTACK_BASE = 'https://api.paystack.co';
+
 router.use(authenticate);
 router.use(updateLastActive);
 
@@ -437,7 +442,81 @@ router.post(
         });
       }
 
-      // ── PAY INSTALLMENT: Partial payment ──
+      // ── Card payments (full/installment): Initialize Paystack ──
+      if (paymentMethod === 'card' && (repaymentType === 'full' || repaymentType === 'installment')) {
+        // Validate installment amount
+        if (repaymentType === 'installment') {
+          if (!installmentAmount || installmentAmount <= 0) {
+            return res.status(400).json({ error: 'Please enter a valid installment amount.' });
+          }
+          if (installmentAmount > remainingPrincipal + interest) {
+            return res.status(400).json({ error: `Installment amount exceeds remaining balance of R${(remainingPrincipal + interest).toFixed(2)}.` });
+          }
+        }
+
+        // Check card exists
+        const [cards] = await pool.query('SELECT id FROM cards WHERE user_id = ? LIMIT 1', [req.user.id]);
+        if (cards.length === 0) {
+          return res.status(400).json({ error: 'No card found. Please add a card before repaying loans.', code: 'NO_CARD' });
+        }
+
+        // Calculate charge amount
+        let chargeAmount;
+        if (repaymentType === 'installment') {
+          chargeAmount = installmentAmount;
+        } else {
+          // Full repayment
+          let penaltyAmount = 0;
+          if (loan.due_date && new Date(loan.due_date) < new Date()) {
+            const msOverdue = new Date() - new Date(loan.due_date);
+            const overdueMonths = Math.ceil(msOverdue / (1000 * 60 * 60 * 24 * 28));
+            penaltyAmount = remainingPrincipal * 0.3 * overdueMonths;
+          }
+          chargeAmount = remainingPrincipal + interest + penaltyAmount;
+        }
+
+        // Get user email
+        const [users] = await pool.query('SELECT email, full_name FROM users WHERE id = ?', [req.user.id]);
+        const reference = `LOAN-${repaymentType.toUpperCase()}-${loanId}-${Date.now()}`;
+
+        try {
+          const paystackRes = await axios.post(
+            `${PAYSTACK_BASE}/transaction/initialize`,
+            {
+              email: users[0].email,
+              amount: Math.round(chargeAmount * 100),
+              currency: 'ZAR',
+              reference,
+              callback_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/loans?profile=${loan.profile_id}`,
+              metadata: {
+                loanId: parseInt(loanId),
+                repaymentType,
+                installmentAmount: installmentAmount || null,
+                cardId: cardId || loan.card_id || null,
+              },
+            },
+            {
+              headers: {
+                Authorization: `Bearer ${PAYSTACK_SECRET()}`,
+                'Content-Type': 'application/json',
+              },
+            }
+          );
+
+          return res.json({
+            requiresPayment: true,
+            message: 'Payment initialized',
+            accessCode: paystackRes.data.data.access_code,
+            reference: paystackRes.data.data.reference,
+            chargeAmount,
+          });
+        } catch (paystackErr) {
+          console.error('Loan Paystack init error:', paystackErr.response?.data || paystackErr.message);
+          return res.status(500).json({ error: 'Payment initialization failed. Please try again.' });
+        }
+      }
+
+      // ── PAY INSTALLMENT (cash): Partial payment ──
       if (repaymentType === 'installment') {
         if (!installmentAmount || installmentAmount <= 0) {
           return res.status(400).json({ error: 'Please enter a valid installment amount.' });
@@ -565,5 +644,146 @@ router.post(
     }
   }
 );
+
+// ────────────────── VERIFY LOAN REPAYMENT (after Paystack payment) ──────────────────
+router.post('/:id/repay/verify', async (req, res) => {
+  try {
+    const loanId = req.params.id;
+    const { reference } = req.body;
+
+    if (!reference) {
+      return res.status(400).json({ error: 'Payment reference is required' });
+    }
+
+    // Verify with Paystack
+    const paystackRes = await axios.get(
+      `${PAYSTACK_BASE}/transaction/verify/${encodeURIComponent(reference)}`,
+      { headers: { Authorization: `Bearer ${PAYSTACK_SECRET()}` } }
+    );
+
+    const paystackData = paystackRes.data.data;
+
+    if (paystackData.status !== 'success') {
+      return res.status(400).json({ error: 'Payment was not successful', paymentStatus: paystackData.status });
+    }
+
+    const metadata = paystackData.metadata || {};
+    const repaymentType = metadata.repaymentType || 'full';
+    const installmentAmount = metadata.installmentAmount ? parseFloat(metadata.installmentAmount) : null;
+    const cardId = metadata.cardId;
+
+    // Fetch loan
+    const [loans] = await pool.query(
+      "SELECT * FROM loans WHERE id = ? AND user_id = ? AND status IN ('active', 'overdue', 'pending_repayment', 'blk', 'ftp')",
+      [loanId, req.user.id]
+    );
+
+    if (loans.length === 0) {
+      return res.status(404).json({ error: 'Active loan not found' });
+    }
+
+    const loan = loans[0];
+    const interest = parseFloat(loan.interest);
+    const principal = parseFloat(loan.amount);
+    const amountPaid = parseFloat(loan.amount_paid || 0);
+    const remainingPrincipal = principal - amountPaid;
+
+    const [stokvel] = await pool.query('SELECT name FROM stokvels WHERE id = ?', [loan.stokvel_id]);
+
+    // ── Process installment ──
+    if (repaymentType === 'installment' && installmentAmount) {
+      const newAmountPaid = amountPaid + installmentAmount;
+      const fullyPaid = newAmountPaid >= principal + interest;
+
+      // Record installment as contribution
+      await pool.query(
+        `INSERT INTO contributions (user_id, profile_id, stokvel_id, amount, payment_method, reference, status, confirmed_at, card_id)
+         VALUES (?, ?, ?, ?, 'loan_repayment', ?, 'confirmed', NOW(), ?)`,
+        [req.user.id, loan.profile_id, loan.stokvel_id, installmentAmount, reference, cardId || loan.card_id || null]
+      );
+
+      if (fullyPaid) {
+        await pool.query(
+          'UPDATE loans SET status = ?, repaid_date = NOW(), repayment_type = ?, amount_paid = ? WHERE id = ?',
+          ['repaid', 'installment', newAmountPaid, loanId]
+        );
+
+        await pool.query(
+          'UPDATE profiles SET saved_amount = LEAST(saved_amount + ?, target_amount) WHERE id = ?',
+          [principal, loan.profile_id]
+        );
+
+        await pool.query(
+          'INSERT INTO notifications (user_id, type, title, message) VALUES (?, ?, ?, ?)',
+          [req.user.id, 'success', 'Loan Fully Repaid \u2705',
+            `Your loan from ${stokvel[0]?.name} has been fully repaid via installments. Total paid: R${newAmountPaid.toFixed(2)}.`]
+        );
+
+        return res.json({ message: 'Loan fully repaid via installments.', amountPaid: newAmountPaid, status: 'repaid' });
+      }
+
+      const newDueDate = new Date();
+      newDueDate.setDate(newDueDate.getDate() + 28);
+
+      await pool.query(
+        'UPDATE loans SET repayment_type = ?, amount_paid = ?, due_date = ? WHERE id = ?',
+        ['installment', newAmountPaid, newDueDate, loanId]
+      );
+
+      const newRemaining = principal + interest - newAmountPaid;
+      await pool.query(
+        'INSERT INTO notifications (user_id, type, title, message) VALUES (?, ?, ?, ?)',
+        [req.user.id, 'info', 'Installment Payment Confirmed \u2705',
+          `R${installmentAmount.toFixed(2)} installment confirmed for your ${stokvel[0]?.name} loan. Remaining: R${newRemaining.toFixed(2)}.`]
+      );
+
+      return res.json({
+        message: 'Installment payment confirmed.',
+        installmentPaid: installmentAmount,
+        totalPaid: newAmountPaid,
+        remaining: newRemaining,
+        newDueDate,
+      });
+    }
+
+    // ── Process full repayment ──
+    let penaltyAmount = 0;
+    if (loan.due_date && new Date(loan.due_date) < new Date()) {
+      const msOverdue = new Date() - new Date(loan.due_date);
+      const overdueMonths = Math.ceil(msOverdue / (1000 * 60 * 60 * 24 * 28));
+      penaltyAmount = remainingPrincipal * 0.3 * overdueMonths;
+    }
+    const totalRepayable = remainingPrincipal + interest + penaltyAmount;
+
+    await pool.query(
+      'UPDATE loans SET status = ?, repaid_date = NOW(), repayment_type = ?, amount_paid = ? WHERE id = ?',
+      ['repaid', 'full', principal + interest, loanId]
+    );
+
+    const totalInterestAndPenalty = interest + penaltyAmount;
+    await pool.query(
+      `INSERT INTO contributions (user_id, profile_id, stokvel_id, amount, payment_method, reference, status, confirmed_at, card_id)
+       VALUES (?, ?, ?, ?, 'loan_repayment', ?, 'confirmed', NOW(), ?)`,
+      [req.user.id, loan.profile_id, loan.stokvel_id, totalInterestAndPenalty, reference, cardId || loan.card_id || null]
+    );
+
+    await pool.query(
+      'UPDATE profiles SET saved_amount = LEAST(saved_amount + ?, target_amount) WHERE id = ?',
+      [remainingPrincipal, loan.profile_id]
+    );
+
+    const penaltyNote = penaltyAmount > 0 ? ` (includes R${penaltyAmount.toLocaleString()} overdue penalty)` : '';
+    await pool.query(
+      'INSERT INTO notifications (user_id, type, title, message) VALUES (?, ?, ?, ?)',
+      [req.user.id, 'success', 'Loan Repaid \u2705',
+        `Your loan of R${totalRepayable.toLocaleString()} to ${stokvel[0]?.name} has been repaid. R${totalInterestAndPenalty.toLocaleString()} interest added to the group pot${penaltyNote}.`]
+    );
+
+    res.json({ message: 'Loan repaid successfully', principalReturned: remainingPrincipal, interestPaid: interest, penaltyPaid: penaltyAmount });
+  } catch (err) {
+    console.error('Verify repayment error:', err.response?.data || err.message);
+    res.status(500).json({ error: 'Failed to verify repayment' });
+  }
+});
 
 export default router;

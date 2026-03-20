@@ -239,14 +239,109 @@ export default function LoanHistory() {
         return;
       }
 
-      await loanApi.repay(
+      const res = await loanApi.repay(
         showRepayModal.id,
         repayMethod === 'card' && selectedCard ? Number(selectedCard) : undefined,
         repayMethod,
         repaymentType,
         instAmt
       );
+
+      // Card payments (full/installment) require Paystack popup
+      if (res.data.requiresPayment) {
+        const { accessCode, reference } = res.data;
+
+        const PaystackPop = (window as any).PaystackPop;
+        if (!PaystackPop) {
+          showToast.error('Payment system is loading. Please try again.');
+          setIsProcessing(false);
+          return;
+        }
+
+        const popup = new PaystackPop();
+        popup.resumeTransaction(accessCode, {
+          onSuccess: async () => {
+            try {
+              const verifyRes = await loanApi.repayVerify(showRepayModal.id, reference);
+              showToast.success(verifyRes.data.message || 'Payment confirmed!');
+            } catch {
+              showToast.success('Payment completed! It will be confirmed shortly.');
+            }
+            // Refresh loans from server
+            try {
+              const loansRes = await loanApi.list({ profileId: Number(profileId) });
+              const loansData = loansRes.data?.data || loansRes.data || [];
+              setLoans(loansData.map((l: any) => ({
+                id: l.id,
+                profileId: String(l.profileId || profileId),
+                profileName: l.stokvelName || '',
+                stokvelName: l.stokvelName || '',
+                amount: l.amount || 0,
+                interest: l.interest || 0,
+                interestRate: l.interestRate || 30,
+                totalRepayable: l.totalRepayable || 0,
+                status: l.status || 'active',
+                borrowedDate: l.borrowedDate ? new Date(l.borrowedDate).toLocaleDateString('en-ZA', {day:'numeric', month:'short', year:'numeric'}) : '',
+                dueDate: l.dueDate ? new Date(l.dueDate).toLocaleDateString('en-ZA', {day:'numeric', month:'short', year:'numeric'}) : '',
+                repaidDate: l.repaidDate ? new Date(l.repaidDate).toLocaleDateString('en-ZA', {day:'numeric', month:'short', year:'numeric'}) : undefined,
+                purpose: l.purpose,
+                daysRemaining: l.daysRemaining,
+                penaltyAmount: l.penaltyAmount || 0,
+                overdueMonths: l.overdueMonths || 0,
+                repaymentType: l.repaymentType || null,
+                amountPaid: l.amountPaid || 0
+              })));
+            } catch {}
+            setRepaymentSuccess(true);
+            setIsProcessing(false);
+            setTimeout(() => {
+              setShowRepayModal(null);
+              setRepaymentSuccess(false);
+            }, 1500);
+          },
+          onCancel: async () => {
+            try {
+              const verifyRes = await loanApi.repayVerify(showRepayModal.id, reference);
+              if (verifyRes.data.message) {
+                showToast.success(verifyRes.data.message);
+                // Refresh loans
+                const loansRes = await loanApi.list({ profileId: Number(profileId) });
+                const loansData = loansRes.data?.data || loansRes.data || [];
+                setLoans(loansData.map((l: any) => ({
+                  id: l.id,
+                  profileId: String(l.profileId || profileId),
+                  profileName: l.stokvelName || '',
+                  stokvelName: l.stokvelName || '',
+                  amount: l.amount || 0,
+                  interest: l.interest || 0,
+                  interestRate: l.interestRate || 30,
+                  totalRepayable: l.totalRepayable || 0,
+                  status: l.status || 'active',
+                  borrowedDate: l.borrowedDate ? new Date(l.borrowedDate).toLocaleDateString('en-ZA', {day:'numeric', month:'short', year:'numeric'}) : '',
+                  dueDate: l.dueDate ? new Date(l.dueDate).toLocaleDateString('en-ZA', {day:'numeric', month:'short', year:'numeric'}) : '',
+                  repaidDate: l.repaidDate ? new Date(l.repaidDate).toLocaleDateString('en-ZA', {day:'numeric', month:'short', year:'numeric'}) : undefined,
+                  purpose: l.purpose,
+                  daysRemaining: l.daysRemaining,
+                  penaltyAmount: l.penaltyAmount || 0,
+                  overdueMonths: l.overdueMonths || 0,
+                  repaymentType: l.repaymentType || null,
+                  amountPaid: l.amountPaid || 0
+                })));
+                setRepaymentSuccess(true);
+                setTimeout(() => { setShowRepayModal(null); setRepaymentSuccess(false); }, 1500);
+              } else {
+                showToast.error('Payment was cancelled. No payment was made.');
+              }
+            } catch {
+              showToast.error('Payment was cancelled. No payment was made.');
+            }
+            setIsProcessing(false);
+          },
+        });
+        return;
+      }
       
+      // Direct processing (cash, BLK, FTP)
       if (repayMethod === 'cash') {
         showToast.success('Cash repayment submitted! Pending admin confirmation.');
       } else if (repaymentType === 'blk') {
@@ -300,7 +395,6 @@ export default function LoanHistory() {
       }, 1500);
     } catch (err: any) {
       showToast.error(err.response?.data?.error || 'Failed to process repayment');
-    } finally {
       setIsProcessing(false);
     }
   };
@@ -539,6 +633,22 @@ export default function LoanHistory() {
                   {getInterestBadge(loan.interestRate)}
                 </div>
 
+                {/* Installment Progress */}
+                {(loan.amountPaid || 0) > 0 && loan.status !== 'repaid' && (
+                  <div className="mt-2">
+                    <div className="flex justify-between text-xs text-gray-600 mb-1">
+                      <span>Paid: {formatCurrency(loan.amountPaid || 0)}</span>
+                      <span>Remaining: {formatCurrency(loan.totalRepayable - (loan.amountPaid || 0))}</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-green-500 h-2 rounded-full transition-all"
+                        style={{ width: `${Math.min(100, ((loan.amountPaid || 0) / loan.totalRepayable) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
                 {/* Stokvel Name */}
                 {loan.stokvelName && (
                   <div className="mt-1 text-xs text-gray-500">
@@ -670,6 +780,18 @@ export default function LoanHistory() {
                         <span className="font-medium">Total:</span>
                         <span className="font-bold text-primary-700">{formatCurrency(loan.totalRepayable)}</span>
                       </div>
+                      {(loan.amountPaid || 0) > 0 && (
+                        <>
+                          <div className="flex justify-between text-green-700">
+                            <span>Already Paid:</span>
+                            <span className="font-medium">- {formatCurrency(loan.amountPaid || 0)}</span>
+                          </div>
+                          <div className="flex justify-between pt-1 border-t border-gray-100">
+                            <span className="font-bold">Remaining:</span>
+                            <span className="font-bold text-red-600">{formatCurrency(loan.totalRepayable - (loan.amountPaid || 0))}</span>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
 
