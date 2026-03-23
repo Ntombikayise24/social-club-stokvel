@@ -76,6 +76,7 @@ router.get('/', async (req, res) => {
           amount: parseFloat(l.amount),
           interestRate: parseFloat(l.interest_rate),
           interest: parseFloat(l.interest),
+          outstandingInterest: Math.max(0, parseFloat(l.interest) - Math.min(parseFloat(l.amount_paid || 0), parseFloat(l.interest))),
           totalRepayable: currentTotalRepayable,
           status: l.due_date && (l.status === 'active') && new Date(l.due_date) < new Date() ? 'overdue' : l.status,
           purpose: l.purpose,
@@ -182,12 +183,19 @@ router.get('/stats', async (req, res) => {
       [userId]
     );
 
+    // Sum all interest paid via contributions (BLK, installment, full repayment)
+    const [interestPaidResult] = await pool.query(
+      "SELECT COALESCE(SUM(amount), 0) as total FROM contributions WHERE user_id = ? AND payment_method = 'loan_repayment' AND status = 'confirmed'",
+      [userId]
+    );
+
     res.json({
       activeLoans: parseInt(active[0].count),
       activeAmount: parseFloat(active[0].total),
       repaidLoans: parseInt(repaid[0].count),
       repaidAmount: parseFloat(repaid[0].total),
       totalBorrowed: parseFloat(totalBorrowed[0].total),
+      totalInterestPaid: parseFloat(interestPaidResult[0].total),
     });
   } catch (err) {
     console.error('Loan stats error:', err);
@@ -438,6 +446,7 @@ router.post(
       }
 
       // ── PAY INSTALLMENT: Partial payment ──
+      // Interest is deducted first, then remaining goes to principal (returned to savings)
       if (repaymentType === 'installment') {
         if (!installmentAmount || installmentAmount <= 0) {
           return res.status(400).json({ error: 'Please enter a valid installment amount.' });
@@ -446,28 +455,42 @@ router.post(
           return res.status(400).json({ error: `Installment amount exceeds remaining balance of R${(remainingPrincipal + interest).toFixed(2)}.` });
         }
 
+        // Calculate how much of previous installments already covered interest
+        // Total interest + principal owed = interest + principal
+        // amount_paid tracks total paid so far; interest is paid first
+        const interestAlreadyPaid = Math.min(amountPaid, interest);
+        const interestStillOwed = interest - interestAlreadyPaid;
+
+        // Split this installment: interest first, then principal
+        const interestPortion = Math.min(installmentAmount, interestStillOwed);
+        const principalPortion = installmentAmount - interestPortion;
+
         const newAmountPaid = amountPaid + installmentAmount;
         const fullyPaid = newAmountPaid >= principal + interest;
 
-        // Record installment as contribution
-        const reference = `LOAN-INST-${loanId}-${Date.now()}`;
-        await pool.query(
-          `INSERT INTO contributions (user_id, profile_id, stokvel_id, amount, payment_method, reference, status, confirmed_at, card_id)
-           VALUES (?, ?, ?, ?, 'loan_repayment', ?, 'confirmed', NOW(), ?)`,
-          [req.user.id, loan.profile_id, loan.stokvel_id, installmentAmount, reference, cardId || loan.card_id || null]
-        );
+        // Record only the interest portion as a contribution to the interest pot
+        if (interestPortion > 0) {
+          const interestRef = `LOAN-INST-${loanId}-${Date.now()}`;
+          await pool.query(
+            `INSERT INTO contributions (user_id, profile_id, stokvel_id, amount, payment_method, reference, status, confirmed_at, card_id)
+             VALUES (?, ?, ?, ?, 'loan_repayment', ?, 'confirmed', NOW(), ?)`,
+            [req.user.id, loan.profile_id, loan.stokvel_id, interestPortion, interestRef, cardId || loan.card_id || null]
+          );
+        }
+
+        // Return the principal portion back to the user's savings
+        if (principalPortion > 0) {
+          await pool.query(
+            'UPDATE profiles SET saved_amount = LEAST(saved_amount + ?, target_amount) WHERE id = ?',
+            [principalPortion, loan.profile_id]
+          );
+        }
 
         if (fullyPaid) {
           // Fully repaid via installments
           await pool.query(
             'UPDATE loans SET status = ?, repaid_date = NOW(), repayment_type = ?, amount_paid = ? WHERE id = ?',
             ['repaid', 'installment', newAmountPaid, loanId]
-          );
-
-          // Return principal to saved_amount
-          await pool.query(
-            'UPDATE profiles SET saved_amount = LEAST(saved_amount + ?, target_amount) WHERE id = ?',
-            [principal, loan.profile_id]
           );
 
           await pool.query(
@@ -479,7 +502,7 @@ router.post(
           return res.json({ message: 'Loan fully repaid via installments.', amountPaid: newAmountPaid, status: 'repaid' });
         }
 
-        // Partial payment - extend due date by 28 days if within current period
+        // Partial payment - extend due date by 28 days
         const newDueDate = new Date();
         newDueDate.setDate(newDueDate.getDate() + 28);
 
@@ -489,15 +512,21 @@ router.post(
         );
 
         const newRemaining = principal + interest - newAmountPaid;
+        const noteParts = [];
+        if (interestPortion > 0) noteParts.push(`R${interestPortion.toFixed(2)} to interest`);
+        if (principalPortion > 0) noteParts.push(`R${principalPortion.toFixed(2)} returned to savings`);
+
         await pool.query(
           'INSERT INTO notifications (user_id, type, title, message) VALUES (?, ?, ?, ?)',
           [req.user.id, 'info', 'Installment Payment Received',
-            `R${installmentAmount.toFixed(2)} installment received for your ${stokvel[0].name} loan. Remaining: R${newRemaining.toFixed(2)}. If not fully repaid within 28 days, 30% additional interest will be charged.`]
+            `R${installmentAmount.toFixed(2)} installment received for your ${stokvel[0].name} loan (${noteParts.join(', ')}). Remaining: R${newRemaining.toFixed(2)}.`]
         );
 
         return res.json({
           message: 'Installment payment recorded.',
           installmentPaid: installmentAmount,
+          interestPortion,
+          principalPortion,
           totalPaid: newAmountPaid,
           remaining: newRemaining,
           newDueDate
@@ -519,6 +548,15 @@ router.post(
         await pool.query(
           'UPDATE loans SET status = ? WHERE id = ?',
           ['pending_repayment', loanId]
+        );
+
+        // Create a pending contribution so admin sees this in pending approvals
+        const totalInterestAndPenaltyCash = interest + penaltyAmount;
+        const cashReference = `LOAN-INT-${loanId}-${Date.now()}`;
+        await pool.query(
+          `INSERT INTO contributions (user_id, profile_id, stokvel_id, amount, payment_method, reference, status)
+           VALUES (?, ?, ?, ?, 'loan_repayment', ?, 'pending')`,
+          [req.user.id, loan.profile_id, loan.stokvel_id, totalInterestAndPenaltyCash, cashReference]
         );
 
         await pool.query(

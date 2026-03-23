@@ -229,13 +229,15 @@ export default function UserManagementTable({
                 <UserCheck className="w-4 h-4" />
               </button>
             )}
-            <button
-              onClick={() => onDelete(row.original.id)}
-              className="p-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
-              title="Delete user"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
+            {row.original.role !== 'superadmin' && (
+              <button
+                onClick={() => onDelete(row.original.id)}
+                className="p-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
+                title="Delete user"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
             <button
               className="p-1.5 text-gray-600 hover:text-gray-800 hover:bg-gray-50 rounded-lg transition-colors"
               title="More actions"

@@ -1022,21 +1022,52 @@ router.post('/contributions/:id/confirm', async (req, res) => {
       ['confirmed', req.user.id, contributionId]
     );
 
-    // Only update saved_amount for 'your-target', not 'madala-side'
-    if (contribution.contribution_type !== 'madala-side') {
+    const [stokvel] = await conn.query('SELECT name FROM stokvels WHERE id = ?', [contribution.stokvel_id]);
+
+    // Handle loan repayment confirmations specially
+    if (contribution.payment_method === 'loan_repayment') {
+      const loanIdMatch = contribution.reference && contribution.reference.match(/LOAN-INT-(\d+)-/);
+      if (loanIdMatch) {
+        const linkedLoanId = parseInt(loanIdMatch[1]);
+        const [loanRows] = await conn.query('SELECT * FROM loans WHERE id = ?', [linkedLoanId]);
+        if (loanRows.length > 0) {
+          const loan = loanRows[0];
+          const loanPrincipal = parseFloat(loan.amount);
+          const loanInterest = parseFloat(loan.interest);
+          // Mark loan as repaid
+          await conn.query(
+            'UPDATE loans SET status = ?, repaid_date = NOW(), repayment_type = ?, amount_paid = ? WHERE id = ?',
+            ['repaid', 'full', loanPrincipal + loanInterest, linkedLoanId]
+          );
+          // Return principal to saved_amount
+          await conn.query(
+            'UPDATE profiles SET saved_amount = LEAST(saved_amount + ?, target_amount) WHERE id = ?',
+            [loanPrincipal, contribution.profile_id]
+          );
+        }
+      }
+      // Notify user about loan repayment confirmation
       await conn.query(
-        'UPDATE profiles SET saved_amount = LEAST(saved_amount + ?, target_amount) WHERE id = ?',
-        [contribution.amount, contribution.profile_id]
+        'INSERT INTO notifications (user_id, type, title, message) VALUES (?, ?, ?, ?)',
+        [contribution.user_id, 'success', 'Loan Repayment Confirmed',
+          `Your cash loan repayment of R${parseFloat(contribution.amount).toLocaleString()} to ${stokvel[0].name} has been confirmed by admin.`]
+      );
+    } else {
+      // Only update saved_amount for 'your-target', not 'madala-side'
+      if (contribution.contribution_type !== 'madala-side') {
+        await conn.query(
+          'UPDATE profiles SET saved_amount = LEAST(saved_amount + ?, target_amount) WHERE id = ?',
+          [contribution.amount, contribution.profile_id]
+        );
+      }
+
+      // Notify user
+      await conn.query(
+        'INSERT INTO notifications (user_id, type, title, message) VALUES (?, ?, ?, ?)',
+        [contribution.user_id, 'success', 'Contribution Confirmed',
+          `Your R${parseFloat(contribution.amount).toLocaleString()} contribution to ${stokvel[0].name} has been confirmed.`]
       );
     }
-
-    // Notify user
-    const [stokvel] = await conn.query('SELECT name FROM stokvels WHERE id = ?', [contribution.stokvel_id]);
-    await conn.query(
-      'INSERT INTO notifications (user_id, type, title, message) VALUES (?, ?, ?, ?)',
-      [contribution.user_id, 'success', 'Contribution Confirmed',
-        `Your R${parseFloat(contribution.amount).toLocaleString()} contribution to ${stokvel[0].name} has been confirmed.`]
-    );
 
     await conn.commit();
     res.json({ message: 'Contribution confirmed' });
@@ -1081,20 +1112,47 @@ router.post('/contributions/:id/confirm-adjusted', async (req, res) => {
       [adjustedAmount, 'confirmed', req.user.id, contributionId]
     );
 
-    // Only update saved_amount if not madala-side
-    if (contribution.contribution_type !== 'madala-side') {
+    const [stokvel] = await conn.query('SELECT name FROM stokvels WHERE id = ?', [contribution.stokvel_id]);
+
+    // Handle loan repayment confirmations specially
+    if (contribution.payment_method === 'loan_repayment') {
+      const loanIdMatch = contribution.reference && contribution.reference.match(/LOAN-INT-(\d+)-/);
+      if (loanIdMatch) {
+        const linkedLoanId = parseInt(loanIdMatch[1]);
+        const [loanRows] = await conn.query('SELECT * FROM loans WHERE id = ?', [linkedLoanId]);
+        if (loanRows.length > 0) {
+          const loan = loanRows[0];
+          const loanPrincipal = parseFloat(loan.amount);
+          const loanInterest = parseFloat(loan.interest);
+          await conn.query(
+            'UPDATE loans SET status = ?, repaid_date = NOW(), repayment_type = ?, amount_paid = ? WHERE id = ?',
+            ['repaid', 'full', loanPrincipal + loanInterest, linkedLoanId]
+          );
+          await conn.query(
+            'UPDATE profiles SET saved_amount = LEAST(saved_amount + ?, target_amount) WHERE id = ?',
+            [loanPrincipal, contribution.profile_id]
+          );
+        }
+      }
       await conn.query(
-        'UPDATE profiles SET saved_amount = saved_amount + ? WHERE id = ?',
-        [adjustedAmount, contribution.profile_id]
+        'INSERT INTO notifications (user_id, type, title, message) VALUES (?, ?, ?, ?)',
+        [contribution.user_id, 'success', 'Loan Repayment Confirmed',
+          `Your cash loan repayment of R${parseFloat(adjustedAmount).toLocaleString()} to ${stokvel[0].name} has been confirmed by admin.`]
+      );
+    } else {
+      // Only update saved_amount if not madala-side
+      if (contribution.contribution_type !== 'madala-side') {
+        await conn.query(
+          'UPDATE profiles SET saved_amount = saved_amount + ? WHERE id = ?',
+          [adjustedAmount, contribution.profile_id]
+        );
+      }
+      await conn.query(
+        'INSERT INTO notifications (user_id, type, title, message) VALUES (?, ?, ?, ?)',
+        [contribution.user_id, 'success', 'Contribution Confirmed',
+          `Your cash contribution of R${parseFloat(adjustedAmount).toLocaleString()} to ${stokvel[0].name} has been confirmed by admin.`]
       );
     }
-
-    const [stokvel] = await conn.query('SELECT name FROM stokvels WHERE id = ?', [contribution.stokvel_id]);
-    await conn.query(
-      'INSERT INTO notifications (user_id, type, title, message) VALUES (?, ?, ?, ?)',
-      [contribution.user_id, 'success', 'Contribution Confirmed',
-        `Your cash contribution of R${parseFloat(adjustedAmount).toLocaleString()} to ${stokvel[0].name} has been confirmed by admin.`]
-    );
 
     await conn.commit();
     res.json({ message: 'Contribution confirmed with adjusted amount' });
@@ -1129,11 +1187,27 @@ router.post('/contributions/:id/reject', async (req, res) => {
       ['failed', contributionId]
     );
 
+    // If this was a loan repayment, revert loan status back to active
+    if (contribution.payment_method === 'loan_repayment') {
+      const loanIdMatch = contribution.reference && contribution.reference.match(/LOAN-INT-(\d+)-/);
+      if (loanIdMatch) {
+        const linkedLoanId = parseInt(loanIdMatch[1]);
+        const [loanRows] = await pool.query('SELECT * FROM loans WHERE id = ?', [linkedLoanId]);
+        if (loanRows.length > 0) {
+          const loan = loanRows[0];
+          // Revert to active (or overdue if past due date)
+          const revertStatus = loan.due_date && new Date(loan.due_date) < new Date() ? 'overdue' : 'active';
+          await pool.query('UPDATE loans SET status = ? WHERE id = ?', [revertStatus, linkedLoanId]);
+        }
+      }
+    }
+
     const [stokvel] = await pool.query('SELECT name FROM stokvels WHERE id = ?', [contribution.stokvel_id]);
+    const rejectLabel = contribution.payment_method === 'loan_repayment' ? 'loan repayment' : 'cash contribution';
     await pool.query(
       'INSERT INTO notifications (user_id, type, title, message) VALUES (?, ?, ?, ?)',
       [contribution.user_id, 'error', 'Payment Rejected',
-        `Your cash contribution of R${parseFloat(contribution.amount).toLocaleString()} to ${stokvel[0].name} was rejected.${reason ? ' Reason: ' + reason : ''}`]
+        `Your ${rejectLabel} of R${parseFloat(contribution.amount).toLocaleString()} to ${stokvel[0].name} was rejected.${reason ? ' Reason: ' + reason : ''}`]
     );
 
     res.json({ message: 'Contribution rejected' });

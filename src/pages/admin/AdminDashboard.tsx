@@ -3648,7 +3648,7 @@ export default function AdminDashboard() {
                           >
                             <Edit2 className="w-4 h-4" />
                           </button>
-                          {user.email !== 'admin@stokvel.co.za' && (
+                          {user.email !== 'admin@stokvel.co.za' && user.role !== 'superadmin' && (
                           <button
                             onClick={() => setShowDeleteUserConfirm(user.id)}
                             className="text-red-600 hover:text-red-800 p-1"

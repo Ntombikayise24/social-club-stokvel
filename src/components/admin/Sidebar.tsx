@@ -58,7 +58,7 @@ function App() {
       setShowAdminModal(false);
       navigate('/admin');
     } catch (err: any) {
-      const message = err.response?.data?.error || 'Invalid email or password';
+      const message = err.response?.data?.error || (err.request ? 'Server unavailable. Please ensure the backend is running.' : 'Invalid email or password');
       setLoginError(message);
     } finally {
       setIsLoading(false);
@@ -229,7 +229,7 @@ function App() {
 
                 {/* Forgot Password Link */}
                 <div className="text-right">
-                  <button type="button" className="text-sm text-primary-600 hover:text-primary-700 font-medium">
+                  <button type="button" onClick={() => navigate('/forgot-password?from=admin')} className="text-sm text-primary-600 hover:text-primary-700 font-medium">
                     Forgot password?
                   </button>
                 </div>

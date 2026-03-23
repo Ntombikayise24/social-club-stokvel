@@ -326,14 +326,24 @@ export default function MainDashboard() {
           progress: maxBorrowable > 0 ? Math.min(100, Math.floor((borrowed / maxBorrowable) * 100)) : 0,
         });
 
-        // Per-user interest data
-        const pendingInterest = activeLoans.reduce((sum: number, l: any) => sum + (l.interest || 0), 0);
-        const repaidLoans = loans.filter((l: any) => l.status === 'repaid');
-        const paidInterest = repaidLoans.reduce((sum: number, l: any) => sum + (l.interest || 0), 0);
-        setInterestPot({
-          totalInterest: pendingInterest,
-          activeLoans: activeLoans.length,
-          paidInterest,
+        // Per-user interest data — use outstandingInterest which accounts for installment payments
+        const pendingInterest = activeLoans.reduce((sum: number, l: any) => sum + (l.outstandingInterest ?? l.interest ?? 0), 0);
+
+        // Fetch actual interest paid from contributions (includes BLK, installment, full)
+        loanApi.getStats().then(statsRes => {
+          setInterestPot({
+            totalInterest: pendingInterest,
+            activeLoans: activeLoans.length,
+            paidInterest: statsRes.data?.totalInterestPaid || 0,
+          });
+        }).catch(() => {
+          const repaidLoans = loans.filter((l: any) => l.status === 'repaid');
+          const paidInterest = repaidLoans.reduce((sum: number, l: any) => sum + (l.interest || 0), 0);
+          setInterestPot({
+            totalInterest: pendingInterest,
+            activeLoans: activeLoans.length,
+            paidInterest,
+          });
         });
       })
       .catch(() => {

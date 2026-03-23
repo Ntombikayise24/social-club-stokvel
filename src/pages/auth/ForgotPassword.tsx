@@ -1,11 +1,14 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Mail, ArrowLeft, Users, AlertCircle, Lock, Eye, EyeOff } from 'lucide-react';
 import { authApi } from '../../api';
 import { showToast } from '../../utils/toast';
 
 export default function ForgotPassword() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const fromAdmin = searchParams.get('from') === 'admin';
+  const backPath = fromAdmin ? '/' : '/login';
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -67,7 +70,7 @@ export default function ForgotPassword() {
 
     try {
       await authApi.resetPassword({ email, code: resetCode, newPassword });
-      navigate('/login?reset=success');
+      navigate(fromAdmin ? '/?reset=success' : '/login?reset=success');
     } catch (err: any) {
       setPasswordError(err.response?.data?.error || 'Failed to reset password.');
     } finally {
@@ -268,7 +271,7 @@ export default function ForgotPassword() {
 
         {/* Back to Login */}
         <Link
-          to="/login"
+          to={backPath}
           className="mt-6 flex items-center justify-center text-gray-500 hover:text-primary-600 transition-colors"
         >
           <ArrowLeft className="w-4 h-4 mr-1" />
